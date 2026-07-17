@@ -27,6 +27,37 @@ const extractErrorMessage = (err, defaultMsg = 'An error occurred') => {
   return err?.message || defaultMsg;
 };
 
+const CustomTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const isHousehold = data.houseNumber !== undefined;
+    return (
+      <div className="bg-slate-900 border border-slate-700 p-4 rounded-xl shadow-2xl backdrop-blur-md text-xs text-slate-300">
+        {isHousehold ? (
+          <div className="space-y-1.5">
+            <p className="font-bold text-sm text-white flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse inline-block" />
+              Flat {data.houseNumber}
+            </p>
+            <p><span className="text-slate-400 font-medium">Resident:</span> <strong className="text-primary font-semibold">{data.residentName}</strong></p>
+            <p><span className="text-slate-400 font-medium">Total Usage:</span> <strong className="text-emerald-400 font-bold">{data.usage} Liters</strong></p>
+            <p><span className="text-slate-400 font-medium">Last Logged:</span> <span className="text-slate-200">{data.lastReadingDate || 'N/A'}</span></p>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <p className="font-bold text-sm text-white flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
+              {data.name}
+            </p>
+            <p><span className="text-slate-400 font-medium">Total Usage:</span> <strong className="text-blue-400 font-bold">{data.usage} Liters</strong></p>
+          </div>
+        )}
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function AdminDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'overview';
@@ -1276,14 +1307,44 @@ export default function AdminDashboard() {
   const blockDistributionData = getFilteredChartData();
 
   const householdUsageMap = {};
+  const householdLatestLogMap = {};
+
   usageLogs.forEach(log => {
-    const household = log.houseNumber || 'Unknown';
+    const household = (log.houseNumber || 'Unknown').trim();
+    if (!household) return;
+
+    // Sum usage
     householdUsageMap[household] = (householdUsageMap[household] || 0) + (log.readingLiters || 0);
+
+    // Track latest log date
+    if (log.readingDate) {
+      const logDate = new Date(log.readingDate);
+      const currentLatest = householdLatestLogMap[household]
+        ? new Date(householdLatestLogMap[household].readingDate)
+        : null;
+      if (!currentLatest || logDate > currentLatest) {
+        householdLatestLogMap[household] = log;
+      }
+    }
   });
-  const dynamicUsageData = Object.keys(householdUsageMap).map(household => ({
-    name: household,
-    usage: householdUsageMap[household]
-  })).sort((a, b) => b.usage - a.usage).slice(0, 5);
+
+  const dynamicUsageData = Object.keys(householdUsageMap).map(household => {
+    const resident = users.find(u =>
+      u.houseNumber &&
+      u.houseNumber.trim().toLowerCase() === household.toLowerCase()
+    );
+    const residentName = resident ? (resident.fullName || resident.username) : 'Unassigned';
+    const latestLog = householdLatestLogMap[household];
+    const lastDate = latestLog ? latestLog.readingDate : 'N/A';
+
+    return {
+      houseNumber: household,
+      residentName: residentName,
+      name: `Flat ${household} - ${residentName}`,
+      usage: householdUsageMap[household],
+      lastReadingDate: lastDate
+    };
+  }).sort((a, b) => b.usage - a.usage);
 
   const getSecurityLogs = () => {
     const logs = [];
@@ -1807,11 +1868,7 @@ export default function AdminDashboard() {
                             <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                             <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                             <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                            <Tooltip 
-                              contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
-                              labelStyle={{ color: '#f8fafc' }}
-                              itemStyle={{ color: '#cbd5e1' }}
-                            />
+                            <Tooltip content={<CustomTooltip />} />
                             <Line type="monotone" dataKey="usage" stroke={isSuperAdmin ? '#3b82f6' : '#8b5cf6'} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                           </LineChart>
                         );
@@ -1828,11 +1885,7 @@ export default function AdminDashboard() {
                             <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                             <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                             <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                            <Tooltip 
-                              contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
-                              labelStyle={{ color: '#f8fafc' }}
-                              itemStyle={{ color: '#cbd5e1' }}
-                            />
+                            <Tooltip content={<CustomTooltip />} />
                             <Area type="monotone" dataKey="usage" stroke={isSuperAdmin ? '#3b82f6' : '#8b5cf6'} strokeWidth={3} fillOpacity={1} fill="url(#colorUsageAdmin)" />
                           </AreaChart>
                         );
@@ -1845,13 +1898,8 @@ export default function AdminDashboard() {
                         >
                           <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
                           <XAxis type="number" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                          <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={110} />
-                          <Tooltip 
-                            cursor={{ fill: '#334155', opacity: 0.4 }}
-                            contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
-                            labelStyle={{ color: '#f8fafc' }}
-                            itemStyle={{ color: '#cbd5e1' }}
-                          />
+                          <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={175} />
+                          <Tooltip content={<CustomTooltip />} cursor={{ fill: '#334155', opacity: 0.2 }} />
                           <Bar dataKey="usage" radius={[0, 4, 4, 0]} barSize={20}>
                             {chartData.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
