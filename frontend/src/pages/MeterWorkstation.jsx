@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Droplet, Receipt, User, Home, Hash, CheckCircle2,
-  AlertCircle, Loader2, X, ChevronRight, Zap, Calendar, Info, FileText, Plus
+  AlertCircle, Loader2, X, ChevronRight, Zap, Calendar, Info, FileText, Plus,
+  Send, Activity
 } from 'lucide-react';
 import api from '../api';
 
@@ -29,11 +30,28 @@ export default function MeterWorkstation() {
   const block = localStorage.getItem('apartmentBlock') || '';
   const isSuperAdmin = role === 'ROLE_ADMIN';
 
+  // Navigation Tab
+  const [activeTab, setActiveTab] = useState('workstation'); // workstation, cycles, reminders
+
   // Data
   const [users,     setUsers]     = useState([]);
   const [usageLogs, setUsageLogs] = useState([]);
   const [bills,     setBills]     = useState([]);
   const [adminRate, setAdminRate] = useState(null);
+
+  // Billing Cycles & Reminders state
+  const [billingCycles, setBillingCycles] = useState([]);
+  const [billingCycleModalOpen, setBillingCycleModalOpen] = useState(false);
+  const [apartments, setApartments] = useState([]);
+  const [billingCycleForm, setBillingCycleForm] = useState({
+    cycleName: '',
+    startDate: '',
+    endDate: '',
+    apartmentId: '',
+    apartmentBlock: ''
+  });
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionStatus, setActionStatus] = useState(null); // Tab-specific status alerts
 
   // Search
   const [query,       setQuery]       = useState('');
@@ -66,6 +84,8 @@ export default function MeterWorkstation() {
     const token = localStorage.getItem('token');
     if (token) api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     fetchAll();
+    fetchBillingCycles();
+    fetchApartments();
   }, []);
 
   const fetchAll = async () => {
@@ -96,6 +116,128 @@ export default function MeterWorkstation() {
         const r = await api.get(`/users/profile/${u}`);
         if (r.data?.waterRatePerLiter != null) setAdminRate(r.data.waterRatePerLiter);
       } catch (e) {}
+    }
+  };
+
+  // ── Billing Cycles & Reminders Functions ───────────────────────
+  const fetchBillingCycles = async () => {
+    try {
+      const res = await api.get('/billing-cycles');
+      setBillingCycles(res.data || []);
+    } catch (err) {
+      console.error("Error fetching billing cycles", err);
+    }
+  };
+
+  const fetchApartments = async () => {
+    try {
+      const res = await api.get('/public/colonies');
+      const mapped = (res.data || []).map(col => ({
+        id: col.id,
+        name: col.colonyName,
+        address: col.address || '',
+        buildings: col.buildings || []
+      }));
+      setApartments(mapped || []);
+    } catch (err) {
+      console.error("Error fetching apartments", err);
+    }
+  };
+
+  const getApartmentName = (id) => {
+    const apt = apartments.find(a => a.id === id);
+    return apt ? apt.name : `Colony ID: ${id}`;
+  };
+
+  const handleCreateBillingCycle = async (e) => {
+    e.preventDefault();
+    setActionLoading(true); setActionStatus(null);
+    try {
+      await api.post('/billing-cycles', {
+        cycleName: billingCycleForm.cycleName,
+        startDate: billingCycleForm.startDate,
+        endDate: billingCycleForm.endDate,
+        apartmentId: parseInt(billingCycleForm.apartmentId),
+        apartmentBlock: billingCycleForm.apartmentBlock || null
+      });
+      setActionStatus({ type: 'success', msg: `✅ Billing cycle "${billingCycleForm.cycleName}" created successfully.` });
+      setBillingCycleModalOpen(false);
+      fetchBillingCycles();
+    } catch (err) {
+      console.error(err);
+      setActionStatus({ type: 'error', msg: err?.response?.data?.message || 'Failed to create billing cycle.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleFinalizeCycle = async (cycleId) => {
+    if (!window.confirm("Are you sure you want to finalize this billing cycle? This will calculate consumption and generate bills for all households in the scope of this cycle.")) return;
+    setActionLoading(true); setActionStatus(null);
+    try {
+      const res = await api.post(`/billing-cycles/${cycleId}/finalize`);
+      setActionStatus({ type: 'success', msg: `✅ ${res.data || 'Billing cycle finalized successfully.'}` });
+      fetchBillingCycles();
+      fetchAll(); // refresh billing/logs data
+    } catch (err) {
+      console.error(err);
+      setActionStatus({ type: 'error', msg: err?.response?.data?.message || 'Failed to finalize billing cycle.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleArchiveCycle = async (cycleId) => {
+    setActionLoading(true); setActionStatus(null);
+    try {
+      await api.post(`/billing-cycles/${cycleId}/archive`);
+      setActionStatus({ type: 'success', msg: '✅ Billing cycle archived successfully.' });
+      fetchBillingCycles();
+    } catch (err) {
+      console.error(err);
+      setActionStatus({ type: 'error', msg: err?.response?.data?.message || 'Failed to archive billing cycle.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleScanAlertAdmins = async () => {
+    setActionLoading(true); setActionStatus(null);
+    try {
+      await api.post('/bills/reminders/check');
+      setActionStatus({ type: 'success', msg: '✅ Global scan completed. Community admins have been alerted.' });
+      fetchAll();
+    } catch (err) {
+      setActionStatus({ type: 'error', msg: 'Failed to scan and alert admins.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSendAllReminders = async () => {
+    setActionLoading(true); setActionStatus(null);
+    try {
+      const targetBlock = isSuperAdmin ? '' : block;
+      await api.post(`/bills/reminders/send-all?apartmentBlock=${encodeURIComponent(targetBlock)}`);
+      setActionStatus({ type: 'success', msg: `✅ Dispatched payment reminders to all unpaid households in ${targetBlock || 'all blocks'}!` });
+      fetchAll();
+    } catch (err) {
+      setActionStatus({ type: 'error', msg: 'Failed to send reminders to all.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSendIndividualReminder = async (houseNo, aptBlk) => {
+    setActionLoading(true); setActionStatus(null);
+    try {
+      await api.post(`/bills/reminders/send?houseNumber=${encodeURIComponent(houseNo)}&apartmentBlock=${encodeURIComponent(aptBlk)}`);
+      setActionStatus({ type: 'success', msg: `✅ Reminder notice dispatched to resident of ${houseNo} (${aptBlk})!` });
+      fetchAll();
+    } catch (err) {
+      setActionStatus({ type: 'error', msg: 'Failed to send individual reminder.' });
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -361,370 +503,685 @@ export default function MeterWorkstation() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-text">Meter Workstation</h1>
-        <p className="text-text-muted mt-1">Search a resident → log their meter reading → generate their bill — all in one place.</p>
+        <p className="text-text-muted mt-1">Manage readings, run billing cycles, and track reminders — all in one centralized console.</p>
       </div>
 
-      {/* ── Action Toolbar ───────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-surface border border-border p-4 rounded-2xl">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleDownloadTemplate}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 rounded-xl text-sm font-semibold transition-all cursor-pointer"
-          >
-            <FileText className="w-4 h-4" /> Download CSV Template
-          </button>
-          <label className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 rounded-xl text-sm font-semibold transition-all cursor-pointer">
-            <Plus className="w-4 h-4" /> Upload CSV Logs
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleUploadCsv}
-              className="hidden"
-            />
-          </label>
-        </div>
-        <button
-          onClick={handleGenerateAllBills}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-650 hover:from-blue-650 hover:to-indigo-800 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/35 transition-all cursor-pointer"
+      {/* ── Sub-Tab Switcher ─────────────────────────────────────── */}
+      <div className="flex gap-4 border-b border-border pb-4">
+        {[
+          { id: 'workstation', label: 'Workstation', icon: Droplet },
+          { id: 'cycles', label: 'Billing Cycles & Periods', icon: Calendar },
+          { id: 'reminders', label: 'Payment Reminders 🔔', icon: Zap }
+        ].map(tab => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); setActionStatus(null); }}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                activeTab === tab.id
+                  ? 'bg-primary text-white shadow-md shadow-primary/15'
+                  : 'text-text-muted hover:text-text bg-surface-lighter/50 border border-border/40'
+              }`}
+            >
+              <Icon className="w-4.5 h-4.5" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab-Specific Action Status Alerts */}
+      {actionStatus && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+          className={`flex items-center justify-between gap-2 px-4 py-3.5 rounded-xl text-sm font-medium border ${
+            actionStatus.type === 'success'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+              : 'bg-red-500/10 border-red-500/30 text-red-400'
+          }`}
         >
-          <Zap className="w-4 h-4" /> Generate Bills for All
-        </button>
-      </div>
-
-      {/* ── Resident Search & Browse ─────────────────────────────── */}
-      <div className="flex flex-col md:flex-row gap-4 items-stretch">
-        <div ref={searchRef} className="relative flex-1">
-          <div className={`flex items-center gap-3 px-4 py-3.5 bg-surface border border-border rounded-2xl transition-all ${showDropdown || selected ? 'border-primary/50 shadow-lg shadow-primary/10' : 'border-border'}`}>
-            <Search className="w-5 h-5 text-primary flex-shrink-0" />
-            <input
-              type="text"
-              value={query}
-              onChange={e => { setQuery(e.target.value); setShowDropdown(true); if (!e.target.value) { setSelected(null); setBillCalc(null); } }}
-              onFocus={() => query && setShowDropdown(true)}
-              placeholder="Search resident by name, house number, meter ID, username..."
-              className="flex-1 bg-transparent text-text placeholder-text-muted/50 text-sm focus:outline-none"
-            />
-            {query && (
-              <button onClick={() => { setQuery(''); setSelected(null); setBillCalc(null); setShowDropdown(false); }} className="text-text-muted hover:text-text cursor-pointer">
-                <X className="w-4 h-4" />
-              </button>
-            )}
+          <div className="flex items-center gap-2">
+            {actionStatus.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
+            {actionStatus.msg}
           </div>
-
-          {/* Dropdown */}
-          <AnimatePresence>
-            {showDropdown && matched.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: -6, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -6 }}
-                className="absolute top-full left-0 right-0 mt-2 bg-surface/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl z-50 overflow-hidden"
-              >
-                <div className="px-4 py-2 border-b border-border/50 flex items-center justify-between">
-                  <p className="text-xs font-medium text-text-muted">Select a resident</p>
-                  <span className="text-xs text-primary font-semibold">{matched.length} found</span>
-                </div>
-                {matched.map(u => <ResidentCard key={u.id || u.username} u={u} onClick={selectResident} />)}
-              </motion.div>
-            )}
-            {showDropdown && query.trim().length > 0 && matched.length === 0 && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute top-full left-0 right-0 mt-2 bg-surface border border-border rounded-2xl shadow-xl z-50 px-4 py-6 text-center">
-                <Search className="w-8 h-8 text-text-muted mx-auto mb-2 opacity-40" />
-                <p className="text-sm text-text-muted">No residents match "<strong className="text-text">{query}</strong>"</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Complete List Dropdown */}
-        <div ref={allDropdownRef} className="relative">
-          <button
-            onClick={() => setShowAllDropdown(!showAllDropdown)}
-            className={`h-full px-5 py-3.5 bg-surface border rounded-2xl font-semibold text-sm text-text hover:border-primary/50 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap min-w-[200px] justify-between ${showAllDropdown ? 'border-primary/50 shadow-lg shadow-primary/10' : 'border-border'}`}
-          >
-            <span className="flex items-center gap-2">
-              <User className="w-4 h-4 text-primary" />
-              {selected ? 'Change Resident' : 'Browse All'}
-            </span>
-            <ChevronRight className={`w-4 h-4 text-text-muted transition-transform duration-200 ${showAllDropdown ? 'rotate-90' : ''}`} />
+          <button onClick={() => setActionStatus(null)} className="text-text-muted hover:text-text cursor-pointer">
+            <X className="w-4 h-4" />
           </button>
+        </motion.div>
+      )}
 
-          <AnimatePresence>
-            {showAllDropdown && (
-              <motion.div
-                initial={{ opacity: 0, y: -6, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -6 }}
-                className="absolute top-full right-0 mt-2 w-80 bg-surface/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl z-50 overflow-hidden"
+      {/* ── WORKSTATION TAB CONTENT ─────────────────────────────── */}
+      {activeTab === 'workstation' && (
+        <motion.div
+          key="workstation"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          className="space-y-6"
+        >
+          {/* Action Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-4 glass-card p-5">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleDownloadTemplate}
+                className="flex items-center gap-2 px-4 py-2.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 rounded-xl text-sm font-semibold transition-all cursor-pointer"
               >
-                <div className="px-4 py-2.5 border-b border-border/50 bg-surface-lighter/50">
-                  <p className="text-xs font-semibold text-text-muted">All Residents ({residents.length})</p>
+                <FileText className="w-4 h-4" /> Download CSV Template
+              </button>
+              <label className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 rounded-xl text-sm font-semibold transition-all cursor-pointer">
+                <Plus className="w-4 h-4" /> Upload CSV Logs
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleUploadCsv}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            <button
+              onClick={handleGenerateAllBills}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-650 hover:from-blue-650 hover:to-indigo-800 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/35 transition-all cursor-pointer"
+            >
+              <Zap className="w-4 h-4" /> Generate Bills for All
+            </button>
+          </div>
+
+          {/* Resident Search & Browse */}
+          <div className="flex flex-col md:flex-row gap-4 items-stretch">
+            <div ref={searchRef} className="relative flex-1">
+              <div className={`flex items-center gap-3 px-4 py-3.5 bg-surface-lighter/60 border border-border/80 rounded-2xl transition-all ${showDropdown || selected ? 'border-primary/50 shadow-lg shadow-primary/10' : 'border-border'} hover:border-primary/40`}>
+                <Search className="w-5 h-5 text-primary flex-shrink-0" />
+                <input
+                  type="text"
+                  value={query}
+                  onChange={e => { setQuery(e.target.value); setShowDropdown(true); if (!e.target.value) { setSelected(null); setBillCalc(null); } }}
+                  onFocus={() => query && setShowDropdown(true)}
+                  placeholder="Search resident by name, house number, username..."
+                  className="flex-1 bg-transparent text-text placeholder-text-muted text-sm focus:outline-none"
+                />
+                {query && (
+                  <button onClick={() => { setQuery(''); setSelected(null); setBillCalc(null); setShowDropdown(false); }} className="text-text-muted hover:text-text cursor-pointer">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Dropdown */}
+              <AnimatePresence>
+                {showDropdown && matched.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-surface/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl z-50 overflow-hidden"
+                  >
+                    <div className="px-4 py-2 border-b border-border/50 flex items-center justify-between">
+                      <p className="text-xs font-medium text-text-muted">Select a resident</p>
+                      <span className="text-xs text-primary font-semibold">{matched.length} found</span>
+                    </div>
+                    {matched.map(u => <ResidentCard key={u.id || u.username} u={u} onClick={selectResident} />)}
+                  </motion.div>
+                )}
+                {showDropdown && query.trim().length > 0 && matched.length === 0 && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute top-full left-0 right-0 mt-2 bg-surface border border-border rounded-2xl shadow-xl z-50 px-4 py-6 text-center">
+                    <Search className="w-8 h-8 text-text-muted mx-auto mb-2 opacity-40" />
+                    <p className="text-sm text-text-muted">No residents match "<strong className="text-text">{query}</strong>"</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Complete List Dropdown */}
+            <div ref={allDropdownRef} className="relative">
+              <button
+                onClick={() => setShowAllDropdown(!showAllDropdown)}
+                className={`h-full px-5 py-3.5 bg-surface-lighter/60 border border-border/80 rounded-2xl font-semibold text-sm text-text hover:border-primary/50 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap min-w-[200px] justify-between ${showAllDropdown ? 'border-primary/50 shadow-lg shadow-primary/10' : ''}`}
+              >
+                <span className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-primary" />
+                  {selected ? 'Change Resident' : 'Browse All'}
+                </span>
+                <ChevronRight className={`w-4 h-4 text-text-muted transition-transform duration-200 ${showAllDropdown ? 'rotate-90' : ''}`} />
+              </button>
+
+              <AnimatePresence>
+                {showAllDropdown && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    className="absolute top-full right-0 mt-2 w-80 bg-surface/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl z-50 overflow-hidden"
+                  >
+                    <div className="px-4 py-2.5 border-b border-border/50 bg-surface-lighter/50">
+                      <p className="text-xs font-semibold text-text-muted">All Residents ({residents.length})</p>
+                    </div>
+                    <div className="max-h-72 overflow-y-auto custom-scrollbar">
+                      {residents.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-xs text-text-muted">No residents found.</div>
+                      ) : (
+                        residents.map(u => (
+                          <button
+                            key={u.id || u.username}
+                            onClick={() => selectResident(u)}
+                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-primary/8 transition-colors text-left cursor-pointer border-b border-border/30 last:border-0"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-text truncate">{u.fullName || u.username}</p>
+                              <p className="text-xs text-text-muted truncate">@{u.username}</p>
+                            </div>
+                            <span className="px-2.5 py-1 bg-surface-lighter border border-border rounded-lg text-xs font-bold text-text-muted flex-shrink-0 ml-2">
+                              House {u.houseNumber || '—'}
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* Selected Resident Info Banner */}
+          <AnimatePresence>
+            {selected && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                className="flex flex-wrap items-center gap-4 p-4 bg-primary/5 border border-primary/20 rounded-2xl"
+              >
+                <div className="w-12 h-12 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+                  <User className="w-6 h-6 text-primary" />
                 </div>
-                <div className="max-h-72 overflow-y-auto custom-scrollbar">
-                  {residents.length === 0 ? (
-                    <div className="px-4 py-6 text-center text-xs text-text-muted">No residents found.</div>
-                  ) : (
-                    residents.map(u => (
-                      <button
-                        key={u.id || u.username}
-                        onClick={() => selectResident(u)}
-                        className="w-full px-4 py-3 flex items-center justify-between hover:bg-primary/8 transition-colors text-left cursor-pointer border-b border-border/30 last:border-0"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-text truncate">{u.fullName || u.username}</p>
-                          <p className="text-xs text-text-muted truncate">@{u.username}</p>
-                        </div>
-                        <span className="px-2.5 py-1 bg-surface-lighter border border-border rounded-lg text-xs font-bold text-text-muted flex-shrink-0 ml-2">
-                          House {u.houseNumber || '—'}
-                        </span>
-                      </button>
-                    ))
-                  )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-text">{selected.fullName || selected.username}</p>
+                  <p className="text-xs text-text-muted">@{selected.username}</p>
                 </div>
+                {[
+                  { icon: Home,     label: 'House',  value: selected.houseNumber || '—' },
+                  { icon: Hash,     label: 'Block',  value: selected.apartmentBlock || '—' },
+                  { icon: Zap,      label: 'Meter',  value: selected.meterId || selected.meterNumber || 'N/A' },
+                  { icon: Receipt,  label: 'Rate',   value: selected.waterRatePerLiter ? `₹${selected.waterRatePerLiter}/L` : 'Block rate' },
+                ].map(({ icon: Icon, label, value }) => (
+                  <div key={label} className="text-center px-4 py-2 bg-surface/60 rounded-xl border border-border/50 min-w-[80px]">
+                    <Icon className="w-4 h-4 text-primary mx-auto mb-1" />
+                    <p className="text-[10px] text-text-muted uppercase tracking-wider">{label}</p>
+                    <p className="text-sm font-bold text-text">{value}</p>
+                  </div>
+                ))}
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
-      </div>
 
-      {/* ── Selected Resident Info Banner ───────────────────────── */}
-      <AnimatePresence>
-        {selected && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="flex flex-wrap items-center gap-4 p-4 bg-primary/5 border border-primary/20 rounded-2xl"
-          >
-            <div className="w-12 h-12 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
-              <User className="w-6 h-6 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-text">{selected.fullName || selected.username}</p>
-              <p className="text-xs text-text-muted">@{selected.username}</p>
-            </div>
-            {[
-              { icon: Home,     label: 'House',  value: selected.houseNumber || '—' },
-              { icon: Hash,     label: 'Block',  value: selected.apartmentBlock || '—' },
-              { icon: Zap,      label: 'Meter',  value: selected.meterId || selected.meterNumber || 'N/A' },
-              { icon: Receipt,  label: 'Rate',   value: selected.waterRatePerLiter ? `₹${selected.waterRatePerLiter}/L` : 'Block rate' },
-            ].map(({ icon: Icon, label, value }) => (
-              <div key={label} className="text-center px-4 py-2 bg-surface/60 rounded-xl border border-border/50 min-w-[80px]">
-                <Icon className="w-4 h-4 text-primary mx-auto mb-1" />
-                <p className="text-[10px] text-text-muted uppercase tracking-wider">{label}</p>
-                <p className="text-sm font-bold text-text">{value}</p>
-              </div>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Split Panel ──────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* LEFT — Water Meter Log */}
-        <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-          <div className="flex items-center gap-3 px-6 py-4 border-b border-border bg-blue-500/5">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center">
-              <Droplet className="w-5 h-5 text-blue-400" />
-            </div>
-            <div>
-              <h2 className="font-bold text-text text-sm">Log Meter Reading</h2>
-              <p className="text-xs text-text-muted">Record daily or monthly water consumption</p>
-            </div>
-          </div>
-
-          <div className="p-6 space-y-4">
-            {!selected && (
-              <div className="flex flex-col items-center py-10 text-center text-text-muted">
-                <Droplet className="w-12 h-12 mb-3 opacity-20" />
-                <p className="text-sm font-medium">Search and select a resident above</p>
-                <p className="text-xs mt-1 opacity-70">to log their meter reading</p>
-              </div>
-            )}
-
-            {selected && (
-              <form onSubmit={submitLog} className="space-y-4">
-                <StatusBanner status={logStatus} />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">House Number</label>
-                    <div className="px-3 py-2.5 bg-surface-lighter border border-border rounded-xl text-sm text-text font-medium">{selected.houseNumber}</div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Block</label>
-                    <div className="px-3 py-2.5 bg-surface-lighter border border-border rounded-xl text-sm text-text font-medium">{selected.apartmentBlock}</div>
-                  </div>
+          {/* Split Panel */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* LEFT — Water Meter Log */}
+            <div className="glass-card overflow-hidden">
+              <div className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-blue-500/5">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center">
+                  <Droplet className="w-5 h-5 text-blue-400" />
                 </div>
-
-                {(selected.meterId || selected.meterNumber) && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/8 border border-blue-500/20 rounded-xl">
-                    <Zap className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                    <p className="text-xs text-blue-300">Meter ID: <strong>{selected.meterId || selected.meterNumber}</strong></p>
-                  </div>
-                )}
-
                 <div>
-                  <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Log Period</label>
-                  <select
-                    value={logForm.logType}
-                    onChange={e => setLogForm(f => ({ ...f, logType: e.target.value }))}
-                    className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer"
-                  >
-                    <option value="DAILY">Single Day (Daily Log)</option>
-                    <option value="WEEKLY">Weekly Log</option>
-                    <option value="MONTHLY">Monthly Log</option>
-                  </select>
+                  <h2 className="font-bold text-text text-sm">Log Meter Reading</h2>
+                  <p className="text-xs text-text-muted">Record daily or monthly water consumption</p>
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Reading (Liters)</label>
-                    <input
-                      type="number" min="0" step="0.1" required
-                      value={logForm.readingLiters}
-                      onChange={e => setLogForm(f => ({ ...f, readingLiters: e.target.value }))}
-                      placeholder="e.g. 350"
-                      className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Reading Date</label>
-                    <input
-                      type="date" required
-                      value={logForm.readingDate}
-                      onChange={e => setLogForm(f => ({ ...f, readingDate: e.target.value }))}
-                      className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit" disabled={logLoading || !logForm.readingLiters}
-                  className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {logLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Droplet className="w-4 h-4" />}
-                  {logLoading ? 'Submitting…' : 'Submit Reading Log'}
-                </button>
-              </form>
-            )}
-          </div>
-        </div>
-
-        {/* RIGHT — Bill Generation */}
-        <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-          <div className="flex items-center gap-3 px-6 py-4 border-b border-border bg-emerald-500/5">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center">
-              <Receipt className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div>
-              <h2 className="font-bold text-text text-sm">Generate Bill</h2>
-              <p className="text-xs text-text-muted">Create bill from unbilled water usage logs</p>
-            </div>
-          </div>
-
-          <div className="p-6 space-y-4">
-            {!selected && (
-              <div className="flex flex-col items-center py-10 text-center text-text-muted">
-                <Receipt className="w-12 h-12 mb-3 opacity-20" />
-                <p className="text-sm font-medium">Select a resident first</p>
-                <p className="text-xs mt-1 opacity-70">Bill amount will be auto-calculated from usage logs</p>
               </div>
-            )}
 
-            {selected && !billCalc && (
-              <div className="flex flex-col items-center py-8 text-center">
-                <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
-                <p className="text-sm text-text-muted">Calculating bill…</p>
-              </div>
-            )}
-
-            {selected && billCalc && (
-              <form onSubmit={submitBill} className="space-y-4">
-                <StatusBanner status={billStatus} />
-
-                {billCalc.baseRateNotSet ? (
-                  <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/25 rounded-2xl">
-                    <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-text">Base rate is not set</p>
-                      <p className="text-xs text-text-muted mt-1">Please contact your Super Admin to configure the base rate for this community before generating bills.</p>
-                    </div>
+              <div className="p-6 space-y-4">
+                {!selected && (
+                  <div className="flex flex-col items-center py-10 text-center text-text-muted">
+                    <Droplet className="w-12 h-12 mb-3 opacity-20" />
+                    <p className="text-sm font-medium">Search and select a resident above</p>
+                    <p className="text-xs mt-1 opacity-70">to log their meter reading</p>
                   </div>
-                ) : (
-                  /* Calculation Summary Card */
-                  <div className="bg-surface-lighter border border-border rounded-xl p-4 space-y-2.5">
-                    <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Bill Calculation</p>
-                    {[
-                      ['Unbilled Usage', `${billCalc.totalL.toLocaleString()} Liters`],
-                      ['Safe Limit Threshold', `${billCalc.limit.toLocaleString()} Liters`],
-                      ['Within Limit Logged', `${billCalc.withinLimit.toLocaleString()} L @ ₹${billCalc.baseRate}/L`],
-                      ['Overused Logged', billCalc.overused > 0 ? `${billCalc.overused.toLocaleString()} L @ ₹${billCalc.excessRate}/L` : '0 L (No Overuse)'],
-                      ['Last Bill Date', billCalc.lastBillDate === 'None' ? 'First Bill' : new Date(billCalc.lastBillDate).toLocaleDateString('en-IN')],
-                      ['Unbilled Logs count', `${billCalc.unbilled.length} entries`],
-                    ].map(([k,v]) => (
-                      <div key={k} className="flex justify-between text-sm">
-                        <span className="text-text-muted">{k}</span>
-                        <span className="font-semibold text-text">{v}</span>
+                )}
+
+                {selected && (
+                  <form onSubmit={submitLog} className="space-y-4">
+                    <StatusBanner status={logStatus} />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">House Number</label>
+                        <div className="px-3 py-2.5 bg-surface-lighter/50 border border-border/80 rounded-xl text-sm text-text font-medium">{selected.houseNumber}</div>
                       </div>
-                    ))}
-                    <div className="h-px bg-border my-2" />
-                    <div className="flex justify-between">
-                      <span className="font-bold text-text">Total Amount</span>
-                      <span className="text-xl font-black text-emerald-400">₹{billCalc.amount}</span>
+                      <div>
+                        <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Block</label>
+                        <div className="px-3 py-2.5 bg-surface-lighter/50 border border-border/80 rounded-xl text-sm text-text font-medium">{selected.apartmentBlock}</div>
+                      </div>
                     </div>
-                  </div>
-                )}
 
-                {billCalc.unbilled.length === 0 && (
-                  <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-                    <Info className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-300">No unbilled water logs found. Please submit a meter reading first using the panel on the left.</p>
-                  </div>
-                )}
+                    {(selected.meterId || selected.meterNumber) && (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/8 border border-blue-500/20 rounded-xl">
+                        <Zap className="w-4 h-4 text-blue-300 flex-shrink-0" />
+                        <p className="text-xs text-blue-200">Meter ID: <strong>{selected.meterId || selected.meterNumber}</strong></p>
+                      </div>
+                    )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Bill Amount (₹)</label>
-                    <input
-                      type="number" step="0.01" required
-                      disabled={billCalc.baseRateNotSet}
-                      value={billForm.amount}
-                      onChange={e => setBillForm(f => ({ ...f, amount: e.target.value }))}
-                      className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text font-bold focus:outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/10 transition-all disabled:opacity-50"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Due Date</label>
-                    <input
-                      type="date" required
-                      disabled={billCalc.baseRateNotSet}
-                      value={billForm.dueDate}
-                      onChange={e => setBillForm(f => ({ ...f, dueDate: e.target.value }))}
-                      className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-emerald-500/60 cursor-pointer disabled:opacity-50"
-                    />
-                  </div>
+                    <div>
+                      <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Log Period</label>
+                      <select
+                        value={logForm.logType}
+                        onChange={e => setLogForm(f => ({ ...f, logType: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer"
+                      >
+                        <option value="DAILY">Single Day (Daily Log)</option>
+                        <option value="WEEKLY">Weekly Log</option>
+                        <option value="MONTHLY">Monthly Log</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Reading (Liters)</label>
+                        <input
+                          type="number" min="0" step="0.1" required
+                          value={logForm.readingLiters}
+                          onChange={e => setLogForm(f => ({ ...f, readingLiters: e.target.value }))}
+                          placeholder="e.g. 350"
+                          className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Reading Date</label>
+                        <input
+                          type="date" required
+                          value={logForm.readingDate}
+                          onChange={e => setLogForm(f => ({ ...f, readingDate: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit" disabled={logLoading || !logForm.readingLiters}
+                      className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      {logLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Droplet className="w-4 h-4" />}
+                      {logLoading ? 'Submitting…' : 'Submit Reading Log'}
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
+
+            {/* RIGHT — Bill Generation */}
+            <div className="glass-card overflow-hidden">
+              <div className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-emerald-500/5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center">
+                  <Receipt className="w-5 h-5 text-emerald-400" />
                 </div>
+                <div>
+                  <h2 className="font-bold text-text text-sm">Generate Bill</h2>
+                  <p className="text-xs text-text-muted">Create bill from unbilled water usage logs</p>
+                </div>
+              </div>
 
-                <button
-                  type="submit"
-                  disabled={billLoading || billCalc.unbilled.length === 0 || billCalc.baseRateNotSet}
-                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {billLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
-                  {billLoading ? 'Generating…' : 'Generate & Save Bill'}
-                </button>
-
-                {billCalc.unbilled.length === 0 && !billCalc.baseRateNotSet && (
-                  <p className="text-xs text-center text-text-muted">Add a water reading on the left first to enable bill generation.</p>
+              <div className="p-6 space-y-4">
+                {!selected && (
+                  <div className="flex flex-col items-center py-10 text-center text-text-muted">
+                    <Receipt className="w-12 h-12 mb-3 opacity-20" />
+                    <p className="text-sm font-medium">Select a resident first</p>
+                    <p className="text-xs mt-1 opacity-70">Bill amount will be auto-calculated from usage logs</p>
+                  </div>
                 )}
-              </form>
-            )}
+
+                {selected && !billCalc && (
+                  <div className="flex flex-col items-center py-8 text-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
+                    <p className="text-sm text-text-muted">Calculating bill…</p>
+                  </div>
+                )}
+
+                {selected && billCalc && (
+                  <form onSubmit={submitBill} className="space-y-4">
+                    <StatusBanner status={billStatus} />
+
+                    {billCalc.baseRateNotSet ? (
+                      <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/25 rounded-2xl">
+                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-semibold text-text">Base rate is not set</p>
+                          <p className="text-xs text-text-muted mt-1">Please contact your Super Admin to configure the base rate for this community before generating bills.</p>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Calculation Summary Card */
+                      <div className="bg-surface-lighter border border-border rounded-xl p-4 space-y-2.5">
+                        <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Bill Calculation</p>
+                        {[
+                          ['Unbilled Usage', `${billCalc.totalL.toLocaleString()} Liters`],
+                          ['Safe Limit Threshold', `${billCalc.limit.toLocaleString()} Liters`],
+                          ['Within Limit Logged', `${billCalc.withinLimit.toLocaleString()} L @ ₹${billCalc.baseRate}/L`],
+                          ['Overused Logged', billCalc.overused > 0 ? `${billCalc.overused.toLocaleString()} L @ ₹${billCalc.excessRate}/L` : '0 L (No Overuse)'],
+                          ['Last Bill Date', billCalc.lastBillDate === 'None' ? 'First Bill' : new Date(billCalc.lastBillDate).toLocaleDateString('en-IN')],
+                          ['Unbilled Logs count', `${billCalc.unbilled.length} entries`],
+                        ].map(([k,v]) => (
+                          <div key={k} className="flex justify-between text-sm">
+                            <span className="text-text-muted">{k}</span>
+                            <span className="font-semibold text-text">{v}</span>
+                          </div>
+                        ))}
+                        <div className="h-px bg-border my-2" />
+                        <div className="flex justify-between">
+                          <span className="font-bold text-text">Total Amount</span>
+                          <span className="text-xl font-black text-emerald-400">₹{billCalc.amount}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {billCalc.unbilled.length === 0 && (
+                      <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                        <Info className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-300">No unbilled water logs found. Please submit a meter reading first using the panel on the left.</p>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Bill Amount (₹)</label>
+                        <input
+                          type="number" step="0.01" required
+                          disabled={billCalc.baseRateNotSet}
+                          value={billForm.amount}
+                          onChange={e => setBillForm(f => ({ ...f, amount: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text font-bold focus:outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/10 transition-all disabled:opacity-50"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Due Date</label>
+                        <input
+                          type="date" required
+                          disabled={billCalc.baseRateNotSet}
+                          value={billForm.dueDate}
+                          onChange={e => setBillForm(f => ({ ...f, dueDate: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-emerald-500/60 cursor-pointer disabled:opacity-50"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={billLoading || billCalc.unbilled.length === 0 || billCalc.baseRateNotSet}
+                      className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      {billLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
+                      {billLoading ? 'Generating…' : 'Generate & Save Bill'}
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      )}
+
+      {/* ── BILLING CYCLES TAB CONTENT ───────────────────────────── */}
+      {activeTab === 'cycles' && (
+        <motion.div
+          key="cycles"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          className="space-y-6"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-text text-lg">Billing Cycles & Periods</h3>
+              <p className="text-text-muted text-sm mt-0.5">
+                Define water billing cycles per Colony community and auto-calculate household bills.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                const myColonyName = localStorage.getItem('colonyName') || '';
+                const myColony = apartments.find(a => a.name === myColonyName);
+                const myColonyId = myColony?.id || '';
+                setBillingCycleForm({
+                  cycleName: '',
+                  startDate: '',
+                  endDate: '',
+                  apartmentId: isSuperAdmin ? (apartments[0]?.id || '') : myColonyId,
+                  apartmentBlock: isSuperAdmin ? '' : block
+                });
+                setBillingCycleModalOpen(true);
+              }}
+              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-semibold transition-colors flex items-center gap-2 cursor-pointer"
+            >
+              <Plus className="w-4.5 h-4.5" />
+              Create Billing Cycle
+            </button>
+          </div>
+
+          <div className="glass-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-surface-lighter/50 border-b border-border">
+                    <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Cycle Name</th>
+                    <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Colony / Community</th>
+                    <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Building / Block</th>
+                    <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Start Date</th>
+                    <th className="px-6 py-4 text-xs font-bold text-primary uppercase">End Date</th>
+                    <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Total Water (L)</th>
+                    <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Total Billed</th>
+                    <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Status</th>
+                    <th className="px-6 py-4 text-xs font-bold text-primary uppercase text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {(() => {
+                    const filteredCycles = billingCycles.filter(cycle => {
+                      if (isSuperAdmin) return true;
+                      const myColonyName = localStorage.getItem('colonyName') || '';
+                      const myColony = apartments.find(a => a.name === myColonyName);
+                      return cycle.apartmentId === myColony?.id && cycle.apartmentBlock === block;
+                    });
+
+                    if (filteredCycles.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan="9" className="px-6 py-10 text-center text-text-muted text-sm">
+                            No billing cycles defined yet. Click "Create Billing Cycle" to define one.
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filteredCycles.map(cycle => (
+                      <tr key={cycle.id} className="hover:bg-surface-lighter/20 transition-colors text-sm">
+                        <td className="px-6 py-4 font-semibold text-text">{cycle.cycleName}</td>
+                        <td className="px-6 py-4 text-text-muted">{getApartmentName(cycle.apartmentId)}</td>
+                        <td className="px-6 py-4 text-text-muted">
+                          <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                            cycle.apartmentBlock 
+                              ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
+                              : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                          }`}>
+                            {cycle.apartmentBlock || 'All Blocks'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-text-muted">{cycle.startDate}</td>
+                        <td className="px-6 py-4 text-text-muted">{cycle.endDate}</td>
+                        <td className="px-6 py-4 text-text font-bold">{cycle.totalConsumptionLiters ? `${cycle.totalConsumptionLiters.toLocaleString()} L` : '0 L'}</td>
+                        <td className="px-6 py-4 text-text font-bold">₹{cycle.totalBilledAmount ? cycle.totalBilledAmount.toFixed(2) : '0.00'}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            cycle.status === 'FINALIZED'
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                              : cycle.status === 'OPEN'
+                              ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                              : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'
+                          }`}>
+                            {cycle.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-3">
+                            {cycle.status === 'OPEN' && (
+                              <button
+                                onClick={() => handleFinalizeCycle(cycle.id)}
+                                title="Finalize & Auto-Generate Bills"
+                                className="px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20 rounded-lg cursor-pointer text-xs font-semibold flex items-center gap-1"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Finalize
+                              </button>
+                            )}
+                            {cycle.status === 'FINALIZED' && (
+                              <button
+                                onClick={() => handleArchiveCycle(cycle.id)}
+                                title="Archive Cycle"
+                                className="px-3 py-1.5 bg-slate-500/10 text-slate-405 hover:bg-slate-500/25 border border-slate-500/20 rounded-lg cursor-pointer text-xs font-semibold"
+                              >
+                                Archive
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── PAYMENT REMINDERS TAB CONTENT ────────────────────────── */}
+      {activeTab === 'reminders' && (
+        <motion.div
+          key="reminders"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          className="space-y-6"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="font-bold text-text text-lg">Payment Reminder Control Panel</h3>
+              <p className="text-text-muted text-sm mt-0.5">
+                Notify community admins of blocks with pending bills, and dispatch email notices to unpaid residents.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={handleScanAlertAdmins}
+                disabled={actionLoading}
+                className="px-4 py-2.5 bg-blue-500/10 text-blue-450 hover:bg-blue-500/20 border border-blue-500/20 rounded-xl font-semibold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 text-sm"
+              >
+                <Activity className="w-4 h-4" />
+                Scan & Alert Admins
+              </button>
+
+              <button 
+                onClick={handleSendAllReminders}
+                disabled={actionLoading}
+                className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/10 disabled:opacity-50 text-sm"
+              >
+                <Send className="w-4 h-4" />
+                Send All Reminders
+              </button>
+            </div>
+          </div>
+
+          {/* Aggregated Unpaid Households */}
+          {(() => {
+            const blockBills = isSuperAdmin 
+              ? bills
+              : bills.filter(b => b.apartmentBlock === block);
+            
+            const unpaidBills = blockBills.filter(b => b.status === 'UNPAID' || b.status === 'OVERDUE');
+            const unpaidByHouse = {};
+            
+            unpaidBills.forEach(b => {
+              const key = `${b.apartmentBlock}-${b.houseNumber}`;
+              if (!unpaidByHouse[key]) {
+                unpaidByHouse[key] = {
+                  houseNumber: b.houseNumber,
+                  apartmentBlock: b.apartmentBlock,
+                  totalAmount: 0,
+                  billCount: 0,
+                  latestDueDate: b.dueDate
+                };
+              }
+              unpaidByHouse[key].totalAmount += b.amount;
+              unpaidByHouse[key].billCount += 1;
+              if (new Date(b.dueDate) > new Date(unpaidByHouse[key].latestDueDate)) {
+                unpaidByHouse[key].latestDueDate = b.dueDate;
+              }
+            });
+            
+            const unpaidList = Object.values(unpaidByHouse);
+
+            return (
+              <div className="glass-card overflow-hidden">
+                <div className="px-6 py-4 bg-primary/5 border-b border-border/40 flex items-center justify-between">
+                  <span className="text-sm font-bold text-text">
+                    Unpaid Households: <strong className="text-primary font-black">{unpaidList.length}</strong> total
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-surface-lighter/50 border-b border-border">
+                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase">House Number</th>
+                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase">Apartment Block</th>
+                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase">Resident Name</th>
+                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase">Unpaid Bills</th>
+                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase">Total Outstanding</th>
+                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase">Latest Due Date</th>
+                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/40 text-sm">
+                      {unpaidList.length > 0 ? (
+                        unpaidList.map(item => {
+                          const resident = users.find(u => u.houseNumber === item.houseNumber && u.apartmentBlock === item.apartmentBlock);
+                          return (
+                            <tr key={`${item.apartmentBlock}-${item.houseNumber}`} className="hover:bg-primary/5 transition-colors">
+                              <td className="px-6 py-4 font-bold text-text">{item.houseNumber}</td>
+                              <td className="px-6 py-4 text-text-muted font-medium">{item.apartmentBlock}</td>
+                              <td className="px-6 py-4 text-text">
+                                {resident ? (resident.fullName || resident.username) : 'N/A'}
+                              </td>
+                              <td className="px-6 py-4 font-semibold text-amber-500">
+                                {item.billCount} pending
+                              </td>
+                              <td className="px-6 py-4 font-bold text-red-400">
+                                ₹{item.totalAmount.toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 text-text-muted text-xs font-semibold">{item.latestDueDate}</td>
+                              <td className="px-6 py-4 text-right">
+                                <button 
+                                  onClick={() => handleSendIndividualReminder(item.houseNumber, item.apartmentBlock)}
+                                  disabled={actionLoading}
+                                  className="px-3 py-1.5 bg-primary/10 hover:bg-primary/25 text-primary border border-primary/20 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ml-auto disabled:opacity-50"
+                                >
+                                  <Send className="w-3 h-3" /> Send Reminder
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan="7" className="px-6 py-10 text-center text-text-muted">
+                            No unpaid household bills found. All clear!
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
+        </motion.div>
+      )}
 
       {/* Bulk Bill Generation Modal */}
       {bulkGenerating && (
@@ -878,6 +1335,84 @@ export default function MeterWorkstation() {
               </div>
             </div>
           </motion.div>
+        </div>
+      )}
+
+      {/* Create Billing Cycle Modal */}
+      {billingCycleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-surface border border-border w-full max-w-md rounded-2xl p-6 shadow-2xl relative">
+            <button
+              onClick={() => setBillingCycleModalOpen(false)}
+              className="absolute top-4 right-4 text-text-muted hover:text-text cursor-pointer p-1.5 hover:bg-surface-lighter rounded-lg border border-border/40"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-xl font-bold text-text mb-4">Create Billing Cycle</h3>
+            <form onSubmit={handleCreateBillingCycle} className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Cycle Name</label>
+                <input
+                  type="text" required
+                  placeholder="e.g. June 2026 Cycle"
+                  value={billingCycleForm.cycleName}
+                  onChange={e => setBillingCycleForm(prev => ({ ...prev, cycleName: e.target.value }))}
+                  className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Start Date</label>
+                  <input
+                    type="date" required
+                    value={billingCycleForm.startDate}
+                    onChange={e => setBillingCycleForm(prev => ({ ...prev, startDate: e.target.value }))}
+                    className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">End Date</label>
+                  <input
+                    type="date" required
+                    value={billingCycleForm.endDate}
+                    onChange={e => setBillingCycleForm(prev => ({ ...prev, endDate: e.target.value }))}
+                    className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Colony / Community</label>
+                <select
+                  required
+                  value={billingCycleForm.apartmentId}
+                  onChange={e => setBillingCycleForm(prev => ({ ...prev, apartmentId: e.target.value }))}
+                  className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer"
+                >
+                  <option value="">Select Colony</option>
+                  {apartments.map(apt => (
+                    <option key={apt.id} value={apt.id}>{apt.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Building / Block</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Block A (Leave empty for all)"
+                  value={billingCycleForm.apartmentBlock}
+                  onChange={e => setBillingCycleForm(prev => ({ ...prev, apartmentBlock: e.target.value }))}
+                  className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60"
+                />
+              </div>
+              <button
+                type="submit" disabled={actionLoading}
+                className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                Create Cycle
+              </button>
+            </form>
+          </div>
         </div>
       )}
     </div>

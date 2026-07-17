@@ -99,39 +99,51 @@ body {
     0 0 20px 2px rgba(37, 99, 235, 0.15);
 }
 
-/* Light Theme Auth & Forms Styling Overrides */
-[data-theme='light'] .glass-card label {
-  color: #1e293b !important;
-  font-weight: 600 !important;
-}
-
-[data-theme='light'] .glass-card .text-text-muted,
-[data-theme='light'] .glass-card p.text-text-muted {
-  color: #475569 !important;
-}
-
-[data-theme='light'] .glass-card input[type="text"],
-[data-theme='light'] .glass-card input[type="email"],
-[data-theme='light'] .glass-card input[type="password"],
-[data-theme='light'] .glass-card input[type="tel"],
-[data-theme='light'] .glass-card input[type="number"],
-[data-theme='light'] .glass-card select,
-[data-theme='light'] .glass-card textarea {
-  background-color: #f8fafc !important;
-  border: 1px solid rgba(59, 130, 246, 0.3) !important;
+/* Light Theme Form Control Styling Overrides (Global) */
+[data-theme='light'] label {
   color: #0b1a30 !important;
+  font-weight: 700 !important;
 }
 
-[data-theme='light'] .glass-card input::placeholder {
-  color: rgba(71, 85, 105, 0.6) !important;
+[data-theme='light'] .text-text-muted,
+[data-theme='light'] p.text-text-muted,
+[data-theme='light'] span.text-text-muted {
+  color: #2e3e56 !important;
+  font-weight: 500 !important;
 }
 
-[data-theme='light'] .glass-card input:focus,
-[data-theme='light'] .glass-card select:focus,
-[data-theme='light'] .glass-card textarea:focus {
-  border-color: var(--color-primary) !important;
-  box-shadow: 0 0 0 1px var(--color-primary) !important;
+[data-theme='light'] input[type="text"]:not(.bg-transparent),
+[data-theme='light'] input[type="email"]:not(.bg-transparent),
+[data-theme='light'] input[type="password"]:not(.bg-transparent),
+[data-theme='light'] input[type="tel"]:not(.bg-transparent),
+[data-theme='light'] input[type="number"]:not(.bg-transparent),
+[data-theme='light'] input[type="date"]:not(.bg-transparent),
+[data-theme='light'] select:not(.bg-transparent),
+[data-theme='light'] textarea:not(.bg-transparent) {
   background-color: #ffffff !important;
+  border: 1.5px solid rgba(37, 99, 235, 0.35) !important;
+  color: #0b1a30 !important;
+  font-weight: 500 !important;
+}
+
+[data-theme='light'] input::placeholder {
+  color: rgba(46, 62, 86, 0.65) !important;
+}
+
+[data-theme='light'] input:focus:not(.bg-transparent),
+[data-theme='light'] select:focus:not(.bg-transparent),
+[data-theme='light'] textarea:focus:not(.bg-transparent) {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25) !important;
+  background-color: #ffffff !important;
+}
+
+/* Explicit transparent input overrides for light mode */
+[data-theme='light'] input.bg-transparent,
+[data-theme='light'] select.bg-transparent {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .neumorphic-inset {
