@@ -567,11 +567,11 @@ export default function MeterWorkstation() {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleDownloadTemplate}
-                className="flex items-center gap-2 px-4 py-2.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 rounded-xl text-sm font-semibold transition-all cursor-pointer"
+                className="download-csv-btn"
               >
                 <FileText className="w-4 h-4" /> Download CSV Template
               </button>
-              <label className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 rounded-xl text-sm font-semibold transition-all cursor-pointer">
+              <label className="upload-csv-btn">
                 <Plus className="w-4 h-4" /> Upload CSV Logs
                 <input
                   type="file"
@@ -583,9 +583,16 @@ export default function MeterWorkstation() {
             </div>
             <button
               onClick={handleGenerateAllBills}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-650 hover:from-blue-650 hover:to-indigo-800 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/35 transition-all cursor-pointer"
+              className="generate-bills-button"
             >
-              <Zap className="w-4 h-4" /> Generate Bills for All
+              <div className="button-outer">
+                <div className="button-inner">
+                  <span>
+                    <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
+                    Generate Bills for All
+                  </span>
+                </div>
+              </div>
             </button>
           </div>
 
