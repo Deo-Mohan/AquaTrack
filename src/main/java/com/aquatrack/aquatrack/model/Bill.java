@@ -57,6 +57,28 @@ public class Bill {
     @Column(name = "generated_date")
     private LocalDate generatedDate;
 
+    @Column(name = "meter_id")
+    private String meterId;
+
+    // Tariff breakdown fields
+    @Column(name = "within_limit_liters")
+    private Double withinLimitLiters = 0.0;
+
+    @Column(name = "excess_liters")
+    private Double excessLiters = 0.0;
+
+    @Column(name = "base_rate_per_liter")
+    private Double baseRatePerLiter = 0.0;
+
+    @Column(name = "excess_rate_per_liter")
+    private Double excessRatePerLiter = 0.0;
+
+    @Column(name = "excess_charge")
+    private Double excessCharge = 0.0;
+
+    @Column(name = "monthly_limit_liters")
+    private Double monthlyLimitLiters = 0.0;
+
     // Default Constructor
     public Bill() {}
 
@@ -108,4 +130,25 @@ public class Bill {
 
     public LocalDate getGeneratedDate() { return generatedDate; }
     public void setGeneratedDate(LocalDate generatedDate) { this.generatedDate = generatedDate; }
+
+    public String getMeterId() { return meterId; }
+    public void setMeterId(String meterId) { this.meterId = meterId; }
+
+    public Double getWithinLimitLiters() { return withinLimitLiters; }
+    public void setWithinLimitLiters(Double withinLimitLiters) { this.withinLimitLiters = withinLimitLiters; }
+
+    public Double getExcessLiters() { return excessLiters; }
+    public void setExcessLiters(Double excessLiters) { this.excessLiters = excessLiters; }
+
+    public Double getBaseRatePerLiter() { return baseRatePerLiter; }
+    public void setBaseRatePerLiter(Double baseRatePerLiter) { this.baseRatePerLiter = baseRatePerLiter; }
+
+    public Double getExcessRatePerLiter() { return excessRatePerLiter; }
+    public void setExcessRatePerLiter(Double excessRatePerLiter) { this.excessRatePerLiter = excessRatePerLiter; }
+
+    public Double getExcessCharge() { return excessCharge; }
+    public void setExcessCharge(Double excessCharge) { this.excessCharge = excessCharge; }
+
+    public Double getMonthlyLimitLiters() { return monthlyLimitLiters; }
+    public void setMonthlyLimitLiters(Double monthlyLimitLiters) { this.monthlyLimitLiters = monthlyLimitLiters; }
 }

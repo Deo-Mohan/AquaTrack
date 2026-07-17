@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Droplet, 
@@ -13,13 +13,19 @@ import {
   X,
   HelpCircle,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Gauge,
+  Users,
+  Wrench,
+  BookOpen
 } from 'lucide-react';
 
 export default function Sidebar({ isOpen, setIsOpen }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const role = localStorage.getItem('role');
   const isAdmin = role === 'ROLE_ADMIN' || role === 'ROLE_COMMUNITY_ADMIN';
+  const isCommunityAdmin = role === 'ROLE_COMMUNITY_ADMIN';
 
   // Persistent collapsed state for desktop
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -40,10 +46,14 @@ export default function Sidebar({ isOpen, setIsOpen }) {
 
   const navItems = isAdmin 
     ? [
-        { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
-        { icon: Bell, label: 'Notifications', path: '/notifications' },
-        { icon: User, label: 'Profile', path: '/profile' },
-        { icon: HelpCircle, label: 'Support', path: '/support' },
+        { icon: LayoutDashboard, label: 'Dashboard',         path: '/admin' },
+        { icon: Users,           label: 'User Directory',    path: '/admin?tab=users' },
+        { icon: Wrench,          label: 'Meter Workstation', path: '/meter-workstation' },
+        { icon: BookOpen,        label: 'Water & Billing History', path: '/water-billing-history' },
+        ...(isCommunityAdmin ? [{ icon: Gauge, label: 'Tariff Settings', path: '/tariff' }] : []),
+        { icon: Bell,            label: 'Notifications',     path: '/notifications' },
+        { icon: User,            label: 'Profile',           path: '/profile' },
+        { icon: HelpCircle,      label: 'Support',           path: '/support' },
       ]
     : [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
@@ -62,6 +72,23 @@ export default function Sidebar({ isOpen, setIsOpen }) {
     navigate('/login');
   };
 
+  const isLinkActive = (path) => {
+    const [itemPathname, itemSearch] = path.split('?');
+    const currentPathname = location.pathname;
+    const currentSearch = location.search;
+
+    if (itemSearch) {
+      return currentPathname === itemPathname && currentSearch.includes(itemSearch);
+    }
+    
+    // If we're on /admin with a tab param, the dashboard link is NOT active
+    if (itemPathname === '/admin' && currentSearch.includes('tab=')) {
+      return false;
+    }
+    
+    return currentPathname === itemPathname;
+  };
+
   return (
     <>
       {/* Mobile Backdrop */}
@@ -75,7 +102,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       <aside 
         onClick={handleSidebarClick}
         className={`fixed lg:relative inset-y-0 left-0 flex flex-col bg-surface border-r border-border h-full z-50 transform transition-all duration-300 ease-in-out lg:translate-x-0 lg:cursor-pointer ${
-          isCollapsed ? 'lg:w-16 w-48' : 'lg:w-52 w-48'
+          isCollapsed ? 'lg:w-16 w-56' : 'lg:w-[17.5rem] w-56'
         } ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
 
@@ -102,8 +129,8 @@ export default function Sidebar({ isOpen, setIsOpen }) {
                 e.stopPropagation();
                 setIsOpen(false);
               }}
-              className={({ isActive }) => 
-                `nav-item group flex items-center ${isActive ? 'active' : ''} ${
+              className={() => 
+                `nav-item group flex items-center ${isLinkActive(item.path) ? 'active' : ''} ${
                   isCollapsed ? 'lg:justify-center lg:px-2' : ''
                 }`
               }
@@ -112,7 +139,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
               <item.icon className={`w-5 h-5 flex-shrink-0 transition-all duration-300 ${
                 isCollapsed ? 'lg:mr-0' : 'mr-3'
               }`} />
-              <span className={`font-medium text-sm transition-all duration-300 whitespace-nowrap overflow-hidden ${
+              <span className={`font-medium text-sm transition-all duration-300 truncate text-ellipsis overflow-hidden ${
                 isCollapsed ? 'lg:hidden lg:w-0' : 'block opacity-100'
               }`}>{item.label}</span>
             </NavLink>

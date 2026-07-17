@@ -5,9 +5,11 @@
 export function generateInvoiceHTML(bill) {
   const logoUrl = `${window.location.origin}/logo.png`;
   const isPaid = bill.status === 'PAID';
-  const ratePerLiter = bill.consumptionLiters
-    ? (bill.amount / bill.consumptionLiters).toFixed(4)
-    : '0.0000';
+  const ratePerLiter = bill.baseRatePerLiter
+    ? Number(bill.baseRatePerLiter).toFixed(4)
+    : bill.consumptionLiters
+      ? (bill.amount / bill.consumptionLiters).toFixed(4)
+      : '0.0000';
   const invoiceNumber = `#AQ-${String(bill.id).padStart(5, '0')}`;
   const generatedOn = new Date().toLocaleString('en-IN', {
     day: '2-digit', month: 'long', year: 'numeric',
@@ -493,7 +495,7 @@ export function generateInvoiceHTML(bill) {
       <div class="party-name">Resident &mdash; House ${bill.houseNumber}</div>
       ${bill.apartmentBlock ? `<div class="party-detail">Apartment Block: ${bill.apartmentBlock}</div>` : ''}
       <div class="party-detail">AquaTrack Consumer ID: AQ-USR-${String(bill.id).padStart(6, '0')}</div>
-      <div class="party-detail">Meter No: MT${String(bill.id * 31 + 1007).padStart(8, '0')}</div>
+      <div class="party-detail">Meter No: ${bill.meterId ? bill.meterId : 'MT' + String(bill.id * 31 + 1007).padStart(8, '0')}</div>
       <div class="party-detail">Connection Type: Residential</div>
     </div>
   </div>
@@ -529,6 +531,27 @@ export function generateInvoiceHTML(bill) {
       </tr>
     </thead>
     <tbody>
+      ${bill.monthlyLimitLiters > 0 ? `
+      <tr>
+        <td>
+          <strong>Standard Consumption Charge</strong><br/>
+          <span style="font-size:11px;color:#10b981;">Within monthly limit (${Number(bill.monthlyLimitLiters).toLocaleString()} L)</span>
+        </td>
+        <td>${Number(bill.withinLimitLiters || 0).toLocaleString()} L</td>
+        <td>${Number(bill.baseRatePerLiter || 0).toFixed(4)}</td>
+        <td><strong style="color:#10b981;">₹${(Number(bill.withinLimitLiters || 0) * Number(bill.baseRatePerLiter || 0)).toFixed(2)}</strong></td>
+      </tr>
+      ${Number(bill.excessLiters || 0) > 0 ? `
+      <tr style="background:#fff5f5;">
+        <td>
+          <strong style="color:#ef4444;">⚠ Excess Consumption Charge</strong><br/>
+          <span style="font-size:11px;color:#f87171;">${Number(bill.excessLiters || 0).toLocaleString()} L above monthly limit — penalty rate applies</span>
+        </td>
+        <td style="color:#ef4444;">${Number(bill.excessLiters || 0).toLocaleString()} L</td>
+        <td style="color:#ef4444;">₹${Number(bill.excessRatePerLiter || 0).toFixed(4)}</td>
+        <td><strong style="color:#ef4444;">+₹${(Number(bill.excessLiters || 0) * Number(bill.excessRatePerLiter || 0)).toFixed(2)}</strong></td>
+      </tr>` : ''}
+      ` : `
       <tr>
         <td>
           <strong>Water Utility Consumption Charge</strong><br/>
@@ -536,10 +559,11 @@ export function generateInvoiceHTML(bill) {
         </td>
         <td>${bill.consumptionLiters || 0} L</td>
         <td>${ratePerLiter}</td>
-        <td><strong>${Number(bill.amount).toFixed(2)}</strong></td>
+        <td><strong>₹${Number(bill.amount).toFixed(2)}</strong></td>
       </tr>
+      `}
       <tr>
-        <td>Maintenance & Infrastructure Cess</td>
+        <td>Maintenance &amp; Infrastructure Cess</td>
         <td>—</td>
         <td>—</td>
         <td>0.00</td>

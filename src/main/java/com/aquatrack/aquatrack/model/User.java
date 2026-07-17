@@ -55,6 +55,12 @@ public class User {
 
     private String whatsAppNumber;
 
+    private String meterId;
+
+    private Double monthlyLimitLiters;   // Monthly water usage limit per flat (set by CA)
+
+    private Double excessRatePerLiter;   // Rate charged per liter above the monthly limit
+
     public User() {}
 
     public User(String username, String email, String password, String role, String houseNumber, String colonyName, String apartmentBlock, String gender) {
@@ -101,4 +107,10 @@ public class User {
     public void setMobileNumber(String mobileNumber) { this.mobileNumber = mobileNumber; }
     public String getWhatsAppNumber() { return whatsAppNumber; }
     public void setWhatsAppNumber(String whatsAppNumber) { this.whatsAppNumber = whatsAppNumber; }
+    public String getMeterId() { return meterId; }
+    public void setMeterId(String meterId) { this.meterId = meterId; }
+    public Double getMonthlyLimitLiters() { return monthlyLimitLiters; }
+    public void setMonthlyLimitLiters(Double monthlyLimitLiters) { this.monthlyLimitLiters = monthlyLimitLiters; }
+    public Double getExcessRatePerLiter() { return excessRatePerLiter; }
+    public void setExcessRatePerLiter(Double excessRatePerLiter) { this.excessRatePerLiter = excessRatePerLiter; }
 }

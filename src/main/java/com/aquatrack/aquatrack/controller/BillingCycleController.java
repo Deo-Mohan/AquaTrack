@@ -150,7 +150,7 @@ public class BillingCycleController {
         double totalConsumption = 0.0;
         double totalBilled = 0.0;
 
-        // Get active tariff for this apartment
+        // Get active tariff for this apartment (used as fallback only)
         TariffPlan tariff = billingEngineService.getActiveTariff(cycle.getApartmentId());
 
         // Cache shared cost distributions per block to avoid recalculating
@@ -170,24 +170,89 @@ public class BillingCycleController {
                     household.getHouseNumber(), cycle.getStartDate(), cycle.getEndDate(), tariff);
 
             double sharedCharge = blockSharedCostsCache.get(blockName).getOrDefault(household.getHouseNumber(), 0.0);
-            double totalAmount = breakdown.get("totalCharge") + sharedCharge;
+
+            java.util.Optional<User> userOpt = userRepository.findByHouseNumber(household.getHouseNumber());
+
+            // --- Resolve tariff settings from resident or their community admin ---
+            double totalLiters = breakdown.get("consumptionLiters");
+            Double waterRate = null;
+            Double monthlyLimit = null;
+            Double excessRate = null;
+
+            if (userOpt.isPresent()) {
+                User resUser = userOpt.get();
+                waterRate = resUser.getWaterRatePerLiter();
+                monthlyLimit = resUser.getMonthlyLimitLiters();
+                excessRate = resUser.getExcessRatePerLiter();
+            }
+            // Fall back to community admin of the same block if any value is missing or zero
+            boolean needsRateFallback = (waterRate == null || waterRate <= 0);
+            boolean needsLimitFallback = (monthlyLimit == null);
+            boolean needsExcessFallback = (excessRate == null);
+            if (needsRateFallback || needsLimitFallback || needsExcessFallback) {
+                java.util.List<User> blockAdmins = userRepository.findByRoleAndApartmentBlock("ROLE_COMMUNITY_ADMIN", blockName);
+                for (User admin : blockAdmins) {
+                    if (needsRateFallback && admin.getWaterRatePerLiter() != null && admin.getWaterRatePerLiter() > 0) waterRate = admin.getWaterRatePerLiter();
+                    if (needsLimitFallback && admin.getMonthlyLimitLiters() != null) monthlyLimit = admin.getMonthlyLimitLiters();
+                    if (needsExcessFallback && admin.getExcessRatePerLiter() != null) excessRate = admin.getExcessRatePerLiter();
+                    if (!needsRateFallback && !needsLimitFallback && !needsExcessFallback) break;
+                    needsRateFallback = (waterRate == null || waterRate <= 0);
+                    needsLimitFallback = (monthlyLimit == null);
+                    needsExcessFallback = (excessRate == null);
+                    if (!needsRateFallback && !needsLimitFallback && !needsExcessFallback) break;
+                }
+            }
+
+            // --- Apply tiered tariff calculation ---
+            double withinLimit = totalLiters;
+            double excessLiters = 0.0;
+            double excessCharge = 0.0;
+            double baseCharge;
+            double totalAmount;
+
+            if (waterRate != null) {
+                // Use user-level tariff: base rate + excess rate above monthly limit
+                if (monthlyLimit != null && monthlyLimit > 0 && excessRate != null && totalLiters > monthlyLimit) {
+                    withinLimit = monthlyLimit;
+                    excessLiters = totalLiters - monthlyLimit;
+                    excessCharge = excessLiters * excessRate;
+                }
+                baseCharge = withinLimit * waterRate;
+                totalAmount = Math.round((baseCharge + excessCharge + sharedCharge) * 100.0) / 100.0;
+            } else {
+                // Fall back to TariffPlan KL-based engine result
+                baseCharge = breakdown.get("baseCharge");
+                waterRate = totalLiters > 0 ? baseCharge / totalLiters : 0.0;
+                monthlyLimit = 0.0;
+                excessRate = 0.0;
+                totalAmount = Math.round((breakdown.get("totalCharge") + sharedCharge) * 100.0) / 100.0;
+            }
 
             Bill bill = new Bill();
             bill.setHouseNumber(household.getHouseNumber());
             bill.setApartmentBlock(blockName);
-            bill.setBaseCharge(breakdown.get("baseCharge"));
+            bill.setBaseCharge(baseCharge);
+            bill.setExcessCharge(excessCharge);
             bill.setSharedAreaCharge(sharedCharge);
             bill.setFixedCharge(breakdown.get("fixedCharge"));
-            bill.setAmount(Math.round(totalAmount * 100.0) / 100.0);
-            bill.setConsumptionLiters(breakdown.get("consumptionLiters"));
+            bill.setAmount(totalAmount);
+            bill.setConsumptionLiters(totalLiters);
+            bill.setWithinLimitLiters(withinLimit);
+            bill.setExcessLiters(excessLiters);
+            bill.setBaseRatePerLiter(waterRate);
+            bill.setExcessRatePerLiter(excessRate != null ? excessRate : 0.0);
+            bill.setMonthlyLimitLiters(monthlyLimit != null ? monthlyLimit : 0.0);
             bill.setDueDate(cycle.getEndDate().plusDays(15));
             bill.setStatus("UNPAID");
             bill.setBillingCycleId(cycle.getId());
             bill.setGeneratedDate(LocalDate.now());
+            if (userOpt.isPresent()) {
+                bill.setMeterId(userOpt.get().getMeterId());
+            }
 
             billRepository.save(bill);
 
-            totalConsumption += breakdown.get("consumptionLiters");
+            totalConsumption += totalLiters;
             totalBilled += totalAmount;
 
             // Send notification to household user
@@ -202,7 +267,6 @@ public class BillingCycleController {
             notificationRepository.save(notification);
 
             // Send email to resident
-            java.util.Optional<User> userOpt = userRepository.findByHouseNumber(household.getHouseNumber());
             if (userOpt.isPresent()) {
                 User user = userOpt.get();
                 if (user.getEmail() != null && !user.getEmail().trim().isEmpty()) {
@@ -214,7 +278,13 @@ public class BillingCycleController {
                             bill.getAmount(),
                             bill.getGeneratedDate(),
                             bill.getDueDate(),
-                            bill.getConsumptionLiters()
+                            bill.getConsumptionLiters(),
+                            bill.getMeterId(),
+                            bill.getWithinLimitLiters(),
+                            bill.getExcessLiters(),
+                            bill.getBaseRatePerLiter(),
+                            bill.getExcessRatePerLiter(),
+                            bill.getMonthlyLimitLiters()
                         );
                     } catch (Exception e) {
                         System.err.println("SMTP dispatch failed for billing cycle email: " + e.getMessage());

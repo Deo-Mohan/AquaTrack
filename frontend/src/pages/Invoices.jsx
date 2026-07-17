@@ -176,6 +176,9 @@ export default function Invoices() {
                   {invoiceModalBill.apartmentBlock && (
                     <p className="text-xs text-text-muted mt-1">Block: {invoiceModalBill.apartmentBlock}</p>
                   )}
+                  {invoiceModalBill.meterId && (
+                    <p className="text-xs text-text-muted mt-0.5">Meter ID: <span className="font-semibold text-text">{invoiceModalBill.meterId}</span></p>
+                  )}
                   <p className="text-xs text-text-muted">AquaTrack Registered Consumer</p>
                 </div>
               </div>

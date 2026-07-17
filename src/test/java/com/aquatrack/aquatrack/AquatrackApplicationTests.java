@@ -273,4 +273,45 @@ class AquatrackApplicationTests {
 		org.junit.jupiter.api.Assertions.assertEquals("MONTHLY", logs2.get(0).getLogType());
 		org.junit.jupiter.api.Assertions.assertEquals(25000.0, logs2.get(0).getReadingLiters());
 	}
+	@Test
+	void testTieredBillingWithExcessCharge() {
+		// Clean up previous test data
+		userRepository.findByUsername("tier_admin_test").ifPresent(u -> userRepository.delete(u));
+		userRepository.findByUsername("tier_resident_test").ifPresent(u -> userRepository.delete(u));
+
+		// Create a Community Admin with tiered tariff settings
+		User admin = new User("tier_admin_test", "tier_admin@test.com", "password", "ROLE_COMMUNITY_ADMIN", "APT-TIER-999", "Colony T", "Block TIER", "Male");
+		admin.setStatus("APPROVED");
+		admin.setWaterRatePerLiter(0.01);		// ₹0.01 per liter base rate
+		admin.setMonthlyLimitLiters(3000.0);	// 3000 L limit
+		admin.setExcessRatePerLiter(0.03);		// ₹0.03 per liter above limit
+		userRepository.save(admin);
+
+		// Create a Resident with NO tariff fields set (simulates invite-registered user)
+		User resident = new User("tier_resident_test", "tier_res@test.com", "password", "ROLE_RESIDENT", "APT-TIER-101", "Colony T", "Block TIER", "Male");
+		resident.setStatus("APPROVED");
+		// Intentionally NOT setting waterRatePerLiter, monthlyLimitLiters, excessRatePerLiter
+		userRepository.save(resident);
+
+		// Log 5000 L usage (exceeds the 3000 L limit by 2000 L)
+		waterUsageRepository.save(new WaterUsageLog("APT-TIER-101", "Block TIER", java.time.LocalDate.now().minusDays(3), 5000.0, "MANUAL"));
+
+		// Trigger bill generation via BillController
+		org.springframework.http.ResponseEntity<?> resp = billController.generateBillForHousehold("APT-TIER-101");
+		org.junit.jupiter.api.Assertions.assertEquals(org.springframework.http.HttpStatus.OK, resp.getStatusCode());
+
+		Bill generatedBill = (Bill) resp.getBody();
+		org.junit.jupiter.api.Assertions.assertNotNull(generatedBill);
+
+		// Expected: within-limit = 3000 L * 0.01 = ₹30, excess = 2000 L * 0.03 = ₹60, total = ₹90
+		org.junit.jupiter.api.Assertions.assertEquals(3000.0, generatedBill.getWithinLimitLiters(), 0.01);
+		org.junit.jupiter.api.Assertions.assertEquals(2000.0, generatedBill.getExcessLiters(), 0.01);
+		org.junit.jupiter.api.Assertions.assertEquals(30.0, generatedBill.getBaseCharge(), 0.01);
+		org.junit.jupiter.api.Assertions.assertEquals(60.0, generatedBill.getExcessCharge(), 0.01);
+		org.junit.jupiter.api.Assertions.assertEquals(90.0, generatedBill.getAmount(), 0.01);
+
+		// Clean up usage logs
+		waterUsageRepository.findByHouseNumber("APT-TIER-101").forEach(l -> waterUsageRepository.delete(l));
+		billRepository.findByHouseNumber("APT-TIER-101").forEach(b -> billRepository.delete(b));
+	}
 }

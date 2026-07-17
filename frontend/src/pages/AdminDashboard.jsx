@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Home, Droplet, AlertCircle, Server, Settings, Database, Activity, 
@@ -27,7 +28,11 @@ const extractErrorMessage = (err, defaultMsg = 'An error occurred') => {
 };
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('overview'); // overview, users, usage, billing
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'overview';
+  const setActiveTab = (tabId) => {
+    setSearchParams({ tab: tabId });
+  };
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [stats, setStats] = useState(null);
@@ -47,6 +52,8 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [blockFilter, setBlockFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [genderFilter, setGenderFilter] = useState('');
   const [sortField, setSortField] = useState('fullName');
   const [sortDir, setSortDir] = useState('asc');
 
@@ -263,7 +270,8 @@ export default function AdminDashboard() {
     waterRatePerLiter: '',
     fullName: '',
     mobileNumber: '',
-    whatsAppNumber: ''
+    whatsAppNumber: '',
+    meterId: ''
   });
 
   // Smart username availability check for the admin user creation form
@@ -592,7 +600,8 @@ export default function AdminDashboard() {
       waterRatePerLiter: '',
       fullName: '',
       mobileNumber: '',
-      whatsAppNumber: ''
+      whatsAppNumber: '',
+      meterId: ''
     });
     setUserModalOpen(true);
   };
@@ -612,7 +621,8 @@ export default function AdminDashboard() {
       waterRatePerLiter: user.waterRatePerLiter || '',
       fullName: user.fullName || '',
       mobileNumber: user.mobileNumber || '',
-      whatsAppNumber: user.whatsAppNumber || ''
+      whatsAppNumber: user.whatsAppNumber || '',
+      meterId: user.meterId || ''
     });
     setUserModalOpen(true);
   };
@@ -641,7 +651,8 @@ export default function AdminDashboard() {
         const payload = {
           fullName: userForm.fullName.trim(),
           email: userForm.email.trim().toLowerCase(),
-          houseNumber: userForm.houseNumber.trim()
+          houseNumber: userForm.houseNumber.trim(),
+          meterId: userForm.meterId ? userForm.meterId.trim() : null
         };
         await api.post('/admin/users/invite', payload, {
           params: {
@@ -1116,7 +1127,10 @@ export default function AdminDashboard() {
 
   // Smart-filtered + sorted users
   const filteredUsers = sortUsers(
-    smartFilter(users, searchQuery).filter(u => blockFilter ? u.apartmentBlock === blockFilter : true),
+    smartFilter(users, searchQuery)
+      .filter(u => blockFilter ? u.apartmentBlock === blockFilter : true)
+      .filter(u => statusFilter ? u.status === statusFilter : true)
+      .filter(u => genderFilter ? u.gender?.toLowerCase() === genderFilter : true),
     sortField, sortDir
   );
 
@@ -1603,12 +1617,16 @@ export default function AdminDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-text">
-            {isSuperAdmin ? 'Super Admin Panel' : 'Community Admin Dashboard'}
+            {activeTab === 'users' 
+              ? 'User Directory' 
+              : isSuperAdmin ? 'Super Admin Panel' : 'Community Admin Dashboard'}
           </h1>
           <p className="text-text-muted mt-1">
-            {isSuperAdmin 
-              ? 'Global administrative overview, user onboarding & database administration.' 
-              : `Block Level Water & Account Management for ${block}`}
+            {activeTab === 'users'
+              ? (isSuperAdmin ? 'Manage and monitor all users and admins across communities.' : `Manage, search, and invite residents for ${block}.`)
+              : isSuperAdmin 
+                ? 'Global administrative overview, user onboarding & database administration.' 
+                : `Block Level Water & Account Management for ${block}`}
           </p>
         </div>
       </div>
@@ -1630,55 +1648,56 @@ export default function AdminDashboard() {
       )}
 
       {/* Custom Tabs & Glowing Bulb Help */}
-      <div className="flex items-center justify-between border-b border-border mb-6">
-        <div className="flex overflow-x-auto gap-8">
-          {[
-            { id: 'overview', label: 'Overview' },
-            isSuperAdmin && { id: 'community-analytics', label: 'Community Analytics 📊' },
-            { id: 'users', label: 'User Directory' },
-            { id: 'usage', label: 'Water Usage logs' },
-            { id: 'billing', label: 'Billing & Alerts' },
-            isSuperAdmin && { id: 'colonies', label: '🏘️ Colony Management' },
-            {
-              id: 'doc-verification',
-              label: `📋 Doc Verification${pendingVerifications.length > 0 ? ` (${pendingVerifications.length})` : ''}`
-            },
-            { 
-              id: 'approvals', 
-              label: `Pending Approvals${pendingApprovals.length > 0 ? ` (${pendingApprovals.length})` : ''}` 
-            }
-          ].filter(Boolean).map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`py-3 text-sm font-semibold border-b-2 transition-all relative whitespace-nowrap ${
-                activeTab === tab.id 
-                  ? 'border-primary text-primary' 
-                  : 'border-transparent text-text-muted hover:text-text'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      {activeTab !== 'users' && (
+        <div className="flex items-center justify-between border-b border-border mb-6">
+          <div className="flex overflow-x-auto gap-8">
+            {[
+              { id: 'overview', label: 'Overview' },
+              isSuperAdmin && { id: 'community-analytics', label: 'Community Analytics 📊' },
+              { id: 'usage', label: 'Water Usage logs' },
+              { id: 'billing', label: 'Billing & Alerts' },
+              isSuperAdmin && { id: 'colonies', label: '🏘️ Colony Management' },
+              {
+                id: 'doc-verification',
+                label: `📋 Doc Verification${pendingVerifications.length > 0 ? ` (${pendingVerifications.length})` : ''}`
+              },
+              { 
+                id: 'approvals', 
+                label: `Pending Approvals${pendingApprovals.length > 0 ? ` (${pendingApprovals.length})` : ''}` 
+              }
+            ].filter(Boolean).map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`py-3 text-sm font-semibold border-b-2 transition-all relative whitespace-nowrap ${
+                  activeTab === tab.id 
+                    ? 'border-primary text-primary' 
+                    : 'border-transparent text-text-muted hover:text-text'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-        {/* Glowing bulb for quick guide */}
-        <div className="relative pb-1" style={{ zIndex: 40 }}>
-          <button 
-            onMouseEnter={() => setShowTooltip(true)}
-            onMouseLeave={() => setShowTooltip(false)}
-            onClick={() => setQuickHelpModalOpen(true)}
-            className="flex items-center justify-center w-9 h-9 rounded-xl bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.25)] hover:shadow-[0_0_25px_rgba(234,179,8,0.6)] hover:scale-105 transition-all cursor-pointer animate-pulse focus:outline-none"
-          >
-            <Lightbulb className="w-5 h-5 text-yellow-400 fill-yellow-400/20" />
-          </button>
-          {showTooltip && (
-            <div className="absolute right-0 top-11 whitespace-nowrap bg-surface-lighter border border-border text-text text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xl backdrop-blur-md z-50">
-              Quick guide to help you
-            </div>
-          )}
+          {/* Glowing bulb for quick guide */}
+          <div className="relative pb-1" style={{ zIndex: 40 }}>
+            <button 
+              onMouseEnter={() => setShowTooltip(true)}
+              onMouseLeave={() => setShowTooltip(false)}
+              onClick={() => setQuickHelpModalOpen(true)}
+              className="flex items-center justify-center w-9 h-9 rounded-xl bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.25)] hover:shadow-[0_0_25px_rgba(234,179,8,0.6)] hover:scale-105 transition-all cursor-pointer animate-pulse focus:outline-none"
+            >
+              <Lightbulb className="w-5 h-5 text-yellow-400 fill-yellow-400/20" />
+            </button>
+            {showTooltip && (
+              <div className="absolute right-0 top-11 whitespace-nowrap bg-surface-lighter border border-border text-text text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xl backdrop-blur-md z-50">
+                Quick guide to help you
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Tab Contents */}
       <AnimatePresence mode="wait">
@@ -2182,44 +2201,50 @@ export default function AdminDashboard() {
             className="space-y-6"
           >
             {/* Smart Search Toolbar */}
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="flex-1 min-w-0">
-                <SmartSearchBar
-                  users={users}
-                  query={searchQuery}
-                  onQueryChange={setSearchQuery}
-                  sortField={sortField}
-                  sortDir={sortDir}
-                  onSortChange={handleSortChange}
-                  blockFilter={blockFilter}
-                  onBlockFilterChange={setBlockFilter}
-                />
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <SmartSearchBar
+                    users={users}
+                    query={searchQuery}
+                    onQueryChange={setSearchQuery}
+                    sortField={sortField}
+                    sortDir={sortDir}
+                    onSortChange={handleSortChange}
+                    blockFilter={blockFilter}
+                    onBlockFilterChange={setBlockFilter}
+                    statusFilter={statusFilter}
+                    onStatusFilterChange={setStatusFilter}
+                    genderFilter={genderFilter}
+                    onGenderFilterChange={setGenderFilter}
+                  />
+                </div>
+                <button
+                  onClick={handleOpenCreateUser}
+                  className="px-4 py-2.5 bg-primary text-white hover:bg-primary-dark rounded-xl font-medium transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap flex-shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  {isSuperAdmin ? 'Register New User' : 'Invite Resident'}
+                </button>
+                {!isSuperAdmin && (
+                  <>
+                    <button
+                      onClick={() => { setBulkInviteFile(null); setBulkInviteReport(null); setBulkInviteModalOpen(true); }}
+                      className="px-4 py-2.5 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 border border-violet-500/20 rounded-xl font-medium transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap flex-shrink-0"
+                    >
+                      <Upload className="w-4 h-4" />
+                      Bulk Invite
+                    </button>
+                    <button
+                      onClick={downloadCsvTemplate}
+                      className="px-4 py-2.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-xl font-medium transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap flex-shrink-0"
+                    >
+                      <Download className="w-4 h-4" />
+                      Template
+                    </button>
+                  </>
+                )}
               </div>
-              <button
-                onClick={handleOpenCreateUser}
-                className="px-4 py-2.5 bg-primary text-white hover:bg-primary-dark rounded-xl font-medium transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap flex-shrink-0"
-              >
-                <Plus className="w-4 h-4" />
-                {isSuperAdmin ? 'Register New User' : 'Invite Resident'}
-              </button>
-              {!isSuperAdmin && (
-                <>
-                  <button
-                    onClick={() => { setBulkInviteFile(null); setBulkInviteReport(null); setBulkInviteModalOpen(true); }}
-                    className="px-4 py-2.5 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 border border-violet-500/20 rounded-xl font-medium transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap flex-shrink-0"
-                  >
-                    <Upload className="w-4 h-4" />
-                    Bulk Invite
-                  </button>
-                  <button
-                    onClick={downloadCsvTemplate}
-                    className="px-4 py-2.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-xl font-medium transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap flex-shrink-0"
-                  >
-                    <Download className="w-4 h-4" />
-                    Template
-                  </button>
-                </>
-              )}
             </div>
 
             {/* Quick Water Rate Modal */}
@@ -2340,7 +2365,10 @@ export default function AdminDashboard() {
                                       {blockHH.map(hu => (
                                         <tr key={hu.id} className="hover:bg-blue-500/5 transition-colors">
                                           <td className="px-5 py-3 font-semibold text-text text-sm">{hu.houseNumber || '—'}</td>
-                                          <td className="px-5 py-3 text-text text-sm">{hu.fullName || hu.username}</td>
+                                          <td className="px-5 py-3 text-sm">
+                                            <div className="font-semibold text-text">{hu.fullName || hu.username}</div>
+                                            {hu.meterId && <div className="text-text-muted text-[11px] mt-0.5">Meter: {hu.meterId}</div>}
+                                          </td>
                                           <td className="px-5 py-3 text-text-muted text-sm">{hu.email}</td>
                                           <td className="px-5 py-3 text-text-muted text-sm">{hu.mobileNumber || '—'}</td>
                                           <td className="px-5 py-3 text-sm">
@@ -2395,7 +2423,10 @@ export default function AdminDashboard() {
                         filteredUsers.map(user => (
                           <tr key={user.id} className="hover:bg-blue-500/5 transition-colors">
                             <td className="px-6 py-4 font-semibold text-text">{user.username}</td>
-                            <td className="px-6 py-4 text-text font-medium">{user.fullName || '—'}</td>
+                            <td className="px-6 py-4 text-sm">
+                              <div className="font-semibold text-text">{user.fullName || '—'}</div>
+                              {user.meterId && <div className="text-text-muted text-[11px] mt-0.5">Meter: {user.meterId}</div>}
+                            </td>
                             <td className="px-6 py-4 text-text-muted">{user.email}</td>
                             <td className="px-6 py-4 text-text-muted">{user.houseNumber || '—'}</td>
                             <td className="px-6 py-4 text-text-muted">{user.mobileNumber || '—'}</td>
@@ -3230,6 +3261,17 @@ export default function AdminDashboard() {
                         placeholder="e.g. APT-101"
                       />
                     </div>
+
+                    <div className="col-span-1">
+                      <label className="block text-sm font-medium text-text-muted mb-1.5">Meter ID / Number</label>
+                      <input
+                        type="text"
+                        value={userForm.meterId || ''}
+                        onChange={(e) => setUserForm({ ...userForm, meterId: e.target.value })}
+                        className="w-full bg-surface-lighter border border-border rounded-xl px-4 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
+                        placeholder="e.g. MTR-90218"
+                      />
+                    </div>
                   </>
                 ) : (
                   <>
@@ -3461,6 +3503,17 @@ export default function AdminDashboard() {
                         onChange={(e) => setUserForm({ ...userForm, houseNumber: e.target.value })}
                         className="w-full bg-surface-lighter border border-border rounded-xl px-4 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
                         placeholder="e.g. APT-101"
+                      />
+                    </div>
+
+                    <div className="col-span-1">
+                      <label className="block text-sm font-medium text-text-muted mb-1.5">Meter ID / Number</label>
+                      <input
+                        type="text"
+                        value={userForm.meterId || ''}
+                        onChange={(e) => setUserForm({ ...userForm, meterId: e.target.value })}
+                        className="w-full bg-surface-lighter border border-border rounded-xl px-4 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
+                        placeholder="e.g. MTR-90218"
                       />
                     </div>
 
@@ -4221,8 +4274,8 @@ export default function AdminDashboard() {
               <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-3">
                 <CheckCircle2 className="w-6 h-6 text-emerald-400" />
               </div>
-              <h3 className="text-xl font-bold text-text mb-1">Pay Now</h3>
-              <p className="text-text-muted text-sm mb-4">Scan the QR code below or confirm payment manually</p>
+              <h3 className="text-xl font-bold text-text mb-1">Collect Payment</h3>
+              <p className="text-text-muted text-xs mb-4">Show this QR to the resident for UPI payment, or collect cash.</p>
               <div className="bg-white p-4 rounded-xl mx-auto w-fit mb-4">
                 <img
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`AquaTrack Bill|ID:${payQrModalBill.id}|House:${payQrModalBill.houseNumber}|Amount:${payQrModalBill.amount}|Due:${payQrModalBill.dueDate}`)}`}
@@ -4240,9 +4293,9 @@ export default function AdminDashboard() {
                 onClick={() => handleMarkBillPaid(payQrModalBill)}
                 className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold transition-all cursor-pointer"
               >
-                ✅ Confirm Payment Received
+                ✅ Confirm Cash/Offline Payment
               </button>
-              <p className="text-xs text-text-muted mt-3">Clicking confirm will mark this bill as PAID and notify the household user.</p>
+              <p className="text-xs text-text-muted mt-3">Clicking confirm will mark this bill as PAID in the system and notify the resident.</p>
             </motion.div>
           </div>
         )}

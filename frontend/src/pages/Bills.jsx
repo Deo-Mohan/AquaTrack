@@ -4,6 +4,7 @@ import { Receipt, CheckCircle, Clock, AlertCircle, RefreshCw, X } from 'lucide-r
 import api from '../api';
 import '../ticket.css';
 import { printInvoice } from '../utils/invoiceGenerator';
+import RazorpayModal from '../components/RazorpayModal';
 
 export default function Bills() {
   const [bills, setBills] = useState([]);
@@ -16,16 +17,11 @@ export default function Bills() {
 
   const handleMarkBillPaid = async (bill) => {
     try {
-      await api.post(`/bills/${bill.id}/mark-paid`);
-      setPayQrModalBill(null);
-      setSuccessMsg(`Payment completed successfully for bill #${bill.id}!`);
-      // Open invoice modal for preview immediately
       const updatedRes = await api.get(`/bills/${bill.id}`);
       setInvoiceModalBill(updatedRes.data);
       await fetchBills();
     } catch (err) {
-      console.error("Error marking bill paid:", err);
-      setErrorMsg("Failed to process payment. Please try again.");
+      console.error('Error refreshing bill:', err);
     }
   };
 
@@ -233,6 +229,12 @@ export default function Bills() {
                             <span className="t-label">House No</span>
                             <span className="t-value">{bill.houseNumber}</span>
                           </div>
+                          {bill.meterId && (
+                            <div className="t-detail-item">
+                              <span className="t-label">Meter ID</span>
+                              <span className="t-value">{bill.meterId}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div
@@ -313,37 +315,17 @@ export default function Bills() {
         )}
       </motion.div>
 
-      {/* QR Pay Modal */}
+      {/* Razorpay Payment Modal */}
       {payQrModalBill && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-surface border border-border w-full max-w-sm rounded-2xl p-6 shadow-2xl relative text-center">
-            <button onClick={() => setPayQrModalBill(null)} className="absolute top-4 right-4 text-text-muted hover:text-text cursor-pointer"><X className="w-5 h-5" /></button>
-            <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-3">
-              <CheckCircle className="w-6 h-6 text-emerald-400" />
-            </div>
-            <h3 className="text-xl font-bold text-text mb-1">Pay Utility Bill</h3>
-            <p className="text-text-muted text-sm mb-4">Scan the QR code below using any UPI app to pay</p>
-            <div className="bg-white p-4 rounded-xl mx-auto w-fit mb-4">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`AquaTrack Bill|ID:${payQrModalBill.id}|House:${payQrModalBill.houseNumber}|Amount:${payQrModalBill.amount}|Due:${payQrModalBill.dueDate}`)}`}
-                alt="Payment QR Code"
-                className="w-44 h-44"
-              />
-            </div>
-            <div className="bg-surface-lighter rounded-xl p-3 text-left mb-5 space-y-1 text-sm">
-              <div className="flex justify-between"><span className="text-text-muted">House</span><span className="font-semibold text-text">{payQrModalBill.houseNumber}</span></div>
-              <div className="flex justify-between"><span className="text-text-muted">Amount</span><span className="font-bold text-emerald-400">₹{payQrModalBill.amount}</span></div>
-              <div className="flex justify-between"><span className="text-text-muted">Due Date</span><span className="font-semibold text-text">{payQrModalBill.dueDate}</span></div>
-              <div className="flex justify-between"><span className="text-text-muted">Status</span><span className="text-amber-400 font-semibold">{payQrModalBill.status}</span></div>
-            </div>
-            <button
-              onClick={() => handleMarkBillPaid(payQrModalBill)}
-              className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold transition-all cursor-pointer"
-            >
-              ✅ I Have Scanned & Paid
-            </button>
-          </motion.div>
-        </div>
+        <RazorpayModal
+          bill={payQrModalBill}
+          onClose={() => setPayQrModalBill(null)}
+          onSuccess={async () => {
+            setPayQrModalBill(null);
+            setSuccessMsg(`Payment successful for bill #${payQrModalBill.id}!`);
+            await handleMarkBillPaid(payQrModalBill);
+          }}
+        />
       )}
 
       {/* Invoice Modal */}
@@ -409,6 +391,9 @@ export default function Bills() {
                   {invoiceModalBill.apartmentBlock && (
                     <p className="text-xs text-text-muted mt-1">Block: {invoiceModalBill.apartmentBlock}</p>
                   )}
+                  {invoiceModalBill.meterId && (
+                    <p className="text-xs text-text-muted mt-0.5">Meter ID: <span className="font-semibold text-text">{invoiceModalBill.meterId}</span></p>
+                  )}
                   <p className="text-xs text-text-muted">AquaTrack Registered Consumer</p>
                 </div>
               </div>
@@ -425,36 +410,79 @@ export default function Bills() {
                 </div>
                 <div>
                   <span className="text-text-muted block">Consumption</span>
-                  <span className="font-semibold text-text text-sm">{invoiceModalBill.consumptionLiters || 0} L</span>
+                  <span className="font-semibold text-text text-sm">{(invoiceModalBill.consumptionLiters || 0).toLocaleString()} L</span>
                 </div>
                 <div>
                   <span className="text-text-muted block">Rate / Liter</span>
                   <span className="font-semibold text-text text-sm">
-                    ₹{invoiceModalBill.consumptionLiters ? (invoiceModalBill.amount / invoiceModalBill.consumptionLiters).toFixed(4) : '0.00'}
+                    ₹{invoiceModalBill.baseRatePerLiter
+                      ? Number(invoiceModalBill.baseRatePerLiter).toFixed(4)
+                      : invoiceModalBill.consumptionLiters
+                        ? (invoiceModalBill.amount / invoiceModalBill.consumptionLiters).toFixed(4)
+                        : '0.0000'}
                   </span>
                 </div>
               </div>
 
-              {/* Table of charges */}
+              {/* Tariff Breakdown Table */}
               <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
+                <table className="w-full text-sm text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-border">
-                      <th className="py-3 font-semibold text-text-muted">Item Description</th>
-                      <th className="py-3 text-right font-semibold text-text-muted">Qty (Liters)</th>
-                      <th className="py-3 text-right font-semibold text-text-muted">Unit Rate</th>
-                      <th className="py-3 text-right font-semibold text-text-muted">Total (INR)</th>
+                    <tr className="bg-surface-lighter/60 border-b border-border">
+                      <th className="py-3 px-3 font-semibold text-text-muted rounded-tl-lg">Item Description</th>
+                      <th className="py-3 px-3 text-right font-semibold text-text-muted">Qty (Liters)</th>
+                      <th className="py-3 px-3 text-right font-semibold text-text-muted">Unit Rate (₹)</th>
+                      <th className="py-3 px-3 text-right font-semibold text-text-muted rounded-tr-lg">Amount (₹)</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr className="border-b border-border/50">
-                      <td className="py-4 font-medium text-text">Water Utility Consumption Fee</td>
-                      <td className="py-4 text-right text-text">{invoiceModalBill.consumptionLiters || 0} L</td>
-                      <td className="py-4 text-right text-text">
-                        ₹{invoiceModalBill.consumptionLiters ? (invoiceModalBill.amount / invoiceModalBill.consumptionLiters).toFixed(4) : '0.00'}
-                      </td>
-                      <td className="py-4 text-right font-semibold text-text">₹{invoiceModalBill.amount?.toFixed(2)}</td>
-                    </tr>
+                    {/* Row 1: Within-limit usage */}
+                    {invoiceModalBill.monthlyLimitLiters > 0 ? (
+                      <>
+                        <tr className="border-b border-border/50 hover:bg-surface-lighter/30">
+                          <td className="py-3.5 px-3">
+                            <div className="font-medium text-text">Standard Usage Charge</div>
+                            <div className="text-xs text-emerald-400 mt-0.5">Within monthly limit ({(invoiceModalBill.monthlyLimitLiters || 0).toLocaleString()} L)</div>
+                          </td>
+                          <td className="py-3.5 px-3 text-right text-text">{(invoiceModalBill.withinLimitLiters || 0).toLocaleString()} L</td>
+                          <td className="py-3.5 px-3 text-right text-text">₹{(invoiceModalBill.baseRatePerLiter || 0).toFixed(4)}</td>
+                          <td className="py-3.5 px-3 text-right font-semibold text-emerald-400">
+                            ₹{((invoiceModalBill.withinLimitLiters || 0) * (invoiceModalBill.baseRatePerLiter || 0)).toFixed(2)}
+                          </td>
+                        </tr>
+                        {(invoiceModalBill.excessLiters || 0) > 0 && (
+                          <tr className="border-b border-border/50 bg-red-500/5 hover:bg-red-500/8">
+                            <td className="py-3.5 px-3">
+                              <div className="font-medium text-red-400">⚠ Excess Consumption Charge</div>
+                              <div className="text-xs text-red-400/70 mt-0.5">
+                                {(invoiceModalBill.excessLiters || 0).toLocaleString()} L above limit — penalty rate applies
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-3 text-right text-red-400">{(invoiceModalBill.excessLiters || 0).toLocaleString()} L</td>
+                            <td className="py-3.5 px-3 text-right text-red-400">₹{(invoiceModalBill.excessRatePerLiter || 0).toFixed(4)}</td>
+                            <td className="py-3.5 px-3 text-right font-semibold text-red-400">
+                              +₹{((invoiceModalBill.excessLiters || 0) * (invoiceModalBill.excessRatePerLiter || 0)).toFixed(2)}
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    ) : (
+                      <tr className="border-b border-border/50 hover:bg-surface-lighter/30">
+                        <td className="py-3.5 px-3">
+                          <div className="font-medium text-text">Water Utility Consumption Fee</div>
+                          <div className="text-xs text-text-muted mt-0.5">Total usage billed at standard rate</div>
+                        </td>
+                        <td className="py-3.5 px-3 text-right text-text">{(invoiceModalBill.consumptionLiters || 0).toLocaleString()} L</td>
+                        <td className="py-3.5 px-3 text-right text-text">
+                          ₹{invoiceModalBill.baseRatePerLiter
+                            ? Number(invoiceModalBill.baseRatePerLiter).toFixed(4)
+                            : invoiceModalBill.consumptionLiters
+                              ? (invoiceModalBill.amount / invoiceModalBill.consumptionLiters).toFixed(4)
+                              : '0.0000'}
+                        </td>
+                        <td className="py-3.5 px-3 text-right font-semibold text-text">₹{invoiceModalBill.amount?.toFixed(2)}</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

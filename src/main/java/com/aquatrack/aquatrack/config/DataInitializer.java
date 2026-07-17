@@ -7,93 +7,64 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Optional;
 
 @Component
 public class DataInitializer implements CommandLineRunner {
 
     private final UserRepository userRepository;
-    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    public DataInitializer(UserRepository userRepository,
-                           org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
+    // Admin credentials — only used when seeding for the first time
+    private static final String ADMIN_USERNAME = "krishna";
+    private static final String ADMIN_EMAIL    = "pwjeeprayas@gmail.com";
+    private static final String ADMIN_PASSWORD  = "Krishna1234@";
+
+    public DataInitializer(UserRepository userRepository) {
         this.userRepository = userRepository;
-        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
     @Transactional
-    public void run(String... args) throws Exception {
-        try {
-            System.out.println("Checking all tables for 'household_id' column...");
-            List<java.util.Map<String, Object>> cols = jdbcTemplate.queryForList(
-                "SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_KEY, EXTRA " +
-                "FROM INFORMATION_SCHEMA.COLUMNS " +
-                "WHERE TABLE_SCHEMA = 'aquatrack'"
-            );
-            for (java.util.Map<String, Object> col : cols) {
-                System.out.println("DB SCHEMA: Table=" + col.get("TABLE_NAME") +
-                                   ", Column=" + col.get("COLUMN_NAME") +
-                                   ", Type=" + col.get("COLUMN_TYPE") +
-                                   ", Null=" + col.get("IS_NULLABLE") +
-                                   ", Key=" + col.get("COLUMN_KEY") +
-                                   ", Extra=" + col.get("EXTRA"));
-            }
-
-            System.out.println("Checking database triggers...");
-            List<java.util.Map<String, Object>> triggers = jdbcTemplate.queryForList(
-                "SELECT TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_STATEMENT " +
-                "FROM INFORMATION_SCHEMA.TRIGGERS " +
-                "WHERE TRIGGER_SCHEMA = 'aquatrack'"
-            );
-            for (java.util.Map<String, Object> trigger : triggers) {
-                System.out.println("TRIGGER: Name=" + trigger.get("TRIGGER_NAME") +
-                                   ", Event=" + trigger.get("EVENT_MANIPULATION") +
-                                   ", Table=" + trigger.get("EVENT_OBJECT_TABLE") +
-                                   ", Statement=" + trigger.get("ACTION_STATEMENT"));
-            }
-        } catch (Exception e) {
-            System.err.println("Error inspecting schema/triggers: " + e.getMessage());
-            e.printStackTrace();
-        }
-
-        // Seed/Update Super Admin (krishna)
-        seedOrUpdateUser("krishna", "pwjeeprayas@gmail.com", "Krishna1234@", "ROLE_ADMIN", "N/A", "System", "N/A", "Male");
+    public void run(String... args) {
+        ensureAdminExists();
     }
 
-    private void seedOrUpdateUser(String username, String email, String password, String role, String houseNumber, String colonyName, String apartmentBlock, String gender) {
-        Optional<User> userOpt = userRepository.findByUsername(username);
+    /**
+     * Seeds the Super Admin account exactly once.
+     * On subsequent boots the admin already exists, so we skip the costly
+     * BCrypt hash and avoid any unnecessary DB writes.
+     */
+    private void ensureAdminExists() {
+        Optional<User> existing = userRepository.findByUsername(ADMIN_USERNAME);
 
-        if (userOpt.isPresent()) {
-            User user = userOpt.get();
-            // Force update password and email as requested
-            user.setEmail(email);
-            user.setPassword(passwordEncoder.encode(password));
-            user.setStatus("APPROVED");
-            user.setRole(role);
-            userRepository.save(user);
-            System.out.println("Updated admin credentials for user: " + username);
+        if (existing.isEmpty()) {
+            User admin = new User();
+            admin.setUsername(ADMIN_USERNAME);
+            admin.setEmail(ADMIN_EMAIL);
+            admin.setPassword(passwordEncoder.encode(ADMIN_PASSWORD)); // BCrypt only runs once
+            admin.setRole("ROLE_ADMIN");
+            admin.setHouseNumber("N/A");
+            admin.setColonyName("System");
+            admin.setApartmentBlock("N/A");
+            admin.setGender("Male");
+            admin.setFullName("Krishna");
+            admin.setMobileNumber("9876543210");
+            admin.setWhatsAppNumber("9876543210");
+            admin.setStatus("APPROVED");
+            admin.setVerificationStatus("APPROVED");
+            userRepository.save(admin);
+            System.out.println("[AquaTrack] Super Admin seeded: " + ADMIN_USERNAME);
         } else {
-            // Create user
-            User user = new User();
-            user.setUsername(username);
-            user.setEmail(email);
-            user.setPassword(passwordEncoder.encode(password));
-            user.setRole(role);
-            user.setHouseNumber(houseNumber);
-            user.setColonyName(colonyName);
-            user.setApartmentBlock(apartmentBlock);
-            user.setGender(gender);
-            user.setFullName("Krishna");
-            user.setMobileNumber("9876543210");
-            user.setWhatsAppNumber("9876543210");
-            user.setStatus("APPROVED");
-            user.setVerificationStatus("APPROVED");
-            userRepository.save(user);
-            System.out.println("Successfully seeded admin user: " + username + " with role: " + role);
+            // Admin already exists — ensure status/role are correct without re-hashing password
+            User admin = existing.get();
+            boolean changed = false;
+            if (!"APPROVED".equals(admin.getStatus()))       { admin.setStatus("APPROVED");      changed = true; }
+            if (!"ROLE_ADMIN".equals(admin.getRole()))       { admin.setRole("ROLE_ADMIN");       changed = true; }
+            if (!ADMIN_EMAIL.equalsIgnoreCase(admin.getEmail())) { admin.setEmail(ADMIN_EMAIL);   changed = true; }
+            if (changed) userRepository.save(admin);
+            System.out.println("[AquaTrack] Super Admin verified: " + ADMIN_USERNAME);
         }
     }
 }

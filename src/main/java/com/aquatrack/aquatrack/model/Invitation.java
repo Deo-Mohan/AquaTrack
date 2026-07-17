@@ -34,6 +34,8 @@ public class Invitation {
 
     private String invitedBy; // Username of Community Admin
 
+    private String meterId;
+
     public Invitation() {}
 
     public Invitation(String email, String fullName, String token, LocalDateTime expiryDate, String colonyName, String apartmentBlock, String houseNumber, String invitedBy) {
@@ -73,4 +75,6 @@ public class Invitation {
     public void setStatus(String status) { this.status = status; }
     public String getInvitedBy() { return invitedBy; }
     public void setInvitedBy(String invitedBy) { this.invitedBy = invitedBy; }
+    public String getMeterId() { return meterId; }
+    public void setMeterId(String meterId) { this.meterId = meterId; }
 }

@@ -8,14 +8,26 @@ import com.aquatrack.aquatrack.repository.UserRepository;
 import jakarta.validation.Valid;
 import com.aquatrack.aquatrack.service.PaymentReminderService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.razorpay.Order;
+import com.razorpay.RazorpayClient;
+import com.razorpay.RazorpayException;
+import com.razorpay.Utils;
+import org.json.JSONObject;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/bills")
 public class BillController {
+
+    @Value("${razorpay.key.id}")
+    private String razorpayKeyId;
+
+    @Value("${razorpay.key.secret}")
+    private String razorpayKeySecret;
 
     @Autowired
     private BillRepository repository;
@@ -104,6 +116,12 @@ public class BillController {
         if (bill.getGeneratedDate() == null) {
             bill.setGeneratedDate(java.time.LocalDate.now());
         }
+        if (bill.getHouseNumber() != null) {
+            java.util.Optional<com.aquatrack.aquatrack.model.User> residentOpt = userRepository.findByHouseNumber(bill.getHouseNumber());
+            if (residentOpt.isPresent()) {
+                bill.setMeterId(residentOpt.get().getMeterId());
+            }
+        }
         Bill savedBill = repository.save(bill);
 
         // Notify the household user
@@ -133,7 +151,8 @@ public class BillController {
                             savedBill.getAmount(),
                             savedBill.getGeneratedDate(),
                             savedBill.getDueDate(),
-                            savedBill.getConsumptionLiters()
+                            savedBill.getConsumptionLiters(),
+                            savedBill.getMeterId()
                         );
                     } catch (Exception e) {
                         System.err.println("SMTP dispatch failed for custom bill generated email: " + e.getMessage());
@@ -234,17 +253,27 @@ public class BillController {
             return ResponseEntity.badRequest().body("No water usage detail found, contact community admin");
         }
 
-        // 4. Resolve water rate
+        // 4. Resolve water rate and tariff settings from user or their community admin
         Double waterRate = user.getWaterRatePerLiter();
-        if (waterRate == null) {
+        Double monthlyLimit = user.getMonthlyLimitLiters();
+        Double excessRate = user.getExcessRatePerLiter();
+
+        boolean needsRateFallback = (waterRate == null || waterRate <= 0);
+        boolean needsLimitFallback = (monthlyLimit == null);
+        boolean needsExcessFallback = (excessRate == null);
+
+        if (needsRateFallback || needsLimitFallback || needsExcessFallback) {
             String block = user.getApartmentBlock();
             if (block != null && !block.trim().isEmpty()) {
                 List<com.aquatrack.aquatrack.model.User> admins = userRepository.findByRoleAndApartmentBlock("ROLE_COMMUNITY_ADMIN", block);
                 for (com.aquatrack.aquatrack.model.User admin : admins) {
-                    if (admin.getWaterRatePerLiter() != null) {
-                        waterRate = admin.getWaterRatePerLiter();
-                        break;
-                    }
+                    if (needsRateFallback && admin.getWaterRatePerLiter() != null && admin.getWaterRatePerLiter() > 0) waterRate = admin.getWaterRatePerLiter();
+                    if (needsLimitFallback && admin.getMonthlyLimitLiters() != null) monthlyLimit = admin.getMonthlyLimitLiters();
+                    if (needsExcessFallback && admin.getExcessRatePerLiter() != null) excessRate = admin.getExcessRatePerLiter();
+                    needsRateFallback = (waterRate == null || waterRate <= 0);
+                    needsLimitFallback = (monthlyLimit == null);
+                    needsExcessFallback = (excessRate == null);
+                    if (!needsRateFallback && !needsLimitFallback && !needsExcessFallback) break;
                 }
             }
         }
@@ -253,20 +282,38 @@ public class BillController {
             return ResponseEntity.badRequest().body("Water rate is not configured. Contact community admin.");
         }
 
-        // 5. Calculate amount
-        double amount = totalLiters * waterRate;
-        amount = Math.round(amount * 100.0) / 100.0;
+        // 5. Apply tiered tariff calculation
+        double withinLimit = totalLiters;
+        double excessLiters = 0.0;
+        double excessCharge = 0.0;
+        double baseCharge;
+
+        if (monthlyLimit != null && monthlyLimit > 0 && excessRate != null && totalLiters > monthlyLimit) {
+            withinLimit = monthlyLimit;
+            excessLiters = totalLiters - monthlyLimit;
+            excessCharge = excessLiters * excessRate;
+        }
+        baseCharge = withinLimit * waterRate;
+        double amount = Math.round((baseCharge + excessCharge) * 100.0) / 100.0;
 
         // 6. Save Bill
         Bill bill = new Bill();
         bill.setHouseNumber(houseNumber);
         bill.setApartmentBlock(user.getApartmentBlock());
         bill.setAmount(amount);
+        bill.setBaseCharge(baseCharge);
+        bill.setExcessCharge(excessCharge);
         bill.setConsumptionLiters(totalLiters);
+        bill.setWithinLimitLiters(withinLimit);
+        bill.setExcessLiters(excessLiters);
+        bill.setBaseRatePerLiter(waterRate);
+        bill.setExcessRatePerLiter(excessRate != null ? excessRate : 0.0);
+        bill.setMonthlyLimitLiters(monthlyLimit != null ? monthlyLimit : 0.0);
         bill.setGeneratedDate(java.time.LocalDate.now());
         bill.setDueDate(java.time.LocalDate.now().plusDays(15));
         bill.setStatus("UNPAID");
         bill.setBillingCycleId(1L); // Default fallback cycle
+        bill.setMeterId(user.getMeterId());
 
         Bill saved = repository.save(bill);
 
@@ -414,5 +461,80 @@ public class BillController {
             @RequestParam String apartmentBlock) {
         paymentReminderService.sendRemindersToAllUnpaidInBlock(apartmentBlock);
         return ResponseEntity.ok("Reminders successfully dispatched to all unpaid households in block " + apartmentBlock);
+    }
+
+    // POST: Create a Razorpay Order ID for a bill payment
+    @PostMapping("/{id}/create-order")
+    public ResponseEntity<?> createRazorpayOrder(@PathVariable Long id) {
+        Bill bill = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Bill not found with ID: " + id));
+
+        try {
+            RazorpayClient client = new RazorpayClient(razorpayKeyId, razorpayKeySecret);
+            JSONObject orderRequest = new JSONObject();
+            orderRequest.put("amount", Math.round(bill.getAmount() * 100)); // in paise
+            orderRequest.put("currency", "INR");
+            orderRequest.put("receipt", "rcpt_" + bill.getId());
+
+            Order order = client.orders.create(orderRequest);
+            
+            java.util.Map<String, Object> response = new java.util.HashMap<>();
+            response.put("orderId", order.get("id"));
+            response.put("amount", order.get("amount"));
+            response.put("currency", order.get("currency"));
+            response.put("keyId", razorpayKeyId);
+
+            return ResponseEntity.ok(response);
+        } catch (RazorpayException e) {
+            return ResponseEntity.status(500).body("Error creating Razorpay order: " + e.getMessage());
+        }
+    }
+
+    // POST: Verify Razorpay payment signature and mark bill as paid
+    @PostMapping("/{id}/verify-payment")
+    public ResponseEntity<?> verifyRazorpayPayment(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, String> payload) {
+        Bill bill = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Bill not found with ID: " + id));
+
+        String orderId = payload.get("razorpay_order_id");
+        String paymentId = payload.get("razorpay_payment_id");
+        String signature = payload.get("razorpay_signature");
+
+        try {
+            JSONObject options = new JSONObject();
+            options.put("razorpay_order_id", orderId);
+            options.put("razorpay_payment_id", paymentId);
+            options.put("razorpay_signature", signature);
+
+            boolean isSignatureValid = Utils.verifyPaymentSignature(options, razorpayKeySecret);
+
+            if (isSignatureValid) {
+                bill.setStatus("PAID");
+                Bill saved = repository.save(bill);
+
+                // Notify household user
+                java.util.Optional<com.aquatrack.aquatrack.model.User> userOpt = userRepository.findByHouseNumber(bill.getHouseNumber());
+                if (userOpt.isPresent()) {
+                    com.aquatrack.aquatrack.model.User user = userOpt.get();
+                    String title = "Payment Received — Invoice Ready";
+                    String message = String.format(
+                        "Your water bill of ₹%.2f for %s (Due: %s) has been marked PAID. Thank you! Your invoice is available for download.",
+                        bill.getAmount(), bill.getHouseNumber(), bill.getDueDate()
+                    );
+                    Notification notif = new Notification(user.getUsername(), "BILL_GENERATED", title, message);
+                    notif.setReferenceId(bill.getId());
+                    notif.setReferenceType("BILL");
+                    notificationRepository.save(notif);
+                }
+
+                return ResponseEntity.ok(saved);
+            } else {
+                return ResponseEntity.badRequest().body("Invalid payment signature verification failed.");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error verifying Razorpay payment: " + e.getMessage());
+        }
     }
 }

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Droplet, ArrowRight, Shield, BarChart3, Users, Zap, CheckCircle2, Sun, Moon } from 'lucide-react';
+import { Droplet, ArrowRight, Shield, BarChart3, Users, Zap, CheckCircle2, Sun, Moon, Sparkles } from 'lucide-react';
 
 function FeaturePanelCard({ icon: Icon, title, subtitle, blobsColor, cardType }) {
   return (
@@ -47,6 +47,9 @@ export default function Landing() {
   const [theme, setTheme] = React.useState(() => {
     return document.documentElement.getAttribute('data-theme') || 'dark';
   });
+  const [bgType, setBgType] = React.useState(() => {
+    return localStorage.getItem('landing-bg-type') || 'modern';
+  });
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -55,7 +58,14 @@ export default function Landing() {
     localStorage.setItem('theme', nextTheme);
   };
 
+  const handleBgTypeChange = (type) => {
+    setBgType(type);
+    localStorage.setItem('landing-bg-type', type);
+  };
+
   React.useEffect(() => {
+    if (bgType !== 'liquid') return;
+
     // Skip loading WebGL/Three.js liquid background on mobile to prevent performance lag
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
     if (isMobile) return;
@@ -93,7 +103,7 @@ export default function Landing() {
         }
       }
     };
-  }, []);
+  }, [bgType]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -126,12 +136,33 @@ export default function Landing() {
     <div className="min-h-screen bg-transparent relative overflow-hidden flex flex-col items-center selection:bg-primary/30 scroll-smooth">
 
       {/* Liquid Background Canvas */}
-      <canvas id="liquid-canvas" className="hidden md:block absolute inset-0 w-full h-full pointer-events-none opacity-80" style={{ zIndex: 0 }} />
+      <canvas 
+        id="liquid-canvas" 
+        className={`hidden md:block absolute inset-0 w-full h-full pointer-events-none transition-opacity duration-700 ${
+          bgType === 'liquid' ? 'opacity-80 z-0' : 'opacity-0 z-[-1]'
+        }`} 
+      />
 
-      {/* Animated Background Elements */}
-      <div className="hidden md:block absolute top-[-20%] left-[-10%] w-[70%] h-[70%] rounded-full bg-blue-600/15 blur-[120px] pointer-events-none animate-pulse" />
-      <div className="hidden md:block absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-cyan-500/10 blur-[120px] pointer-events-none animate-pulse delay-1000" />
-      <div className="hidden md:block absolute top-[40%] right-[10%] w-[30%] h-[40%] rounded-full bg-blue-400/8 blur-[120px] pointer-events-none animate-pulse delay-700" />
+      {/* Modern High Quality Background Elements */}
+      <div className={`absolute inset-0 pointer-events-none overflow-hidden transition-opacity duration-700 z-0 ${
+        bgType === 'modern' ? 'opacity-100' : 'opacity-0'
+      }`}>
+        {/* Subtle Grid Overlay */}
+        <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" 
+             style={{ 
+               backgroundImage: 'radial-gradient(var(--color-primary) 1px, transparent 1px), radial-gradient(var(--color-primary) 1px, transparent 1px)',
+               backgroundSize: '40px 40px',
+               backgroundPosition: '0 0, 20px 20px'
+             }} 
+        />
+        {/* Futuristic mesh gradient lines */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(59,130,246,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(59,130,246,0.03)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
+
+        {/* Large Premium Glow Orbs */}
+        <div className="absolute top-[-10%] left-[5%] w-[60vw] h-[60vw] rounded-full bg-gradient-to-tr from-primary/10 to-blue-500/10 blur-[130px] animate-pulse pointer-events-none" />
+        <div className="absolute bottom-[-10%] right-[5%] w-[50vw] h-[50vw] rounded-full bg-gradient-to-br from-emerald-500/5 to-cyan-500/5 blur-[130px] animate-pulse pointer-events-none" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-[30%] right-[10%] w-[35vw] h-[35vw] rounded-full bg-gradient-to-l from-indigo-500/5 to-blue-500/5 blur-[120px] pointer-events-none" style={{ animationDelay: '1s' }} />
+      </div>
 
       {/* Brand Navbar */}
       <nav className="w-full px-6 py-6 z-20 flex justify-center lg:justify-start">
@@ -177,7 +208,35 @@ export default function Landing() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 md:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+            {/* Background Control Segmented Widget */}
+            <div className="hidden md:flex relative items-center p-1 rounded-full bg-surface-lighter/40 border border-border/20 backdrop-blur-md shadow-lg mr-1 sm:mr-3">
+              <button
+                onClick={() => handleBgTypeChange('modern')}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all duration-300 ${
+                  bgType === 'modern'
+                    ? 'bg-primary text-white shadow-md shadow-primary/20 scale-105'
+                    : 'text-text-muted hover:text-text'
+                }`}
+                title="Modern Background"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Modern</span>
+              </button>
+              <button
+                onClick={() => handleBgTypeChange('liquid')}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all duration-300 ${
+                  bgType === 'liquid'
+                    ? 'bg-primary text-white shadow-md shadow-primary/20 scale-105'
+                    : 'text-text-muted hover:text-text'
+                }`}
+                title="Liquid Background"
+              >
+                <Droplet className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Liquid</span>
+              </button>
+            </div>
+
             <label htmlFor="switch" className="toggle">
               <input 
                 type="checkbox" 
@@ -221,18 +280,18 @@ export default function Landing() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="z-10 w-full px-6 max-w-7xl mx-auto pt-8 pb-20 md:pt-12 md:pb-24 flex flex-col lg:flex-row items-center justify-between gap-12 min-h-[85vh]"
+        className="z-10 w-full px-6 max-w-7xl mx-auto pt-16 pb-28 md:pt-24 md:pb-36 flex flex-col lg:flex-row items-center justify-between gap-12 min-h-[85vh]"
       >
         <div className="flex-1 text-center lg:text-left">
 
-          <motion.h1 variants={itemVariants} className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-text tracking-tighter mb-6 lg:leading-[1.1]">
+          <motion.h1 variants={itemVariants} className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-text tracking-tighter mb-8 lg:leading-[1.1]">
             Smart Water Management <br className="hidden lg:block" />
             <span className="bg-gradient-to-r from-primary via-blue-400 to-cyan-300 bg-clip-text text-transparent">
               For Communities
             </span>
           </motion.h1>
 
-          <motion.p variants={itemVariants} className="text-base sm:text-lg md:text-xl text-text/90 mb-10 max-w-2xl mx-auto lg:mx-0 leading-relaxed px-4 lg:px-0">
+          <motion.p variants={itemVariants} className="text-base sm:text-lg md:text-xl text-text/90 mb-12 max-w-2xl mx-auto lg:mx-0 leading-relaxed px-4 lg:px-0">
             Monitor household consumption, allocate shared costs fairly, and conserve water with our intelligent analytics and automated billing platform.
           </motion.p>
 
@@ -363,7 +422,7 @@ export default function Landing() {
         initial="hidden"
         animate="visible"
         variants={containerVariants}
-        className="z-10 w-full px-6 max-w-6xl mx-auto py-10 md:py-20 relative"
+        className="z-10 w-full px-6 max-w-6xl mx-auto py-20 md:py-32 relative"
       >
         <div className="text-center mb-8 md:mb-16">
           <motion.h2 

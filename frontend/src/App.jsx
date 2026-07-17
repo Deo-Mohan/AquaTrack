@@ -20,6 +20,9 @@ const Support = lazy(() => import('./pages/Support'));
 const Invoices = lazy(() => import('./pages/Invoices'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const WaterTips = lazy(() => import('./pages/WaterTips'));
+const TariffSettings = lazy(() => import('./pages/TariffSettings'));
+const MeterWorkstation = lazy(() => import('./pages/MeterWorkstation'));
+const WaterBillingHistory = lazy(() => import('./pages/WaterBillingHistory'));
 
 // Beautiful premium Glassmorphism page loader during lazy chunks fetching
 const PageLoader = () => (
@@ -56,7 +59,7 @@ const AuthLayout = ({ children }) => {
       <Header toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
       
       {/* Sidebar + Main content container below the header */}
-      <div className="flex flex-1 overflow-hidden w-full relative z-20">
+      <div className="flex flex-1 overflow-hidden w-full relative">
         <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-primary/20 blur-[120px] pointer-events-none" />
         <div className="absolute bottom-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-500/10 blur-[120px] pointer-events-none" />
         
@@ -93,6 +96,9 @@ function App() {
           <Route path="/usage" element={<AuthLayout><MyUsage /></AuthLayout>} />
           <Route path="/profile" element={<AuthLayout><Profile /></AuthLayout>} />
           <Route path="/support" element={<AuthLayout><Support /></AuthLayout>} />
+          <Route path="/tariff" element={<AuthLayout><TariffSettings /></AuthLayout>} />
+          <Route path="/meter-workstation" element={<AuthLayout><MeterWorkstation /></AuthLayout>} />
+          <Route path="/water-billing-history" element={<AuthLayout><WaterBillingHistory /></AuthLayout>} />
           
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/login" replace />} />

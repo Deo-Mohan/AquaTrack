@@ -28,8 +28,17 @@ import java.util.stream.Collectors;
 
 import com.aquatrack.aquatrack.model.Apartment;
 import com.aquatrack.aquatrack.model.Household;
+import com.aquatrack.aquatrack.model.RefreshToken;
+import com.aquatrack.aquatrack.model.WaterUsageLog;
+import com.aquatrack.aquatrack.model.Bill;
+import com.aquatrack.aquatrack.model.WaterUsageAuditLog;
 import com.aquatrack.aquatrack.repository.ApartmentRepository;
 import com.aquatrack.aquatrack.repository.HouseholdRepository;
+import com.aquatrack.aquatrack.repository.RefreshTokenRepository;
+import com.aquatrack.aquatrack.repository.WaterUsageRepository;
+import com.aquatrack.aquatrack.repository.BillRepository;
+import com.aquatrack.aquatrack.repository.WaterUsageAuditLogRepository;
+import org.springframework.transaction.annotation.Transactional;
 
 @RestController
 @RequestMapping("/api/admin/users")
@@ -55,6 +64,18 @@ public class UserManagementController {
 
     @Autowired
     private NotificationRepository notificationRepository;
+
+    @Autowired
+    private RefreshTokenRepository refreshTokenRepository;
+
+    @Autowired
+    private WaterUsageRepository waterUsageRepository;
+
+    @Autowired
+    private BillRepository billRepository;
+
+    @Autowired
+    private WaterUsageAuditLogRepository waterUsageAuditLogRepository;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -208,6 +229,8 @@ public class UserManagementController {
             allResidents.addAll(blockResidents2);
             for (User resident : allResidents) {
                 resident.setWaterRatePerLiter(savedUser.getWaterRatePerLiter());
+                if (savedUser.getMonthlyLimitLiters() != null) resident.setMonthlyLimitLiters(savedUser.getMonthlyLimitLiters());
+                if (savedUser.getExcessRatePerLiter() != null) resident.setExcessRatePerLiter(savedUser.getExcessRatePerLiter());
                 userRepository.save(resident);
             }
         }
@@ -284,8 +307,9 @@ public class UserManagementController {
         existingUser.setFullName(updatedUser.getFullName());
         existingUser.setMobileNumber(updatedUser.getMobileNumber());
         existingUser.setWhatsAppNumber(updatedUser.getWhatsAppNumber());
+        existingUser.setMeterId(updatedUser.getMeterId());
         
-        // Admin can update roles, blocks, and water rate
+        // Admin can update roles, blocks, water rate, and tariff settings
         if ("ROLE_ADMIN".equalsIgnoreCase(callerRole)) {
             String targetRole = updatedUser.getRole();
             if (targetRole != null && !targetRole.isEmpty()) {
@@ -297,6 +321,11 @@ public class UserManagementController {
             existingUser.setApartmentBlock(updatedUser.getApartmentBlock());
             existingUser.setWaterRatePerLiter(updatedUser.getWaterRatePerLiter());
         }
+        // Community Admin can update their own tariff settings
+        if ("ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(callerRole) || "ROLE_ADMIN".equalsIgnoreCase(callerRole)) {
+            if (updatedUser.getMonthlyLimitLiters() != null) existingUser.setMonthlyLimitLiters(updatedUser.getMonthlyLimitLiters());
+            if (updatedUser.getExcessRatePerLiter() != null) existingUser.setExcessRatePerLiter(updatedUser.getExcessRatePerLiter());
+        }
 
         // If a new password is provided, encrypt and update it
         if (updatedUser.getPassword() != null && !updatedUser.getPassword().trim().isEmpty() && updatedUser.getPassword().length() >= 6) {
@@ -305,8 +334,8 @@ public class UserManagementController {
 
         User savedUser = userRepository.save(existingUser);
 
-        // AUTO-PROPAGATE: When Super Admin sets a water rate on a Community Admin,
-        // automatically apply the same rate to all household users in that block.
+        // AUTO-PROPAGATE: When Super Admin updates a Community Admin's water rate / tariff,
+        // automatically sync all household users in that block.
         if ("ROLE_ADMIN".equalsIgnoreCase(callerRole)
                 && "ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(savedUser.getRole())
                 && savedUser.getWaterRatePerLiter() != null) {
@@ -317,6 +346,8 @@ public class UserManagementController {
             allResidents.addAll(blockResidents2);
             for (User resident : allResidents) {
                 resident.setWaterRatePerLiter(savedUser.getWaterRatePerLiter());
+                if (savedUser.getMonthlyLimitLiters() != null) resident.setMonthlyLimitLiters(savedUser.getMonthlyLimitLiters());
+                if (savedUser.getExcessRatePerLiter() != null) resident.setExcessRatePerLiter(savedUser.getExcessRatePerLiter());
                 userRepository.save(resident);
             }
         }
@@ -326,6 +357,7 @@ public class UserManagementController {
 
     // 4. DELETE: Delete user
     @DeleteMapping("/{id}")
+    @Transactional
     public ResponseEntity<?> deleteUser(
             @PathVariable Long id,
             @RequestParam String callerRole,
@@ -348,6 +380,66 @@ public class UserManagementController {
             }
         } else {
             return ResponseEntity.status(403).body("Access denied. Invalid caller role.");
+        }
+
+        // Clean up user-related data cascadingly
+        String username = existingUser.getUsername();
+        String email = existingUser.getEmail();
+        String houseNumber = existingUser.getHouseNumber();
+
+        // 1. Delete Refresh Tokens
+        List<RefreshToken> tokens = refreshTokenRepository.findByUsername(username);
+        if (tokens != null && !tokens.isEmpty()) {
+            refreshTokenRepository.deleteAll(tokens);
+        }
+
+        // 2. Delete User Documents
+        List<UserDocument> docs = userDocumentRepository.findByUsername(username);
+        if (docs != null && !docs.isEmpty()) {
+            userDocumentRepository.deleteAll(docs);
+        }
+
+        // 3. Delete Notifications
+        List<Notification> notifications = notificationRepository.findByUsernameOrderByCreatedAtDesc(username);
+        if (notifications != null && !notifications.isEmpty()) {
+            notificationRepository.deleteAll(notifications);
+        }
+
+        // 4. Delete Invitation
+        if (email != null) {
+            invitationRepository.findByEmail(email).ifPresent(inv -> invitationRepository.delete(inv));
+        }
+
+        // 5. Clean up Household and associated data (Water Usage Logs, Bills, Audit Logs)
+        if (houseNumber != null && !houseNumber.trim().isEmpty()) {
+            List<User> otherUsersWithSameHouse = userRepository.findAll().stream()
+                    .filter(u -> houseNumber.equalsIgnoreCase(u.getHouseNumber()) && !u.getId().equals(existingUser.getId()))
+                    .collect(Collectors.toList());
+
+            if (otherUsersWithSameHouse.isEmpty()) {
+                // Delete associated Water Usage Logs
+                List<WaterUsageLog> logs = waterUsageRepository.findByHouseNumber(houseNumber);
+                if (logs != null && !logs.isEmpty()) {
+                    waterUsageRepository.deleteAll(logs);
+                }
+
+                // Delete associated Bills
+                List<Bill> bills = billRepository.findByHouseNumber(houseNumber);
+                if (bills != null && !bills.isEmpty()) {
+                    billRepository.deleteAll(bills);
+                }
+
+                // Delete associated Water Usage Audit Logs
+                List<WaterUsageAuditLog> auditLogs = waterUsageAuditLogRepository.findAll().stream()
+                        .filter(log -> houseNumber.equalsIgnoreCase(log.getHouseNumber()))
+                        .collect(Collectors.toList());
+                if (auditLogs != null && !auditLogs.isEmpty()) {
+                    waterUsageAuditLogRepository.deleteAll(auditLogs);
+                }
+
+                // Delete the Household itself
+                householdRepository.findByHouseNumber(houseNumber).ifPresent(h -> householdRepository.delete(h));
+            }
         }
 
         userRepository.delete(existingUser);
@@ -484,6 +576,7 @@ public class UserManagementController {
         String fullName = request.get("fullName");
         String email = request.get("email");
         String houseNumber = request.get("houseNumber"); // NEW: flat/house number pre-assigned at invite time
+        String meterId = request.get("meterId");
 
         if (fullName == null || fullName.trim().isEmpty() || email == null || email.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Full Name and Email are required.");
@@ -519,6 +612,7 @@ public class UserManagementController {
             invitation.setApartmentBlock(callerBlock);
             invitation.setHouseNumber(houseNumber.trim());
             invitation.setInvitedBy(callerUsername);
+            invitation.setMeterId(meterId != null ? meterId.trim() : null);
         } else {
             invitation = new Invitation(
                     email,
@@ -530,12 +624,13 @@ public class UserManagementController {
                     houseNumber.trim(),
                     callerUsername
             );
+            invitation.setMeterId(meterId != null ? meterId.trim() : null);
         }
 
         invitationRepository.save(invitation);
 
         // Send Email
-        emailService.sendInvitationEmail(email, fullName, communityAdmin.getColonyName(), token);
+        emailService.sendInvitationEmail(email, fullName, communityAdmin.getColonyName(), token, invitation.getMeterId());
 
         return ResponseEntity.ok("Invitation sent successfully to " + email);
     }
@@ -669,7 +764,7 @@ public class UserManagementController {
                 }
                 invitationRepository.save(invitation);
 
-                emailService.sendInvitationEmail(email, fullName, communityAdmin.getColonyName(), token);
+                emailService.sendInvitationEmail(email, fullName, communityAdmin.getColonyName(), token, invitation.getMeterId());
 
                 imported++;
                 Map<String, String> rowReport = new HashMap<>();

@@ -310,6 +310,7 @@ public class AuthController {
         details.put("apartmentBlock", invitation.getApartmentBlock());
         details.put("houseNumber", invitation.getHouseNumber());
         details.put("invitedBy", invitation.getInvitedBy());
+        details.put("meterId", invitation.getMeterId());
 
         return ResponseEntity.ok(details);
     }
@@ -375,6 +376,18 @@ public class AuthController {
         user.setMobileNumber(mobileNumber);
         user.setWhatsAppNumber(whatsAppNumber != null ? whatsAppNumber : mobileNumber);
         user.setGender(gender != null ? gender : "female");
+        user.setMeterId(invitation.getMeterId());
+
+        // Inherit tariff settings from the Community Admin of this block
+        if (invitation.getApartmentBlock() != null && !invitation.getApartmentBlock().trim().isEmpty()) {
+            List<User> blockAdmins = userRepository.findByRoleAndApartmentBlock("ROLE_COMMUNITY_ADMIN", invitation.getApartmentBlock());
+            if (!blockAdmins.isEmpty()) {
+                User blockAdmin = blockAdmins.get(0);
+                if (blockAdmin.getWaterRatePerLiter() != null) user.setWaterRatePerLiter(blockAdmin.getWaterRatePerLiter());
+                if (blockAdmin.getMonthlyLimitLiters() != null) user.setMonthlyLimitLiters(blockAdmin.getMonthlyLimitLiters());
+                if (blockAdmin.getExcessRatePerLiter() != null) user.setExcessRatePerLiter(blockAdmin.getExcessRatePerLiter());
+            }
+        }
 
         userRepository.save(user);
         syncUserToHousehold(user);

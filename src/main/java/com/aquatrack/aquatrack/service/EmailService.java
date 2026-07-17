@@ -50,7 +50,7 @@ public class EmailService {
     }
 
     // 2. Send Invitation Email to Household User
-    public void sendInvitationEmail(String toEmail, String fullName, String communityName, String token) {
+    public void sendInvitationEmail(String toEmail, String fullName, String communityName, String token, String meterId) {
         String subject = "You are invited to join " + communityName + " on AquaTrack";
         String inviteUrl = "http://localhost:5173/register/invite/" + token;
 
@@ -74,6 +74,11 @@ public class EmailService {
                 "            <td style=\"padding: 6px 0; color: #8b949e;\">Account Type:</td>" +
                 "            <td style=\"padding: 6px 0; font-weight: 600; color: #f0f6fc;\">Household Resident</td>" +
                 "          </tr>" +
+                (meterId != null && !meterId.trim().isEmpty() ?
+                "          <tr>" +
+                "            <td style=\"padding: 6px 0; color: #8b949e;\">Meter ID:</td>" +
+                "            <td style=\"padding: 6px 0; font-weight: 600; color: #f0f6fc;\">" + meterId.trim() + "</td>" +
+                "          </tr>" : "") +
                 "          <tr>" +
                 "            <td style=\"padding: 6px 0; color: #8b949e;\">Validity:</td>" +
                 "            <td style=\"padding: 6px 0; font-weight: 600; color: #ff7e5f;\">48 Hours Only</td>" +
@@ -171,11 +176,36 @@ public class EmailService {
         sendEmail(toEmail, subject, htmlContent);
     }
 
-    // 5. Send Bill Generated Email
-    public void sendBillGeneratedEmail(String toEmail, String fullName, String houseNumber, Double amount, java.time.LocalDate generatedDate, java.time.LocalDate dueDate, Double consumption) {
+    // 5. Send Bill Generated Email (with full tariff breakdown)
+    public void sendBillGeneratedEmail(String toEmail, String fullName, String houseNumber, Double amount,
+            java.time.LocalDate generatedDate, java.time.LocalDate dueDate, Double consumption, String meterId) {
+        sendBillGeneratedEmail(toEmail, fullName, houseNumber, amount, generatedDate, dueDate, consumption, meterId,
+                null, null, null, null, null);
+    }
+
+    // Overload with tariff breakdown details
+    public void sendBillGeneratedEmail(String toEmail, String fullName, String houseNumber, Double amount,
+            java.time.LocalDate generatedDate, java.time.LocalDate dueDate, Double consumption, String meterId,
+            Double withinLimitLiters, Double excessLiters, Double baseRatePerLiter, Double excessRatePerLiter, Double monthlyLimitLiters) {
         String subject = "New Water Bill Generated for House " + houseNumber;
         String formattedDate = generatedDate != null ? generatedDate.toString() : java.time.LocalDate.now().toString();
         String monthName = generatedDate != null ? generatedDate.getMonth().toString() : java.time.LocalDate.now().getMonth().toString();
+
+        boolean hasTariffBreakdown = monthlyLimitLiters != null && monthlyLimitLiters > 0
+                && baseRatePerLiter != null && baseRatePerLiter > 0;
+
+        String breakdownHtml = "";
+        if (hasTariffBreakdown) {
+            double baseCharge = (withinLimitLiters != null ? withinLimitLiters : 0.0) * (baseRatePerLiter != null ? baseRatePerLiter : 0.0);
+            double excessChg = (excessLiters != null && excessLiters > 0 && excessRatePerLiter != null)
+                    ? excessLiters * excessRatePerLiter : 0.0;
+            breakdownHtml =
+                "      <tr><td colspan=\"2\"><hr style=\"border-color:#30363d; margin: 8px 0;\"/></td></tr>" +
+                "      <tr><td style=\"padding: 6px 0; color: #8b949e; font-size: 13px;\">Monthly Limit:</td><td style=\"padding: 6px 0; font-weight: bold; text-align: right; font-size: 13px; color: #f0f6fc;\">" + (monthlyLimitLiters != null ? monthlyLimitLiters.intValue() : 0) + " L</td></tr>" +
+                "      <tr><td style=\"padding: 6px 0; color: #8b949e; font-size: 13px;\">Within-Limit Usage:</td><td style=\"padding: 6px 0; font-weight: bold; text-align: right; font-size: 13px; color: #10b981;\">" + (withinLimitLiters != null ? withinLimitLiters.intValue() : 0) + " L × ₹" + String.format("%.4f", baseRatePerLiter != null ? baseRatePerLiter : 0.0) + " = ₹" + String.format("%.2f", baseCharge) + "</td></tr>" +
+                (excessLiters != null && excessLiters > 0 && excessRatePerLiter != null ?
+                "      <tr><td style=\"padding: 6px 0; color: #f87171; font-size: 13px;\">⚠ Excess Consumption:</td><td style=\"padding: 6px 0; font-weight: bold; text-align: right; font-size: 13px; color: #f87171;\">" + excessLiters.intValue() + " L × ₹" + String.format("%.4f", excessRatePerLiter) + " = +₹" + String.format("%.2f", excessChg) + "</td></tr>" : "");
+        }
 
         String htmlContent = "<div style=\"font-family: 'Segoe UI', Arial, sans-serif; background-color: #0d1117; color: #c9d1d9; padding: 40px 20px; text-align: center;\">" +
                 "  <div style=\"max-width: 600px; margin: 0 auto; background: #161b22; border: 1px solid #30363d; border-radius: 16px; padding: 40px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); text-align: left;\">" +
@@ -190,12 +220,15 @@ public class EmailService {
                 "      <table style=\"width: 100%; border-collapse: collapse; font-size: 15px; color: #c9d1d9;\">" +
                 "        <tr><td style=\"padding: 8px 0; color: #8b949e;\">Generated Date:</td><td style=\"padding: 8px 0; font-weight: bold; text-align: right;\">" + formattedDate + "</td></tr>" +
                 "        <tr><td style=\"padding: 8px 0; color: #8b949e;\">Due Date:</td><td style=\"padding: 8px 0; font-weight: bold; text-align: right;\">" + dueDate + "</td></tr>" +
-                "        <tr><td style=\"padding: 8px 0; color: #8b949e;\">Consumption:</td><td style=\"padding: 8px 0; font-weight: bold; text-align: right;\">" + (consumption != null ? consumption : 0.0) + " Liters</td></tr>" +
+                (meterId != null && !meterId.trim().isEmpty() ?
+                "        <tr><td style=\"padding: 8px 0; color: #8b949e;\">Meter ID:</td><td style=\"padding: 8px 0; font-weight: bold; text-align: right;\">" + meterId.trim() + "</td></tr>" : "") +
+                "        <tr><td style=\"padding: 8px 0; color: #8b949e;\">Total Consumption:</td><td style=\"padding: 8px 0; font-weight: bold; text-align: right;\">" + (consumption != null ? consumption.intValue() : 0) + " Liters</td></tr>" +
+                breakdownHtml +
                 "        <tr style=\"border-top: 1px solid #30363d;\"><td style=\"padding: 12px 0 0 0; color: #8b949e; font-size: 16px;\">Total Amount:</td><td style=\"padding: 12px 0 0 0; font-weight: 800; font-size: 18px; color: #00f2fe; text-align: right;\">₹" + String.format("%.2f", amount) + "</td></tr>" +
                 "      </table>" +
                 "    </div>" +
                 "    <div style=\"text-align: center; margin: 35px 0;\">" +
-                "      <a href=\"http://localhost:5173/login\" style=\"background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%); color: #ffffff; text-decoration: none; padding: 14px 35px; font-weight: bold; border-radius: 8px; font-size: 15px; box-shadow: 0 4px 15px rgba(0, 198, 255, 0.4);\">" +
+                "      <a href=\"http://localhost:5173/dashboard/bills\" style=\"display: inline-block; background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%); color: #ffffff; text-decoration: none; padding: 14px 35px; font-weight: bold; border-radius: 8px; font-size: 15px; box-shadow: 0 4px 15px rgba(0, 198, 255, 0.4);\">" +
                 "        Pay Now" +
                 "      </a>" +
                 "    </div>" +
