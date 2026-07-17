@@ -1337,10 +1337,18 @@ export default function AdminDashboard() {
     const latestLog = householdLatestLogMap[household];
     const lastDate = latestLog ? latestLog.readingDate : 'N/A';
 
+    // Format short name for Y-axis label (e.g. "12 (Anushka)" instead of "Flat 12 - Anushka Yadav")
+    let shortName = '';
+    if (residentName && residentName !== 'Unassigned') {
+      const firstWord = residentName.split(' ')[0];
+      shortName = firstWord.length > 8 ? firstWord.substring(0, 8) + '..' : firstWord;
+    }
+    const labelName = shortName ? `${household} (${shortName})` : household;
+
     return {
       houseNumber: household,
       residentName: residentName,
-      name: `Flat ${household} - ${residentName}`,
+      name: labelName,
       usage: householdUsageMap[household],
       lastReadingDate: lastDate
     };
@@ -1789,7 +1797,7 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <StatCard title="Total Houses" value={stats ? `${stats.totalHouseholds}` : '...'} icon={Home} color="blue" delay={0.1} />
                 <StatCard title="Registered Residents" value={stats ? `${stats.totalResidents}` : '...'} icon={Users} color="emerald" delay={0.2} />
-                <StatCard title="Total Block Usage (Month)" value={stats ? `${stats.totalUsageThisMonth} Liters` : '...'} icon={Droplet} color="purple" delay={0.3} />
+                <StatCard title={`Total Block Usage (${new Date().toLocaleString('default', { month: 'long' })})`} value={stats ? `${stats.totalUsageThisMonth} Liters` : '...'} icon={Droplet} color="purple" delay={0.3} />
               </div>
             )}
 
@@ -1893,12 +1901,12 @@ export default function AdminDashboard() {
                       return (
                         <BarChart 
                           data={chartData} 
-                          margin={{ top: 10, right: 10, left: 10, bottom: 0 }} 
+                          margin={{ top: 10, right: 10, left: 0, bottom: 0 }} 
                           layout="vertical"
                         >
                           <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
                           <XAxis type="number" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                          <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={175} />
+                          <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={85} />
                           <Tooltip content={<CustomTooltip />} cursor={{ fill: '#334155', opacity: 0.2 }} />
                           <Bar dataKey="usage" radius={[0, 4, 4, 0]} barSize={20}>
                             {chartData.map((entry, index) => (
