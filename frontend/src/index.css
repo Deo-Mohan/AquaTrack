@@ -3411,3 +3411,96 @@ body {
 .upload-csv-btn:active {
   transform: translateY(0) scale(0.98);
 }
+
+/* Theme-aware Alert Cards for Dashboard and AdminDashboard */
+.alert-card-danger {
+  background-color: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #f87171; /* red-400 */
+}
+[data-theme='light'] .alert-card-danger {
+  background-color: rgba(239, 68, 68, 0.07) !important;
+  border-color: rgba(239, 68, 68, 0.25) !important;
+  color: #b91c1c !important; /* deep red-700 for high contrast in light mode */
+}
+.alert-card-danger .alert-title {
+  color: #fca5a5;
+}
+[data-theme='light'] .alert-card-danger .alert-title {
+  color: #991b1b !important;
+}
+.alert-card-danger .alert-message {
+  color: rgba(248, 113, 113, 0.85);
+}
+[data-theme='light'] .alert-card-danger .alert-message {
+  color: #7f1d1d !important; /* deep dark red */
+}
+
+.alert-card-warning {
+  background-color: rgba(245, 158, 11, 0.05);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  color: #fbbf24; /* amber-400 */
+}
+[data-theme='light'] .alert-card-warning {
+  background-color: rgba(245, 158, 11, 0.07) !important;
+  border-color: rgba(245, 158, 11, 0.25) !important;
+  color: #b45309 !important; /* amber-700 */
+}
+.alert-card-warning .alert-title {
+  color: #fde047;
+}
+[data-theme='light'] .alert-card-warning .alert-title {
+  color: #92400e !important;
+}
+.alert-card-warning .alert-message {
+  color: rgba(251, 191, 36, 0.85);
+}
+[data-theme='light'] .alert-card-warning .alert-message {
+  color: #78350f !important; /* deep dark amber */
+}
+
+.alert-card-success {
+  background-color: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: #34d399; /* emerald-400 */
+}
+[data-theme='light'] .alert-card-success {
+  background-color: rgba(16, 185, 129, 0.07) !important;
+  border-color: rgba(16, 185, 129, 0.25) !important;
+  color: #047857 !important; /* emerald-700 */
+}
+.alert-card-success .alert-title {
+  color: #6ee7b7;
+}
+[data-theme='light'] .alert-card-success .alert-title {
+  color: #065f46 !important;
+}
+.alert-card-success .alert-message {
+  color: rgba(52, 211, 153, 0.85);
+}
+[data-theme='light'] .alert-card-success .alert-message {
+  color: #064e3b !important; /* deep dark green */
+}
+
+.alert-card-info {
+  background-color: rgba(59, 130, 246, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #60a5fa; /* blue-400 */
+}
+[data-theme='light'] .alert-card-info {
+  background-color: rgba(59, 130, 246, 0.07) !important;
+  border-color: rgba(59, 130, 246, 0.25) !important;
+  color: #1d4ed8 !important; /* blue-700 */
+}
+.alert-card-info .alert-title {
+  color: #93c5fd;
+}
+[data-theme='light'] .alert-card-info .alert-title {
+  color: #1e40af !important;
+}
+.alert-card-info .alert-message {
+  color: rgba(96, 165, 250, 0.85);
+}
+[data-theme='light'] .alert-card-info .alert-message {
+  color: #1e3a8a !important; /* deep dark blue */
+}

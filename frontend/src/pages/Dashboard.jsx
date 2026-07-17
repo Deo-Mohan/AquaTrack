@@ -579,20 +579,20 @@ export default function Dashboard() {
           <div className="space-y-3">
             {alerts.length > 0 ? (
               alerts.slice(0, 2).map((alert, idx) => (
-                <div key={alert.id || idx} className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
-                  <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                <div key={alert.id || idx} className="flex items-start gap-3 p-3.5 rounded-xl transition-all alert-card-warning">
+                  <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-sm font-medium text-amber-200">{alert.title}</p>
-                    <p className="text-xs text-amber-400/70">{alert.message}</p>
+                    <p className="text-sm font-bold alert-title">{alert.title}</p>
+                    <p className="text-xs alert-message mt-1 font-medium">{alert.message}</p>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
-                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <div className="flex items-start gap-3 p-3.5 rounded-xl transition-all alert-card-success">
+                <CheckCircle2 className="w-5 h-5 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-emerald-200">System Healthy</p>
-                  <p className="text-xs text-emerald-400/70">No active alerts or overuse notifications.</p>
+                  <p className="text-sm font-bold alert-title">System Healthy</p>
+                  <p className="text-xs alert-message mt-1 font-medium">No active alerts or overuse notifications.</p>
                 </div>
               </div>
             )}

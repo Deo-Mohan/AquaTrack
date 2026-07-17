@@ -93,6 +93,7 @@ export default function AdminDashboard() {
   const [selectedAdminAnalytics, setSelectedAdminAnalytics] = useState(null);
   
   const [billingSubTab, setBillingSubTab] = useState('cycles'); // cycles, records
+  const [approvalSubTab, setApprovalSubTab] = useState('registrations'); // registrations, verifications
   const [billingCycles, setBillingCycles] = useState([]);
   const [apartments, setApartments] = useState([]);
   const [billingCycleModalOpen, setBillingCycleModalOpen] = useState(false);
@@ -1329,9 +1330,17 @@ export default function AdminDashboard() {
     // Filter usage logs for overuse or leak status
     usageLogs.forEach(log => {
       if (log.status === 'Overuse' || log.status === 'Potential Leak') {
+        const resident = users.find(u => 
+          u.houseNumber && 
+          log.houseNumber && 
+          u.houseNumber.trim().toLowerCase() === log.houseNumber.trim().toLowerCase()
+        );
+        const residentName = resident ? (resident.fullName || resident.username) : '';
+        const titleSuffix = residentName ? ` - ${residentName}` : '';
+
         alerts.push({
           id: `usage-${log.id}`,
-          title: `${log.status}: ${log.houseNumber}`,
+          title: `${log.status}: ${log.houseNumber}${titleSuffix}`,
           message: `Recorded ${log.readingLiters} Liters on ${log.readingDate}.`,
           type: log.status === 'Overuse' ? 'overuse' : 'leak'
         });
@@ -1655,13 +1664,13 @@ export default function AdminDashboard() {
               { id: 'overview', label: 'Overview' },
               isSuperAdmin && { id: 'community-analytics', label: 'Community Analytics 📊' },
               isSuperAdmin && { id: 'colonies', label: '🏘️ Colony Management' },
-              {
-                id: 'doc-verification',
-                label: `📋 Doc Verification${pendingVerifications.length > 0 ? ` (${pendingVerifications.length})` : ''}`
-              },
               { 
                 id: 'approvals', 
-                label: `Pending Approvals${pendingApprovals.length > 0 ? ` (${pendingApprovals.length})` : ''}` 
+                label: `Pending Approvals${
+                  (pendingApprovals.length + users.filter(u => u.verificationStatus === 'PENDING_VERIFICATION').length) > 0 
+                    ? ` (${pendingApprovals.length + users.filter(u => u.verificationStatus === 'PENDING_VERIFICATION').length})` 
+                    : ''
+                }` 
               }
             ].filter(Boolean).map(tab => (
               <button
@@ -1916,32 +1925,24 @@ export default function AdminDashboard() {
                       const isWarning = alert.type === 'warning';
                       const isOk = alert.type === 'ok';
 
-                      let bgColor = 'bg-blue-500/5 border-blue-500/10';
-                      let textColor = 'text-blue-200';
-                      let subColor = 'text-blue-400/70';
+                      let alertClass = 'alert-card-info';
                       let Icon = AlertCircle;
 
                       if (isOveruse || isLeak) {
-                        bgColor = 'bg-red-500/5 border-red-500/10';
-                        textColor = 'text-red-200';
-                        subColor = 'text-red-400/70';
+                        alertClass = 'alert-card-danger';
                       } else if (isWarning) {
-                        bgColor = 'bg-amber-500/5 border-amber-500/10';
-                        textColor = 'text-amber-200';
-                        subColor = 'text-amber-400/70';
+                        alertClass = 'alert-card-warning';
                       } else if (isOk) {
-                        bgColor = 'bg-emerald-500/5 border-emerald-500/10';
-                        textColor = 'text-emerald-200';
-                        subColor = 'text-emerald-400/70';
+                        alertClass = 'alert-card-success';
                         Icon = CheckCircle2;
                       }
 
                       return (
-                        <div key={alert.id} className={`flex items-start gap-3 p-3 rounded-lg border ${bgColor}`}>
-                          <Icon className="w-5 h-5 mt-0.5" style={{ color: (isOveruse || isLeak) ? '#f87171' : isWarning ? '#fbbf24' : isOk ? '#34d399' : '#60a5fa' }} />
+                        <div key={alert.id} className={`flex items-start gap-3 p-3.5 rounded-xl transition-all ${alertClass}`}>
+                          <Icon className="w-5 h-5 mt-0.5 shrink-0" />
                           <div>
-                            <p className={`text-sm font-medium ${textColor}`}>{alert.title}</p>
-                            <p className={`text-xs ${subColor} mt-1`}>{alert.message}</p>
+                            <p className="text-sm font-bold alert-title">{alert.title}</p>
+                            <p className="text-xs alert-message mt-1 font-medium">{alert.message}</p>
                           </div>
                         </div>
                       );
@@ -2458,139 +2459,196 @@ export default function AdminDashboard() {
             exit={{ opacity: 0, y: -10 }}
             className="space-y-6"
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-text text-lg">Pending Registration Approvals</h3>
-                <p className="text-text-muted text-sm mt-0.5">Approve or reject new resident sign-up requests.</p>
-              </div>
+            {/* Elegant Sub-tabs switcher */}
+            <div className="flex bg-surface-lighter/50 p-1.5 rounded-2xl border border-border/40 max-w-lg shadow-sm">
+              <button
+                onClick={() => setApprovalSubTab('registrations')}
+                className={`flex-1 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  approvalSubTab === 'registrations'
+                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                    : 'text-text-muted hover:text-text'
+                }`}
+              >
+                <span>Registration Requests</span>
+                {pendingApprovals.length > 0 && (
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                    approvalSubTab === 'registrations' 
+                      ? 'bg-white/25 text-white' 
+                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  }`}>
+                    {pendingApprovals.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setApprovalSubTab('verifications')}
+                className={`flex-1 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  approvalSubTab === 'verifications'
+                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                    : 'text-text-muted hover:text-text'
+                }`}
+              >
+                <span>Profile Verifications</span>
+                {users.filter(u => u.verificationStatus === 'PENDING_VERIFICATION').length > 0 && (
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                    approvalSubTab === 'verifications' 
+                      ? 'bg-white/25 text-white' 
+                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  }`}>
+                    {users.filter(u => u.verificationStatus === 'PENDING_VERIFICATION').length}
+                  </span>
+                )}
+              </button>
             </div>
 
-            <div className="glass-card overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-surface-lighter/50 border-b border-border">
-                      <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Username</th>
-                      <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Full Name</th>
-                      <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Email</th>
-                      <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Mobile</th>
-                      <th className="px-6 py-4 text-xs font-bold text-primary uppercase">WhatsApp</th>
-                      <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Role</th>
-                      <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Apartment Block</th>
-                      <th className="px-6 py-4 text-xs font-bold text-primary uppercase">House Number</th>
-                      <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Gender</th>
-                      <th className="px-6 py-4 text-xs font-bold text-primary uppercase text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/60">
-                    {pendingApprovals.length > 0 ? (
-                      pendingApprovals.map(req => (
-                        <tr key={req.id} className="hover:bg-surface-lighter/20 transition-colors">
-                          <td className="px-6 py-4 font-semibold text-text">{req.username}</td>
-                          <td className="px-6 py-4 text-text font-medium">{req.fullName || 'N/A'}</td>
-                          <td className="px-6 py-4 text-text-muted">{req.email}</td>
-                          <td className="px-6 py-4 text-text-muted">{req.mobileNumber || 'N/A'}</td>
-                          <td className="px-6 py-4 text-text-muted">{req.whatsAppNumber || 'N/A'}</td>
-                          <td className="px-6 py-4">
-                            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 whitespace-nowrap">
-                              {req.role === 'ROLE_ADMIN' ? 'Super Admin' : 
-                               req.role === 'ROLE_COMMUNITY_ADMIN' ? 'Community Admin' : 'Household User'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-text-muted">{req.apartmentBlock || 'N/A'}</td>
-                          <td className="px-6 py-4 text-text-muted">{req.houseNumber || 'N/A'}</td>
-                          <td className="px-6 py-4 text-text-muted">{req.gender || 'N/A'}</td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex items-center justify-end gap-3">
-                              <button
-                                onClick={() => handleApproveReject(req.id, 'APPROVED')}
-                                title="Approve Request"
-                                className="px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20 rounded-lg cursor-pointer text-xs font-semibold flex items-center gap-1"
-                              >
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                Approve
-                              </button>
-                              <button
-                                onClick={() => handleApproveReject(req.id, 'REJECTED')}
-                                title="Reject Request"
-                                className="px-3 py-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/25 border border-red-500/20 rounded-lg cursor-pointer text-xs font-semibold flex items-center gap-1"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                                Reject
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="7" className="px-6 py-10 text-center text-text-muted">
-                          No pending registration requests found.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <AnimatePresence mode="wait">
+              {approvalSubTab === 'registrations' ? (
+                <motion.div
+                  key="registrations-subtab"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <h3 className="font-semibold text-text text-lg">Pending Registration Approvals</h3>
+                    <p className="text-text-muted text-sm mt-0.5">Approve or reject new resident sign-up requests.</p>
+                  </div>
 
-            {/* Resident Profile Verifications Section */}
-            <div className="flex items-center justify-between mt-8">
-              <div>
-                <h3 className="font-semibold text-text text-lg">Resident Profile Verifications</h3>
-                <p className="text-text-muted text-sm mt-0.5">Review residency documents uploaded by invitation-onboarded household users.</p>
-              </div>
-            </div>
+                  <div className="glass-card overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-surface-lighter/50 border-b border-border">
+                            <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Username</th>
+                            <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Full Name</th>
+                            <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Email</th>
+                            <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Mobile</th>
+                            <th className="px-6 py-4 text-xs font-bold text-primary uppercase">WhatsApp</th>
+                            <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Role</th>
+                            <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Apartment Block</th>
+                            <th className="px-6 py-4 text-xs font-bold text-primary uppercase">House Number</th>
+                            <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Gender</th>
+                            <th className="px-6 py-4 text-xs font-bold text-primary uppercase text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/60">
+                          {pendingApprovals.length > 0 ? (
+                            pendingApprovals.map(req => (
+                              <tr key={req.id} className="hover:bg-surface-lighter/20 transition-colors">
+                                <td className="px-6 py-4 font-semibold text-text">{req.username}</td>
+                                <td className="px-6 py-4 text-text font-medium">{req.fullName || 'N/A'}</td>
+                                <td className="px-6 py-4 text-text-muted">{req.email}</td>
+                                <td className="px-6 py-4 text-text-muted">{req.mobileNumber || 'N/A'}</td>
+                                <td className="px-6 py-4 text-text-muted">{req.whatsAppNumber || 'N/A'}</td>
+                                <td className="px-6 py-4">
+                                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 whitespace-nowrap">
+                                    {req.role === 'ROLE_ADMIN' ? 'Super Admin' : 
+                                     req.role === 'ROLE_COMMUNITY_ADMIN' ? 'Community Admin' : 'Household User'}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-text-muted">{req.apartmentBlock || 'N/A'}</td>
+                                <td className="px-6 py-4 text-text-muted">{req.houseNumber || 'N/A'}</td>
+                                <td className="px-6 py-4 text-text-muted">{req.gender || 'N/A'}</td>
+                                <td className="px-6 py-4 text-right">
+                                  <div className="flex items-center justify-end gap-3">
+                                    <button
+                                      onClick={() => handleApproveReject(req.id, 'APPROVED')}
+                                      title="Approve Request"
+                                      className="px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20 rounded-lg cursor-pointer text-xs font-semibold flex items-center gap-1"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      Approve
+                                    </button>
+                                    <button
+                                      onClick={() => handleApproveReject(req.id, 'REJECTED')}
+                                      title="Reject Request"
+                                      className="px-3 py-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/25 border border-red-500/20 rounded-lg cursor-pointer text-xs font-semibold flex items-center gap-1"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                      Reject
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan="10" className="px-6 py-10 text-center text-text-muted">
+                                No pending registration requests found.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="verifications-subtab"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <h3 className="font-semibold text-text text-lg">Resident Profile Verifications</h3>
+                    <p className="text-text-muted text-sm mt-0.5">Review residency documents uploaded by invitation-onboarded household users.</p>
+                  </div>
 
-            <div className="glass-card overflow-hidden mt-4">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-surface-lighter/50 border-b border-border">
-                      <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Resident</th>
-                      <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Apartment Info</th>
-                      <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Verification Status</th>
-                      <th className="px-6 py-4 text-xs font-bold text-primary uppercase text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/60">
-                    {users.filter(u => u.verificationStatus === 'PENDING_VERIFICATION').length > 0 ? (
-                      users.filter(u => u.verificationStatus === 'PENDING_VERIFICATION').map(resident => (
-                        <tr key={resident.id} className="hover:bg-surface-lighter/20 transition-colors">
-                          <td className="px-6 py-4">
-                            <div className="font-semibold text-text">{resident.fullName || resident.username}</div>
-                            <div className="text-text-muted text-xs">{resident.email}</div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-text text-sm">{resident.apartmentBlock || 'N/A'} - {resident.houseNumber || 'N/A'}</div>
-                            <div className="text-text-muted text-xs">{resident.colonyName || 'N/A'}</div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 whitespace-nowrap">
-                              {resident.verificationStatus}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <button
-                              onClick={() => handleOpenReviewDocs(resident)}
-                              className="px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 rounded-lg cursor-pointer text-xs font-semibold"
-                            >
-                              Review Documents & Verify
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="4" className="px-6 py-10 text-center text-text-muted">
-                          No pending resident profile verifications found.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                  <div className="glass-card overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-surface-lighter/50 border-b border-border">
+                            <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Resident</th>
+                            <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Apartment Info</th>
+                            <th className="px-6 py-4 text-xs font-bold text-primary uppercase">Verification Status</th>
+                            <th className="px-6 py-4 text-xs font-bold text-primary uppercase text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/60">
+                          {users.filter(u => u.verificationStatus === 'PENDING_VERIFICATION').length > 0 ? (
+                            users.filter(u => u.verificationStatus === 'PENDING_VERIFICATION').map(resident => (
+                              <tr key={resident.id} className="hover:bg-surface-lighter/20 transition-colors">
+                                <td className="px-6 py-4">
+                                  <div className="font-semibold text-text">{resident.fullName || resident.username}</div>
+                                  <div className="text-text-muted text-xs">{resident.email}</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="text-text text-sm">{resident.apartmentBlock || 'N/A'} - {resident.houseNumber || 'N/A'}</div>
+                                  <div className="text-text-muted text-xs">{resident.colonyName || 'N/A'}</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 whitespace-nowrap">
+                                    {resident.verificationStatus}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <button
+                                    onClick={() => handleOpenReviewDocs(resident)}
+                                    className="px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 rounded-lg cursor-pointer text-xs font-semibold"
+                                  >
+                                    Review Documents & Verify
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan="4" className="px-6 py-10 text-center text-text-muted">
+                                No pending resident profile verifications found.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
