@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Droplets, Receipt, AlertTriangle, TrendingDown, Upload, FileText, CheckCircle2, ShieldAlert, ShieldCheck, X, AlertCircle, Loader2, ArrowRight, Clock, Info, Zap, BarChart3 } from 'lucide-react';
+import { Droplets, Receipt, AlertTriangle, TrendingDown, Upload, FileText, CheckCircle2, ShieldAlert, ShieldCheck, X, AlertCircle, Loader2, ArrowRight, Clock, Info, Zap, BarChart3, Lightbulb } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, LineChart, Line, Cell
@@ -98,6 +98,8 @@ export default function Dashboard() {
   const username = localStorage.getItem('username') || 'Household User';
   const [loading, setLoading] = useState(true);
   const [showResidentHelp, setShowResidentHelp] = useState(true);
+  const [quickHelpModalOpen, setQuickHelpModalOpen] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
   const [monthlyChartType, setMonthlyChartType] = useState('area'); // area, bar, line
   const [weeklyChartType, setWeeklyChartType] = useState('bar'); // bar, line, area
 
@@ -482,10 +484,27 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-text">Household User Dashboard</h1>
           <p className="text-text-muted mt-1">Welcome back, {username}. Here's your water usage overview.</p>
         </div>
+
+        {/* Glowing bulb for quick guide */}
+        <div className="relative pb-1" style={{ zIndex: 40 }}>
+          <button 
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
+            onClick={() => setQuickHelpModalOpen(true)}
+            className="flex items-center justify-center w-9 h-9 rounded-xl bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.25)] hover:shadow-[0_0_25px_rgba(234,179,8,0.6)] hover:scale-105 transition-all cursor-pointer animate-pulse focus:outline-none"
+          >
+            <Lightbulb className="w-5 h-5 text-yellow-400 fill-yellow-400/20" />
+          </button>
+          {showTooltip && (
+            <div className="absolute right-0 top-11 whitespace-nowrap bg-surface-lighter border border-border text-text text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xl backdrop-blur-md z-50">
+              Quick guide to help you
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Resident Collapsible Help Banner */}
-      <div className="glass-card overflow-hidden border-primary/20">
+      <div className="glass-card overflow-hidden border-primary/25">
         <div 
           onClick={() => setShowResidentHelp(!showResidentHelp)}
           className="flex items-center justify-between px-6 py-4 bg-primary/5 hover:bg-primary/10 transition-all cursor-pointer select-none"
@@ -510,35 +529,35 @@ export default function Dashboard() {
               exit={{ height: 0, opacity: 0 }}
               className="border-t border-border bg-surface-lighter/5"
             >
-              <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-text-muted">
-                <div className="space-y-2 bg-surface-lighter/20 p-4 rounded-xl border border-border/40">
-                  <p className="font-semibold text-blue-400 flex items-center gap-2">
-                    <BarChart3 className="w-4.5 h-4.5" /> Usage Analytics
+              <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-text">
+                <div className="space-y-2 bg-surface-lighter/25 p-4.5 rounded-xl border border-border/50">
+                  <p className="font-bold text-blue-500 dark:text-blue-400 flex items-center gap-2 text-sm">
+                    <BarChart3 className="w-5 h-5" /> Usage Analytics
                   </p>
-                  <p className="text-xs leading-relaxed">
-                    Track your daily, weekly, and monthly water consumption. Use the **My Usage** page to view detailed trend graphs and building comparison metrics.
-                  </p>
-                </div>
-                <div className="space-y-2 bg-surface-lighter/20 p-4 rounded-xl border border-border/40">
-                  <p className="font-semibold text-emerald-400 flex items-center gap-2">
-                    <Zap className="w-4.5 h-4.5" /> Fair Billing Algorithm
-                  </p>
-                  <p className="text-xs leading-relaxed">
-                    AquaTrack dynamically generates bills based on your actual consumption. View invoice PDFs under **My Invoices** and clear outstanding dues.
+                  <p className="text-sm leading-relaxed text-text">
+                    Track your daily, weekly, and monthly water consumption. Use the <strong className="text-primary font-semibold">My Usage</strong> page to view detailed trend graphs and building comparison metrics.
                   </p>
                 </div>
-                <div className="space-y-2 bg-surface-lighter/20 p-4 rounded-xl border border-border/40">
-                  <p className="font-semibold text-rose-400 flex items-center gap-2">
-                    <AlertTriangle className="w-4.5 h-4.5" /> Anomaly & Leak Alerts
+                <div className="space-y-2 bg-surface-lighter/25 p-4.5 rounded-xl border border-border/50">
+                  <p className="font-bold text-emerald-500 dark:text-emerald-400 flex items-center gap-2 text-sm">
+                    <Zap className="w-5 h-5" /> Fair Billing Algorithm
                   </p>
-                  <p className="text-xs leading-relaxed">
-                    Automated analysis flags sudden consumption spikes or continuous flows (leaks). Check for alerts and report concerns via the **Support** tab.
+                  <p className="text-sm leading-relaxed text-text">
+                    AquaTrack dynamically generates bills based on your actual consumption. View invoice PDFs under <strong className="text-primary font-semibold">My Invoices</strong> and clear outstanding dues.
+                  </p>
+                </div>
+                <div className="space-y-2 bg-surface-lighter/25 p-4.5 rounded-xl border border-border/50">
+                  <p className="font-bold text-rose-500 dark:text-rose-400 flex items-center gap-2 text-sm">
+                    <AlertTriangle className="w-5 h-5" /> Anomaly & Leak Alerts
+                  </p>
+                  <p className="text-sm leading-relaxed text-text">
+                    Automated analysis flags sudden consumption spikes or continuous flows (leaks). Check for alerts and report concerns via the <strong className="text-primary font-semibold">Support</strong> tab.
                   </p>
                 </div>
               </div>
-              <div className="px-6 py-3 bg-primary/5 border-t border-border/40 text-xs text-text-muted flex justify-between items-center flex-wrap gap-2">
+              <div className="px-6 py-3 bg-primary/5 border-t border-border/40 text-xs text-text flex justify-between items-center flex-wrap gap-2">
                 <span className="font-semibold text-primary">🌱 Every Drop Counts</span>
-                <span>Need support? Visit the <strong className="text-text">Support</strong> tab to create service tickets or contact the building administration.</span>
+                <span>Need support? Visit the <strong className="text-primary font-semibold">Support</strong> tab to create service tickets or contact the building administration.</span>
               </div>
             </motion.div>
           )}
@@ -831,6 +850,92 @@ export default function Dashboard() {
           )}
         </div>
       </motion.div>
+
+      {/* Quick Help Modal */}
+      {quickHelpModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="help-modal-box border w-full max-w-2xl rounded-2xl p-6 shadow-2xl relative my-8"
+          >
+            <button 
+              onClick={() => setQuickHelpModalOpen(false)}
+              className="absolute top-4 right-4 text-text-muted hover:text-text cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 flex items-center justify-center shadow-[0_0_15px_rgba(234,179,8,0.25)]">
+                <Lightbulb className="w-5 h-5 text-yellow-400 fill-yellow-400/20 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-text">
+                  💡 Resident Quick Guide
+                </h3>
+                <p className="text-text-muted text-xs mt-0.5">Everything you need to know about navigating AquaTrack as a Resident</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-text">
+                <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50">
+                  <p className="font-bold text-blue-500 dark:text-blue-400 text-base flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5" /> Usage & History
+                  </p>
+                  <ul className="list-disc list-inside text-sm space-y-2 leading-relaxed text-text">
+                    <li>Go to the <strong className="text-primary font-bold">My Usage</strong> page to visualize consumption patterns.</li>
+                    <li>Toggle between daily, weekly, and monthly view modes.</li>
+                    <li>Compare your usage to the block average to identify conservation opportunities.</li>
+                  </ul>
+                </div>
+                
+                <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50">
+                  <p className="font-bold text-emerald-500 dark:text-emerald-400 text-base flex items-center gap-2">
+                    <Receipt className="w-5 h-5" /> Bills & Payments
+                  </p>
+                  <ul className="list-disc list-inside text-sm space-y-2 leading-relaxed text-text">
+                    <li>Go to the <strong className="text-primary font-bold">My Bills</strong> page to check pending and paid transactions.</li>
+                    <li>Pay outstanding dues securely using the integrated <strong className="text-emerald-500 dark:text-emerald-400 font-bold">Razorpay Gateway</strong>.</li>
+                    <li>Download detailed, electronic receipt PDFs under <strong className="text-primary font-bold">My Invoices</strong>.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-text">
+                <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50">
+                  <p className="font-bold text-rose-500 dark:text-rose-400 text-base flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5" /> Leak & Overuse Alerts
+                  </p>
+                  <ul className="list-disc list-inside text-sm space-y-2 leading-relaxed text-text">
+                    <li>Check <strong className="text-rose-500 dark:text-rose-400 font-bold">Recent Alerts</strong> on the main panel for automated system flags.</li>
+                    <li>Spike alerts show sudden abnormal water consumption logs.</li>
+                    <li>Leak notifications trigger when continuous flow is registered over long periods.</li>
+                  </ul>
+                </div>
+
+                <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50">
+                  <p className="font-bold text-purple-500 dark:text-purple-400 text-base flex items-center gap-2">
+                    <Info className="w-5 h-5" /> Support Tickets
+                  </p>
+                  <ul className="list-disc list-inside text-sm space-y-2 leading-relaxed text-text">
+                    <li>Go to the <strong className="text-primary font-bold">Support</strong> tab to open tickets for technical help.</li>
+                    <li>File issues under categories: Meter Issue, Leakage Report, Billing Query, or Other.</li>
+                    <li>Real-time status updates are visible as administrators review your reports.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-border flex justify-between items-center text-xs text-text-muted">
+              <span className="font-semibold text-primary">🌱 Conserve Water. Save Earth.</span>
+              <span>AquaTrack Resident Engine</span>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
     </div>
   );

@@ -1487,64 +1487,64 @@ export default function AdminDashboard() {
     switch (activeTab) {
       case 'overview':
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-text-muted">
-            <div className="space-y-3 bg-surface-lighter/20 p-4 rounded-xl border border-border/40">
-              <p className="font-semibold text-primary flex items-center gap-2">
-                <Activity className="w-4.5 h-4.5" /> Dashboard Overview & KPIs
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-text">
+            <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50">
+              <p className="font-bold text-primary text-base flex items-center gap-2">
+                <Activity className="w-5 h-5 text-primary" /> Dashboard Overview & KPIs
               </p>
-              <ul className="list-disc list-inside text-xs space-y-2 leading-relaxed">
-                <li><strong>Global Cards:</strong> Instantly check total approved residents, active billing statistics, and overall community water volume.</li>
-                <li><strong>Usage Insights:</strong> Analyze who is using the most water to quickly verify anomalies or check for active plumbing leaks.</li>
-                <li><strong>Security Feed:</strong> Real-time alerts on system checkups, server status, and backup DB states are shown on the side panel.</li>
+              <ul className="list-disc list-inside text-sm space-y-2.5 leading-relaxed text-text">
+                <li><strong className="text-text font-bold">Global Cards:</strong> Instantly check total approved residents, active billing statistics, and overall community water volume.</li>
+                <li><strong className="text-text font-bold">Usage Insights:</strong> Analyze who is using the most water to quickly verify anomalies or check for active plumbing leaks.</li>
+                <li><strong className="text-text font-bold">Security Feed:</strong> Real-time alerts on system checkups, server status, and backup DB states are shown on the side panel.</li>
               </ul>
             </div>
-            <div className="space-y-3 bg-surface-lighter/20 p-4 rounded-xl border border-border/40">
-              <p className="font-semibold text-primary flex items-center gap-2">
-                <Settings className="w-4.5 h-4.5" /> Administrator Navigation
+            <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50">
+              <p className="font-bold text-primary text-base flex items-center gap-2">
+                <Settings className="w-5 h-5 text-primary" /> Administrator Navigation
               </p>
-              <ul className="list-disc list-inside text-xs space-y-2 leading-relaxed">
-                <li>Go to the **User Directory** tab to approve, reject, or manually update household profiles.</li>
-                <li>Use the **Billing & Alerts** tab to set tariff limits, log meter read cycles, and finalize bills.</li>
-                <li>If residents register via an invitation link, review and approve their profile under **Pending Approvals**.</li>
+              <ul className="list-disc list-inside text-sm space-y-2.5 leading-relaxed text-text">
+                <li>Go to the <strong className="text-primary font-bold">User Directory</strong> tab to approve, reject, or manually update household profiles.</li>
+                <li>Use the <strong className="text-primary font-bold">Billing & Alerts</strong> tab to set tariff limits, log meter read cycles, and finalize bills.</li>
+                <li>If residents register via an invitation link, review and approve their profile under <strong className="text-primary font-bold">Pending Approvals</strong>.</li>
               </ul>
             </div>
           </div>
         );
       case 'community-analytics':
         return (
-          <div className="space-y-3 bg-surface-lighter/20 p-4 rounded-xl border border-border/40 text-sm text-text-muted">
-            <p className="font-semibold text-primary flex items-center gap-2">
-              <BarChart3 className="w-4.5 h-4.5" /> Community Block Analytics
+          <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50 text-sm text-text">
+            <p className="font-bold text-primary text-base flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-primary" /> Community Block Analytics
             </p>
-            <p className="text-xs leading-relaxed">
-              Visualize real-time trends for all apartment blocks. You can view overall billing collection progress, monthly revenue, pending community dues, average consumption stats, and recent action logs. Export complete data reports using the **Download PDF/CSV** option to share reports with committee members.
+            <p className="text-sm leading-relaxed text-text">
+              Visualize real-time trends for all apartment blocks. You can view overall billing collection progress, monthly revenue, pending community dues, average consumption stats, and recent action logs. Export complete data reports using the <strong className="text-primary font-bold">Download PDF/CSV</strong> option to share reports with committee members.
             </p>
           </div>
         );
       case 'users':
         return (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-text-muted">
-            <div className="space-y-3 bg-surface-lighter/20 p-4 rounded-xl border border-border/40">
-              <p className="font-semibold text-blue-400 flex items-center gap-2">
-                <Droplet className="w-4.5 h-4.5" /> 1. Log Meter Reading
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-text">
+            <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50">
+              <p className="font-bold text-blue-500 dark:text-blue-400 text-base flex items-center gap-2">
+                <Droplet className="w-5 h-5 text-blue-500 dark:text-blue-400" /> 1. Log Meter Reading
               </p>
-              <p className="text-xs leading-relaxed">
+              <p className="text-sm leading-relaxed text-text">
                 Click the blue droplet icon next to a resident's name. Enter the liters shown on their physical water meter and save. This updates their usage metrics instantly.
               </p>
             </div>
-            <div className="space-y-3 bg-surface-lighter/20 p-4 rounded-xl border border-border/40">
-              <p className="font-semibold text-purple-400 flex items-center gap-2">
-                <Receipt className="w-4.5 h-4.5" /> 2. Generate Dues
+            <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50">
+              <p className="font-bold text-purple-500 dark:text-purple-400 text-base flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-purple-500 dark:text-purple-400" /> 2. Generate Dues
               </p>
-              <p className="text-xs leading-relaxed">
+              <p className="text-sm leading-relaxed text-text">
                 Click the purple receipt icon next to a resident's name. The billing engine will automatically parse the unbilled consumption log and calculate exact costs!
               </p>
             </div>
-            <div className="space-y-3 bg-surface-lighter/20 p-4 rounded-xl border border-border/40">
-              <p className="font-semibold text-yellow-400 flex items-center gap-2">
-                <Send className="w-4.5 h-4.5" /> 3. Send Alerts
+            <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50">
+              <p className="font-bold text-yellow-500 dark:text-yellow-400 text-base flex items-center gap-2">
+                <Send className="w-5 h-5 text-yellow-500 dark:text-yellow-400" /> 3. Send Alerts
               </p>
-              <p className="text-xs leading-relaxed">
+              <p className="text-sm leading-relaxed text-text">
                 Click the yellow paper airplane icon next to a resident's name to instantly dispatch dashboard notifications or warnings about payment cycles or high usage.
               </p>
             </div>
@@ -1552,31 +1552,31 @@ export default function AdminDashboard() {
         );
       case 'usage':
         return (
-          <div className="space-y-3 bg-surface-lighter/20 p-4 rounded-xl border border-border/40 text-sm text-text-muted">
-            <p className="font-semibold text-primary flex items-center gap-2">
-              <Droplet className="w-4.5 h-4.5" /> Water Usage Records
+          <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50 text-sm text-text">
+            <p className="font-bold text-primary text-base flex items-center gap-2">
+              <Droplet className="w-5 h-5 text-primary" /> Water Usage Records
             </p>
-            <p className="text-xs leading-relaxed">
-              Lists all individual manual and automated meter logs. You can click **"Add Reading"** at the top right to record a manual entry, or upload bulk readings in one go using the **CSV Upload** flow under the User Directory tab. Smart meter data is synced in real-time.
+            <p className="text-sm leading-relaxed text-text">
+              Lists all individual manual and automated meter logs. You can click <strong className="text-primary font-bold">"Add Reading"</strong> at the top right to record a manual entry, or upload bulk readings in one go using the <strong className="text-primary font-bold">CSV Upload</strong> flow under the User Directory tab. Smart meter data is synced in real-time.
             </p>
           </div>
         );
       case 'billing':
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-text-muted">
-            <div className="space-y-3 bg-surface-lighter/20 p-4 rounded-xl border border-border/40">
-              <p className="font-semibold text-emerald-400 flex items-center gap-2">
-                <Receipt className="w-4.5 h-4.5" /> Automated Billing Cycles
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-text">
+            <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50">
+              <p className="font-bold text-emerald-500 dark:text-emerald-400 text-base flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-emerald-500 dark:text-emerald-400" /> Automated Billing Cycles
               </p>
-              <p className="text-xs leading-relaxed">
-                Under "Billing Cycles & Periods", click **"Create Billing Cycle"** at the start of a cycle. Once readings are complete, click **"Finalize"** to batch-calculate and issue invoices to all residents at once.
+              <p className="text-sm leading-relaxed text-text">
+                Under "Billing Cycles & Periods", click <strong className="text-primary font-bold">"Create Billing Cycle"</strong> at the start of a cycle. Once readings are complete, click <strong className="text-primary font-bold">"Finalize"</strong> to batch-calculate and issue invoices to all residents at once.
               </p>
             </div>
-            <div className="space-y-3 bg-surface-lighter/20 p-4 rounded-xl border border-border/40">
-              <p className="font-semibold text-yellow-400 flex items-center gap-2">
-                <Plus className="w-4.5 h-4.5" /> Individual Dues & Tariffs
+            <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50">
+              <p className="font-bold text-yellow-500 dark:text-yellow-400 text-base flex items-center gap-2">
+                <Plus className="w-5 h-5 text-yellow-500 dark:text-yellow-400" /> Individual Dues & Tariffs
               </p>
-              <p className="text-xs leading-relaxed">
+              <p className="text-sm leading-relaxed text-text">
                 Under "Individual Custom Bills", you can search, view, print, or generate manual invoices for specific house numbers. Set rates under "Tariff Rate Structure".
               </p>
             </div>
@@ -1584,34 +1584,34 @@ export default function AdminDashboard() {
         );
       case 'colonies':
         return (
-          <div className="space-y-3 bg-surface-lighter/20 p-4 rounded-xl border border-border/40 text-sm text-text-muted">
-            <p className="font-semibold text-primary flex items-center gap-2">
-              <MapPin className="w-4.5 h-4.5" /> Colony & Building Management
+          <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50 text-sm text-text">
+            <p className="font-bold text-primary text-base flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-primary" /> Colony & Building Management
             </p>
-            <p className="text-xs leading-relaxed">
+            <p className="text-sm leading-relaxed text-text">
               Manage registered colonies and buildings. Add new colonies or add buildings to existing ones. Make colonies collapsible and expandable to keep the list organized.
             </p>
           </div>
         );
       case 'doc-verification':
         return (
-          <div className="space-y-3 bg-surface-lighter/20 p-4 rounded-xl border border-border/40 text-sm text-text-muted">
-            <p className="font-semibold text-primary flex items-center gap-2">
-              <FileText className="w-4.5 h-4.5" /> Document Verification
+          <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50 text-sm text-text">
+            <p className="font-bold text-primary text-base flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" /> Document Verification
             </p>
-            <p className="text-xs leading-relaxed">
+            <p className="text-sm leading-relaxed text-text">
               Verify uploaded residency documents (like tenancy agreements or utility bills) for users onboarded via invitations.
             </p>
           </div>
         );
       case 'approvals':
         return (
-          <div className="space-y-3 bg-surface-lighter/20 p-4 rounded-xl border border-border/40 text-sm text-text-muted">
-            <p className="font-semibold text-primary flex items-center gap-2">
-              <CheckCircle2 className="w-4.5 h-4.5" /> Resident Verification & Approvals
+          <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50 text-sm text-text">
+            <p className="font-bold text-primary text-base flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-primary" /> Resident Verification & Approvals
             </p>
-            <p className="text-xs leading-relaxed">
-              When new household accounts register via invitation codes, their document verifications appear here. Carefully inspect their uploaded files, then choose **"Approve"** to activate their dashboard, or **"Reject"** if details are incorrect or documents are unreadable.
+            <p className="text-sm leading-relaxed text-text">
+              When new household accounts register via invitation codes, their document verifications appear here. Carefully inspect their uploaded files, then choose <strong className="text-emerald-500 dark:text-emerald-400 font-bold">"Approve"</strong> to activate their dashboard, or <strong className="text-red-500 dark:text-red-400 font-bold">"Reject"</strong> if details are incorrect or documents are unreadable.
             </p>
           </div>
         );
@@ -4347,7 +4347,7 @@ export default function AdminDashboard() {
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-surface border border-border w-full max-w-2xl rounded-2xl p-6 shadow-2xl relative my-8"
+            className="help-modal-box border w-full max-w-2xl rounded-2xl p-6 shadow-2xl relative my-8"
           >
             <button 
               onClick={() => setQuickHelpModalOpen(false)}

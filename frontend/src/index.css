@@ -3504,3 +3504,14 @@ body {
 [data-theme='light'] .alert-card-info .alert-message {
   color: #1e3a8a !important; /* deep dark blue */
 }
+
+/* Highly opaque modal styling for maximum readability */
+.help-modal-box {
+  background-color: #0b1524 !important; /* solid premium dark shade for dark mode */
+  border-color: #1e3557 !important;
+}
+[data-theme='light'] .help-modal-box {
+  background-color: #ffffff !important; /* solid white for high-contrast light mode */
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
