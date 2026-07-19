@@ -10,7 +10,7 @@ A **Billing Cycle** defines the temporal and geographical boundaries for calcula
 
 ```mermaid
 graph TD
-    A[Create Cycle: Status = OPEN] --> B[Daily Resident Water Logging]
+    A[Create Cycle: Status = OPEN] --> B[Daily Admin Water Logging]
     B --> C[Admin Trigger Finalize]
     C --> D{Missing Logs?}
     D -- Yes --> E[Block Finalization & Alert Admin]
@@ -32,8 +32,9 @@ Billing cycles can be created by **Super Admins** or **Community Admins**:
 
 ## 3. Phase 2: Daily Operations (Water Logging)
 Water logging runs independently of billing cycles:
-* Residents or admins log daily meter readings (in liters) for individual households.
-* These entries are stored as timestamped log records in the database with their respective log dates.
+* **Access Control:** Residents **cannot** log water usage. Only administrators (Super Admins and Community Admins) can log meter readings for households.
+* **Workstation Logging:** Community Admins log readings for their block's households, and Super Admins can log readings for any household.
+* **Log Entries:** These entries are stored as timestamped log records in the database with their respective log dates.
 * Because logging is independent, readings are not assigned a cycle ID upon insertion; they are dynamically associated with cycles later based on their timestamp.
 
 ---

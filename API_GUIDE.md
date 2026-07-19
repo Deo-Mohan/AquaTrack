@@ -99,10 +99,11 @@ Fetches active billing cycles with **Super Admin override filtering** applied.
 
 ## 3. Water Consumption Logging (`/api/water-usage`)
 
-Manages meter readings.
+Manages meter readings. Only administrators can perform logging operations.
 
 ### `POST /api/water-usage/log`
 Submits a meter reading log for a household.
+* **Access Control:** Residents are blocked from logging water usage. Community Admins can log usage for standard households, and Super Admins can log usage for any household (including Community Admins).
 * **Payload:**
   ```json
   {
@@ -110,6 +111,17 @@ Submits a meter reading log for a household.
     "apartmentBlock": "Block A",
     "consumptionLiters": 350.0,
     "date": "2026-07-19"
+  }
+  ```
+* **Java Implementation Snippet:**
+  ```java
+  if (log.getHouseNumber() != null) {
+      Optional<User> targetUser = userRepository.findByHouseNumber(log.getHouseNumber());
+      if (targetUser.isPresent() && "ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(targetUser.get().getRole())) {
+          if (!"ROLE_ADMIN".equalsIgnoreCase(callerRole)) {
+              return ResponseEntity.status(403).body("Access denied. Only Super Admin can log water usage for a Community Admin.");
+          }
+      }
   }
   ```
 * **Response (200 OK):**
