@@ -47,12 +47,14 @@ public class WaterUsageController {
             @Valid @RequestBody WaterUsageLog log,
             @RequestParam(required = false) String callerRole) {
         
+        if (!"ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(callerRole)) {
+            return ResponseEntity.status(403).body("Access denied. Only Community Admins can log water usage.");
+        }
+
         if (log.getHouseNumber() != null) {
             java.util.Optional<com.aquatrack.aquatrack.model.User> targetUser = userRepository.findByHouseNumber(log.getHouseNumber());
             if (targetUser.isPresent() && "ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(targetUser.get().getRole())) {
-                if (!"ROLE_ADMIN".equalsIgnoreCase(callerRole)) {
-                    return ResponseEntity.status(403).body("Access denied. Only Super Admin can log water usage for a Community Admin.");
-                }
+                return ResponseEntity.status(403).body("Access denied. Cannot log water usage for a Community Admin.");
             }
         }
 
@@ -135,6 +137,11 @@ public class WaterUsageController {
     public ResponseEntity<?> uploadCsvReadings(
             @RequestParam("file") MultipartFile file,
             @RequestParam(required = false) String callerRole) {
+        
+        if (!"ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(callerRole)) {
+            return ResponseEntity.status(403).body("Access denied. Only Community Admins can upload CSV readings.");
+        }
+
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body("CSV file is empty.");
         }
@@ -177,13 +184,11 @@ public class WaterUsageController {
                         }
                     }
 
-                    // Check if target is community admin and caller is not admin
+                    // Check if target is community admin
                     java.util.Optional<com.aquatrack.aquatrack.model.User> targetUser = userRepository.findByHouseNumber(houseNumber);
                     if (targetUser.isPresent() && "ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(targetUser.get().getRole())) {
-                        if (!"ROLE_ADMIN".equalsIgnoreCase(callerRole)) {
-                            errors.add("Line " + lineNumber + ": Access denied. Only Super Admin can log water usage for a Community Admin.");
-                            continue;
-                        }
+                        errors.add("Line " + lineNumber + ": Access denied. Cannot log water usage for a Community Admin.");
+                        continue;
                     }
 
                     // Duplicate detection

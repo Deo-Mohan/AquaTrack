@@ -32,8 +32,8 @@ Billing cycles can be created by **Super Admins** or **Community Admins**:
 
 ## 3. Phase 2: Daily Operations (Water Logging)
 Water logging runs independently of billing cycles:
-* **Access Control:** Residents **cannot** log water usage. Only administrators (Super Admins and Community Admins) can log meter readings for households.
-* **Workstation Logging:** Community Admins log readings for their block's households, and Super Admins can log readings for any household.
+* **Access Control:** Both residents and Super Admins **cannot** log water usage. Only Community Admins can log meter readings for households.
+* **Workstation Logging:** Community Admins log readings for their assigned block's households.
 * **Log Entries:** These entries are stored as timestamped log records in the database with their respective log dates.
 * Because logging is independent, readings are not assigned a cycle ID upon insertion; they are dynamically associated with cycles later based on their timestamp.
 
