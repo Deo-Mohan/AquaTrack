@@ -209,33 +209,6 @@ export default function Landing() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
-            {/* Background Control Segmented Widget */}
-            <div className="hidden md:flex relative items-center p-1 rounded-full bg-surface-lighter/40 border border-border/20 backdrop-blur-md shadow-lg mr-1 sm:mr-3">
-              <button
-                onClick={() => handleBgTypeChange('modern')}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all duration-300 ${
-                  bgType === 'modern'
-                    ? 'bg-primary text-white shadow-md shadow-primary/20 scale-105'
-                    : 'text-text-muted hover:text-text'
-                }`}
-                title="Modern Background"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Modern</span>
-              </button>
-              <button
-                onClick={() => handleBgTypeChange('liquid')}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all duration-300 ${
-                  bgType === 'liquid'
-                    ? 'bg-primary text-white shadow-md shadow-primary/20 scale-105'
-                    : 'text-text-muted hover:text-text'
-                }`}
-                title="Liquid Background"
-              >
-                <Droplet className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Liquid</span>
-              </button>
-            </div>
 
             <label htmlFor="switch" className="toggle">
               <input 
@@ -671,6 +644,35 @@ export default function Landing() {
           <p className="text-xs text-text/80">
             © {new Date().getFullYear()} AquaTrack Systems. All rights reserved.
           </p>
+
+          {/* Background Control Segmented Widget */}
+          <div className="hidden md:flex relative items-center p-1 rounded-full bg-surface-lighter/40 border border-border/20 backdrop-blur-md shadow-lg">
+            <button
+              onClick={() => handleBgTypeChange('modern')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer ${
+                bgType === 'modern'
+                  ? 'bg-primary text-white shadow-md shadow-primary/20 scale-105'
+                  : 'text-text-muted hover:text-text'
+              }`}
+              title="Modern Background"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Modern</span>
+            </button>
+            <button
+              onClick={() => handleBgTypeChange('liquid')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer ${
+                bgType === 'liquid'
+                  ? 'bg-primary text-white shadow-md shadow-primary/20 scale-105'
+                  : 'text-text-muted hover:text-text'
+              }`}
+              title="Liquid Background"
+            >
+              <Droplet className="w-3.5 h-3.5" />
+              <span>Liquid</span>
+            </button>
+          </div>
+
           <div className="footer-social-container">
             {/* GitHub */}
             <a 

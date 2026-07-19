@@ -9,6 +9,7 @@ export default function Invoices() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [invoiceModalBill, setInvoiceModalBill] = useState(null);
+  const [adminName, setAdminName] = useState('Community Admin');
 
   const fetchPaidBills = async () => {
     try {
@@ -31,6 +32,23 @@ export default function Invoices() {
 
   useEffect(() => {
     fetchPaidBills();
+    // Fetch community admin name for invoice footer
+    const fetchAdminName = async () => {
+      try {
+        const u = localStorage.getItem('username');
+        const role = localStorage.getItem('role');
+        if (role === 'ROLE_COMMUNITY_ADMIN') {
+          setAdminName(localStorage.getItem('fullName') || 'Community Admin');
+        } else if (u) {
+          const res = await api.get(`/users/contacts/${u}`);
+          const admin = res.data.find(c => c.role === 'ROLE_COMMUNITY_ADMIN');
+          if (admin && admin.fullName) setAdminName(admin.fullName);
+        }
+      } catch (err) {
+        console.error('Failed to fetch admin name:', err);
+      }
+    };
+    fetchAdminName();
   }, []);
 
   const filteredBills = bills.filter(bill => 
@@ -102,7 +120,10 @@ export default function Invoices() {
               </div>
 
               <button
-                onClick={() => setInvoiceModalBill(bill)}
+                onClick={() => {
+                  const residentName = localStorage.getItem('fullName') || localStorage.getItem('username') || '';
+                  setInvoiceModalBill({ ...bill, residentName, adminName });
+                }}
                 className="mt-5 w-full flex items-center justify-center gap-2 py-2.5 bg-primary/10 hover:bg-primary/20 text-primary hover:text-primary-dark rounded-xl font-bold text-sm transition-all cursor-pointer border border-primary/20"
               >
                 <span>View & Print Invoice</span>
@@ -172,6 +193,9 @@ export default function Invoices() {
                 </div>
                 <div className="text-right">
                   <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">Invoice To</p>
+                  {invoiceModalBill.residentName && (
+                    <p className="font-bold text-text">{invoiceModalBill.residentName}</p>
+                  )}
                   <p className="font-bold text-text">Resident of House {invoiceModalBill.houseNumber}</p>
                   {invoiceModalBill.apartmentBlock && (
                     <p className="text-xs text-text-muted mt-1">Block: {invoiceModalBill.apartmentBlock}</p>

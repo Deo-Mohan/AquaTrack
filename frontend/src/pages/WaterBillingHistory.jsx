@@ -92,7 +92,13 @@ export default function WaterBillingHistory() {
       await api.delete(`/bills/${id}`);
       flash('Bill deleted.');
       fetchAll();
-    } catch (e) { flash(e?.response?.data?.message || 'Failed to delete bill.', 'error'); }
+    } catch (e) {
+      // Backend returns plain strings for errors, not JSON objects
+      const errMsg = typeof e?.response?.data === 'string'
+        ? e.response.data
+        : e?.response?.data?.message || 'Failed to delete bill.';
+      flash(errMsg, 'error');
+    }
   };
 
   // ── Filter helpers ──────────────────────────────────────────────
@@ -330,13 +336,23 @@ export default function WaterBillingHistory() {
                                     </button>
                                   </>
                                 )}
-                                <button
-                                  onClick={() => deleteBill(bill.id)}
-                                  className="p-1.5 text-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                                  title="Delete bill"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                                {bill.status !== 'PAID' && (
+                                  <button
+                                    onClick={() => deleteBill(bill.id)}
+                                    className="p-1.5 text-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                                    title="Delete bill"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                                {bill.status === 'PAID' && (
+                                  <span
+                                    className="p-1.5 text-text-muted/30 cursor-not-allowed"
+                                    title="Paid bills are protected and cannot be deleted"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </span>
+                                )}
                               </div>
                             </td>
                           </tr>

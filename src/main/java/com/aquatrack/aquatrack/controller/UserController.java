@@ -186,4 +186,45 @@ public class UserController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + doc.getFileName() + "\"")
                 .body(doc.getFileContent());
     }
+
+    // 7. PUT Change Password
+    @PutMapping("/profile/change-password/{username}")
+    public ResponseEntity<?> changePassword(
+            @PathVariable String username,
+            @RequestBody Map<String, String> body) {
+        
+        String currentPassword = body.get("currentPassword");
+        String newPassword = body.get("newPassword");
+        
+        if (currentPassword == null || newPassword == null) {
+            return ResponseEntity.badRequest().body("Error: Current password and new password are required.");
+        }
+        
+        if (newPassword.length() < 6) {
+            return ResponseEntity.badRequest().body("Error: New password must be at least 6 characters long.");
+        }
+        
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Error: User not found with username: " + username));
+        
+        org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder passwordEncoder = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            return ResponseEntity.badRequest().body("Error: Incorrect current password.");
+        }
+        
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        
+        // Notify user
+        notificationRepository.save(new Notification(
+                user.getUsername(),
+                "PASSWORD_CHANGE",
+                "Password Updated Successfully",
+                "Your account password was updated successfully. If you did not perform this change, contact administrator immediately."
+        ));
+        
+        Map<String, String> res = new HashMap<>();
+        res.put("message", "Password updated successfully!");
+        return ResponseEntity.ok(res);
+    }
 }

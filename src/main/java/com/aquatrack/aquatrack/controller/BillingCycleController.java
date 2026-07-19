@@ -48,19 +48,22 @@ public class BillingCycleController {
     @PostMapping
     public ResponseEntity<BillingCycle> createCycle(@Valid @RequestBody BillingCycle cycle) {
         cycle.setStatus("OPEN");
+        if (cycle.getCreatedByRole() == null || cycle.getCreatedByRole().trim().isEmpty()) {
+            cycle.setCreatedByRole("ROLE_COMMUNITY_ADMIN");
+        }
         return ResponseEntity.ok(billingCycleRepository.save(cycle));
     }
 
     // GET all billing cycles
     @GetMapping
     public ResponseEntity<List<BillingCycle>> getAllCycles() {
-        return ResponseEntity.ok(billingCycleRepository.findAll());
+        return ResponseEntity.ok(applyOverrides(billingCycleRepository.findAll()));
     }
 
     // GET billing cycles for a specific apartment
     @GetMapping("/apartment/{apartmentId}")
     public ResponseEntity<List<BillingCycle>> getCyclesByApartment(@PathVariable Long apartmentId) {
-        return ResponseEntity.ok(billingCycleRepository.findByApartmentId(apartmentId));
+        return ResponseEntity.ok(applyOverrides(billingCycleRepository.findByApartmentId(apartmentId)));
     }
 
     // GET a single billing cycle
@@ -317,5 +320,24 @@ public class BillingCycleController {
         cycle.setStatus("ARCHIVED");
         billingCycleRepository.save(cycle);
         return ResponseEntity.ok("Billing cycle archived successfully.");
+    }
+
+    private List<BillingCycle> applyOverrides(List<BillingCycle> cycles) {
+        return cycles.stream().filter(c -> {
+            if (!"ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(c.getCreatedByRole()) && c.getCreatedByRole() != null) {
+                // Super Admin cycles are never overridden
+                return true;
+            }
+            // Check if there is any Super Admin cycle matching the same apartmentId and apartmentBlock
+            boolean hasSuperAdminOverride = cycles.stream().anyMatch(other -> 
+                "ROLE_ADMIN".equalsIgnoreCase(other.getCreatedByRole()) &&
+                other.getApartmentId().equals(c.getApartmentId()) &&
+                (
+                    (other.getApartmentBlock() == null && c.getApartmentBlock() == null) ||
+                    (other.getApartmentBlock() != null && other.getApartmentBlock().equalsIgnoreCase(c.getApartmentBlock()))
+                )
+            );
+            return !hasSuperAdminOverride;
+        }).collect(java.util.stream.Collectors.toList());
     }
 }

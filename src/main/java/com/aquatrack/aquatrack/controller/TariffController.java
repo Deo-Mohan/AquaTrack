@@ -79,6 +79,11 @@ public class TariffController {
         Double limit = body.get("monthlyLimitLiters") != null ? ((Number) body.get("monthlyLimitLiters")).doubleValue() : null;
         Double excessRate = body.get("excessRatePerLiter") != null ? ((Number) body.get("excessRatePerLiter")).doubleValue() : null;
 
+        // Round to 4 decimal places to avoid IEEE 754 floating point corruption in MySQL
+        if (baseRate != null) baseRate = Math.round(baseRate * 10000.0) / 10000.0;
+        if (limit != null) limit = Math.round(limit * 10000.0) / 10000.0;
+        if (excessRate != null) excessRate = Math.round(excessRate * 10000.0) / 10000.0;
+
         // Base rate is a Super Admin-only setting — Community Admins cannot change it
         if ("ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(callerRole)) {
             baseRate = null; // Silently reject any base rate change from CA

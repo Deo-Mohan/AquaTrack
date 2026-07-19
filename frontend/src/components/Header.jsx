@@ -293,7 +293,7 @@ export default function Header({ toggleSidebar }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
-                className="fixed sm:absolute right-4 sm:right-0 left-4 sm:left-auto top-16 sm:top-full mt-3 w-auto sm:w-96 max-h-[480px] bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden z-50"
+                className="fixed sm:absolute right-4 sm:right-0 left-4 sm:left-auto top-16 sm:top-full mt-3 w-auto sm:w-96 max-h-[480px] bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden z-50 notification-dropdown"
               >
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-border">

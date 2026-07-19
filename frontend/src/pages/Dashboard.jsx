@@ -9,6 +9,13 @@ import api from '../api';
 
 const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#f43f5e', '#06b6d4', '#6366f1', '#f97316'];
 
+const getGreeting = () => {
+  const hr = new Date().getHours();
+  if (hr < 12) return 'Good morning';
+  if (hr < 17) return 'Good afternoon';
+  return 'Good evening';
+};
+
 const StatCard = ({ title, value, subtitle, icon: Icon, color, delay }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
@@ -96,18 +103,31 @@ export default function Dashboard() {
   const [weeklyUsage, setWeeklyUsage] = useState([]);
   const [monthlyUsageData, setMonthlyUsageData] = useState([]);
   const username = localStorage.getItem('username') || 'Household User';
+  const [displayName, setDisplayName] = useState(() => {
+    return localStorage.getItem('fullName') || localStorage.getItem('username') || 'Household User';
+  });
   const [loading, setLoading] = useState(true);
   const [showResidentHelp, setShowResidentHelp] = useState(true);
   const [quickHelpModalOpen, setQuickHelpModalOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
+  const [safeWaterLimit, setSafeWaterLimit] = useState(0); // monthlyLimitLiters from CA tariff
   const [monthlyChartType, setMonthlyChartType] = useState('area'); // area, bar, line
   const [weeklyChartType, setWeeklyChartType] = useState('bar'); // bar, line, area
 
+  const handleRemoveAlert = async (id) => {
+    try {
+      await api.delete(`/notifications/${id}`);
+      setAlerts(prev => prev.filter(alert => alert.id !== id));
+    } catch (err) {
+      console.error("Error deleting notification:", err);
+    }
+  };
+
   const latestVal = stats?.latestReading || 0;
-  const avgVal = 180;
-  const maxVal = Math.max(latestVal, avgVal) || 1;
+  const avgVal = safeWaterLimit > 0 ? safeWaterLimit : 0;
+  const maxVal = Math.max(latestVal, avgVal, 1);
   const userPercentage = Math.round((latestVal * 100) / maxVal);
-  const avgPercentage = Math.round((avgVal * 100) / maxVal);
+  const avgPercentage = avgVal > 0 ? Math.round((avgVal * 100) / maxVal) : 0;
 
   const getLast6MonthsData = (logs) => {
     const months = [];
@@ -158,6 +178,13 @@ export default function Dashboard() {
               currentStatus = profileRes.data.verificationStatus || 'NOT_SUBMITTED';
               setVerificationStatus(currentStatus);
               setRejectReason(profileRes.data.verificationRejectReason || '');
+              if (profileRes.data.fullName) {
+                setDisplayName(profileRes.data.fullName);
+              }
+              // Load the safe water limit set by the community admin
+              if (profileRes.data.monthlyLimitLiters != null && profileRes.data.monthlyLimitLiters > 0) {
+                setSafeWaterLimit(profileRes.data.monthlyLimitLiters);
+              }
             }
           } catch (e) {
             console.error("Error fetching user profile:", e);
@@ -482,7 +509,18 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-text">Household User Dashboard</h1>
-          <p className="text-text-muted mt-1">Welcome back, {username}. Here's your water usage overview.</p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1 text-sm text-text-muted">
+            <span>{getGreeting()}, <span className="font-extrabold text-amber-500 dark:text-amber-400">{displayName}</span></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-border shrink-0 hidden sm:inline" />
+            <div className="flex items-center gap-1.5 bg-surface-lighter/50 px-2.5 py-0.5 rounded-full border border-border/60 text-xs">
+              <span className="text-text-muted font-medium">Flat:</span>
+              <strong className="text-primary font-semibold">{localStorage.getItem('houseNumber') || 'N/A'}</strong>
+            </div>
+            <div className="flex items-center gap-1.5 bg-surface-lighter/50 px-2.5 py-0.5 rounded-full border border-border/60 text-xs">
+              <span className="text-text-muted font-medium">Community/Area:</span>
+              <strong className="text-emerald-400 font-semibold">{localStorage.getItem('colonyName') || 'Qutub Minar'}</strong>
+            </div>
+          </div>
         </div>
 
         {/* Glowing bulb for quick guide */}
@@ -503,66 +541,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Resident Collapsible Help Banner */}
-      <div className="glass-card overflow-hidden border-primary/25">
-        <div 
-          onClick={() => setShowResidentHelp(!showResidentHelp)}
-          className="flex items-center justify-between px-6 py-4 bg-primary/5 hover:bg-primary/10 transition-all cursor-pointer select-none"
-        >
-          <div className="flex items-center gap-3">
-            <Info className="w-5 h-5 text-primary" />
-            <div>
-              <h4 className="font-bold text-text text-sm">💡 Resident Help & Quick Guide</h4>
-              <p className="text-text-muted text-xs mt-0.5">Click here to {showResidentHelp ? 'hide' : 'show'} basic explanations on reading your dashboard.</p>
-            </div>
-          </div>
-          <span className="text-text-muted text-xs font-semibold">
-            {showResidentHelp ? 'Collapse 🟢' : 'Expand 🔵'}
-          </span>
-        </div>
-        
-        <AnimatePresence>
-          {showResidentHelp && (
-            <motion.div 
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="border-t border-border bg-surface-lighter/5"
-            >
-              <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-text">
-                <div className="space-y-2 bg-surface-lighter/25 p-4.5 rounded-xl border border-border/50">
-                  <p className="font-bold text-blue-500 dark:text-blue-400 flex items-center gap-2 text-sm">
-                    <BarChart3 className="w-5 h-5" /> Usage Analytics
-                  </p>
-                  <p className="text-sm leading-relaxed text-text">
-                    Track your daily, weekly, and monthly water consumption. Use the <strong className="text-primary font-semibold">My Usage</strong> page to view detailed trend graphs and building comparison metrics.
-                  </p>
-                </div>
-                <div className="space-y-2 bg-surface-lighter/25 p-4.5 rounded-xl border border-border/50">
-                  <p className="font-bold text-emerald-500 dark:text-emerald-400 flex items-center gap-2 text-sm">
-                    <Zap className="w-5 h-5" /> Fair Billing Algorithm
-                  </p>
-                  <p className="text-sm leading-relaxed text-text">
-                    AquaTrack dynamically generates bills based on your actual consumption. View invoice PDFs under <strong className="text-primary font-semibold">My Invoices</strong> and clear outstanding dues.
-                  </p>
-                </div>
-                <div className="space-y-2 bg-surface-lighter/25 p-4.5 rounded-xl border border-border/50">
-                  <p className="font-bold text-rose-500 dark:text-rose-400 flex items-center gap-2 text-sm">
-                    <AlertTriangle className="w-5 h-5" /> Anomaly & Leak Alerts
-                  </p>
-                  <p className="text-sm leading-relaxed text-text">
-                    Automated analysis flags sudden consumption spikes or continuous flows (leaks). Check for alerts and report concerns via the <strong className="text-primary font-semibold">Support</strong> tab.
-                  </p>
-                </div>
-              </div>
-              <div className="px-6 py-3 bg-primary/5 border-t border-border/40 text-xs text-text flex justify-between items-center flex-wrap gap-2">
-                <span className="font-semibold text-primary">🌱 Every Drop Counts</span>
-                <span>Need support? Visit the <strong className="text-primary font-semibold">Support</strong> tab to create service tickets or contact the building administration.</span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
@@ -598,12 +576,21 @@ export default function Dashboard() {
           <div className="space-y-3">
             {alerts.length > 0 ? (
               alerts.slice(0, 2).map((alert, idx) => (
-                <div key={alert.id || idx} className="flex items-start gap-3 p-3.5 rounded-xl transition-all alert-card-warning">
-                  <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-sm font-bold alert-title">{alert.title}</p>
-                    <p className="text-xs alert-message mt-1 font-medium">{alert.message}</p>
+                <div key={alert.id || idx} className="flex items-start justify-between gap-3 p-3.5 rounded-xl transition-all alert-card-warning group/alert relative">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-bold alert-title">{alert.title}</p>
+                      <p className="text-xs alert-message mt-1 font-medium">{alert.message}</p>
+                    </div>
                   </div>
+                  <button 
+                    onClick={() => handleRemoveAlert(alert.id)}
+                    className="p-1 rounded-full text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer focus:outline-none shrink-0"
+                    title="Dismiss alert"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               ))
             ) : (
@@ -795,8 +782,14 @@ export default function Dashboard() {
         className="glass-card p-6"
       >
         <div className="flex items-center justify-between mb-6">
-          <h3 className="font-semibold text-text">Apartment Average Comparison</h3>
-          <button className="text-sm text-primary hover:text-primary-dark transition-colors">View Details</button>
+          <div>
+            <h3 className="font-semibold text-text">Monthly Tariff Limit Comparison</h3>
+            <p className="text-xs text-text-muted mt-0.5">
+              {avgVal > 0 
+                ? `Safe limit: ${avgVal.toLocaleString()} L/mo — excess usage attracts penalty charges`
+                : 'Contact your Community Admin to configure a monthly water limit'}
+            </p>
+          </div>
         </div>
         
         <div className="flex flex-col md:flex-row gap-8 items-center">
@@ -818,15 +811,20 @@ export default function Dashboard() {
             
             <div>
               <div className="flex justify-between text-sm mb-2">
-                <span className="text-text-muted">Building Average</span>
-                <span className="text-text font-medium">180 L</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-text-muted">Safe Usage Limit</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-semibold border border-primary/20">CA Set</span>
+                </div>
+                <span className="text-text font-medium">
+                  {avgVal > 0 ? `${avgVal.toLocaleString()} L` : <span className="text-text-muted/60 italic text-xs">Not configured</span>}
+                </span>
               </div>
               <div className="h-2 w-full bg-surface-lighter rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
-                  animate={{ width: `${avgPercentage}%` }}
+                  animate={{ width: avgVal > 0 ? `${avgPercentage}%` : '0%' }}
                   transition={{ duration: 1, delay: 0.8 }}
-                  className="h-full bg-slate-400"
+                  className="h-full bg-emerald-400"
                 />
               </div>
             </div>
@@ -835,17 +833,24 @@ export default function Dashboard() {
           {stats.latestReading === 0 ? (
             <div className="w-full md:w-auto p-4 rounded-xl bg-slate-500/10 border border-slate-500/20 text-center">
               <h4 className="text-xl font-bold text-text-muted mb-1">No Data</h4>
-              <p className="text-sm text-text-muted/80 max-w-[200px] mx-auto">Log water readings to view building comparison metrics.</p>
+              <p className="text-sm text-text-muted/80 max-w-[200px] mx-auto">Log water readings to view tariff limit comparison.</p>
             </div>
-          ) : stats.latestReading < 180 ? (
+          ) : avgVal === 0 ? (
+            <div className="w-full md:w-auto p-4 rounded-xl bg-slate-500/10 border border-slate-500/20 text-center">
+              <h4 className="text-xl font-bold text-text-muted mb-1">No Limit Set</h4>
+              <p className="text-sm text-text-muted/80 max-w-[200px] mx-auto">Your Community Admin has not configured a monthly water limit yet.</p>
+            </div>
+          ) : stats.latestReading <= avgVal ? (
             <div className="w-full md:w-auto p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
-              <h4 className="text-xl font-bold text-emerald-400 mb-1">Great Job!</h4>
-              <p className="text-sm text-emerald-400/80 max-w-[200px] mx-auto">You're using less water than the average household user.</p>
+              <h4 className="text-xl font-bold text-emerald-400 mb-1">Within Limit ✓</h4>
+              <p className="text-sm text-emerald-400/80 max-w-[200px] mx-auto">You're within the safe usage limit. No excess tariff applies.</p>
             </div>
           ) : (
-            <div className="w-full md:w-auto p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
-              <h4 className="text-xl font-bold text-amber-400 mb-1">High Usage</h4>
-              <p className="text-sm text-amber-400/80 max-w-[200px] mx-auto">Your usage is higher than the average. Consider water-saving habits.</p>
+            <div className="w-full md:w-auto p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
+              <h4 className="text-xl font-bold text-red-400 mb-1">Limit Exceeded ⚠️</h4>
+              <p className="text-sm text-red-400/80 max-w-[200px] mx-auto">
+                Over by {(stats.latestReading - avgVal).toLocaleString()} L. Excess tariff charges will apply.
+              </p>
             </div>
           )}
         </div>

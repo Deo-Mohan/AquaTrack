@@ -120,6 +120,69 @@ public class BillController {
             java.util.Optional<com.aquatrack.aquatrack.model.User> residentOpt = userRepository.findByHouseNumber(bill.getHouseNumber());
             if (residentOpt.isPresent()) {
                 bill.setMeterId(residentOpt.get().getMeterId());
+
+                // --- Auto-populate consumption and tariff breakdown from unbilled usage logs ---
+                com.aquatrack.aquatrack.model.User resUser = residentOpt.get();
+
+                // Find unbilled logs (after the latest existing bill date)
+                List<com.aquatrack.aquatrack.model.WaterUsageLog> allLogs = waterUsageRepository.findByHouseNumber(bill.getHouseNumber());
+                List<com.aquatrack.aquatrack.model.Bill> existingBills = repository.findByHouseNumber(bill.getHouseNumber());
+                java.time.LocalDate latestBillDate = existingBills.stream()
+                        .map(b -> b.getGeneratedDate())
+                        .filter(d -> d != null)
+                        .max(java.util.Comparator.naturalOrder())
+                        .orElse(null);
+                final java.time.LocalDate cutOff = latestBillDate;
+                List<com.aquatrack.aquatrack.model.WaterUsageLog> unbilledLogs = allLogs.stream()
+                        .filter(log -> cutOff == null || log.getReadingDate().isAfter(cutOff))
+                        .collect(java.util.stream.Collectors.toList());
+
+                double totalLiters = unbilledLogs.stream()
+                        .mapToDouble(log -> log.getReadingLiters() != null ? log.getReadingLiters() : 0.0)
+                        .sum();
+
+                // Resolve tariff settings: user first, then community admin fallback
+                Double waterRate = resUser.getWaterRatePerLiter();
+                Double monthlyLimit = resUser.getMonthlyLimitLiters();
+                Double excessRate = resUser.getExcessRatePerLiter();
+                if ((waterRate == null || waterRate <= 0) || monthlyLimit == null || excessRate == null) {
+                    String blk = resUser.getApartmentBlock();
+                    if (blk != null && !blk.trim().isEmpty()) {
+                        List<com.aquatrack.aquatrack.model.User> admins = userRepository.findByRoleAndApartmentBlock("ROLE_COMMUNITY_ADMIN", blk);
+                        for (com.aquatrack.aquatrack.model.User adm : admins) {
+                            if ((waterRate == null || waterRate <= 0) && adm.getWaterRatePerLiter() != null && adm.getWaterRatePerLiter() > 0) waterRate = adm.getWaterRatePerLiter();
+                            if (monthlyLimit == null && adm.getMonthlyLimitLiters() != null) monthlyLimit = adm.getMonthlyLimitLiters();
+                            if (excessRate == null && adm.getExcessRatePerLiter() != null) excessRate = adm.getExcessRatePerLiter();
+                            if (waterRate != null && waterRate > 0 && monthlyLimit != null && excessRate != null) break;
+                        }
+                    }
+                }
+
+                if (totalLiters > 0 && waterRate != null && waterRate > 0) {
+                    double withinLimit = totalLiters;
+                    double excessLiters = 0.0;
+                    double excessCharge = 0.0;
+                    if (monthlyLimit != null && monthlyLimit > 0 && excessRate != null && totalLiters > monthlyLimit) {
+                        withinLimit = monthlyLimit;
+                        excessLiters = totalLiters - monthlyLimit;
+                        excessCharge = excessLiters * excessRate;
+                    }
+                    double baseCharge = withinLimit * waterRate;
+                    double computedAmount = Math.round((baseCharge + excessCharge) * 100.0) / 100.0;
+
+                    bill.setConsumptionLiters(totalLiters);
+                    bill.setWithinLimitLiters(withinLimit);
+                    bill.setExcessLiters(excessLiters);
+                    bill.setBaseRatePerLiter(waterRate);
+                    bill.setExcessRatePerLiter(excessRate != null ? excessRate : 0.0);
+                    bill.setMonthlyLimitLiters(monthlyLimit != null ? monthlyLimit : 0.0);
+                    bill.setBaseCharge(baseCharge);
+                    bill.setExcessCharge(excessCharge);
+                    // Only override amount if admin didn't manually set one
+                    if (bill.getAmount() == null || bill.getAmount() <= 0) {
+                        bill.setAmount(computedAmount);
+                    }
+                }
             }
         }
         Bill savedBill = repository.save(bill);
@@ -141,7 +204,7 @@ public class BillController {
                 notif.setReferenceType("BILL");
                 notificationRepository.save(notif);
 
-                // 2. Email dispatch since it is created by Community Admin
+                // 2. Email dispatch with full tariff breakdown
                 if (user.getEmail() != null && !user.getEmail().trim().isEmpty()) {
                     try {
                         emailService.sendBillGeneratedEmail(
@@ -152,7 +215,12 @@ public class BillController {
                             savedBill.getGeneratedDate(),
                             savedBill.getDueDate(),
                             savedBill.getConsumptionLiters(),
-                            savedBill.getMeterId()
+                            savedBill.getMeterId(),
+                            savedBill.getWithinLimitLiters(),
+                            savedBill.getExcessLiters(),
+                            savedBill.getBaseRatePerLiter(),
+                            savedBill.getExcessRatePerLiter(),
+                            savedBill.getMonthlyLimitLiters()
                         );
                     } catch (Exception e) {
                         System.err.println("SMTP dispatch failed for custom bill generated email: " + e.getMessage());

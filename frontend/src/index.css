@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 @theme {
   --color-primary: #3b82f6;
   --color-primary-dark: #2563eb;
@@ -877,7 +879,7 @@ body {
   position: relative;
   padding: 12px 24px;
   font-size: 16px;
-  background: #1a1a1a;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -886,11 +888,13 @@ body {
   align-items: center;
   gap: 10px;
   transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.18);
 }
 
 .pay-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.28);
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
 }
 
 .pay-btn .icon-container {
@@ -905,7 +909,7 @@ body {
   left: 0;
   width: 24px;
   height: 24px;
-  color: #22c55e;
+  color: #ffffff;
   opacity: 0;
   visibility: hidden;
 }
@@ -913,6 +917,7 @@ body {
 .pay-btn .default-icon {
   opacity: 1;
   visibility: visible;
+  color: #ffffff;
 }
 
 /* Hover animations */
@@ -2269,6 +2274,30 @@ body {
     brightness(103%) contrast(103%);
 }
 
+[data-theme='light'] .footer-social-btn {
+  background-color: rgba(11, 26, 48, 0.08);
+  border-color: rgba(11, 26, 48, 0.15);
+  color: #0b1a30;
+}
+
+[data-theme='light'] .footer-social-btn .footer-social-svg,
+[data-theme='light'] .footer-social-btn .footer-social-svg g,
+[data-theme='light'] .footer-social-btn .footer-social-svg path {
+  fill: #0b1a30 !important;
+}
+
+[data-theme='light'] .footer-social-btn:hover {
+  background-color: #0b1a30;
+  border-color: #0b1a30;
+}
+
+[data-theme='light'] .footer-social-btn:hover .footer-social-svg,
+[data-theme='light'] .footer-social-btn:hover .footer-social-svg g,
+[data-theme='light'] .footer-social-btn:hover .footer-social-svg path {
+  fill: #ffffff !important;
+  filter: none !important;
+}
+
 /* Neobrutalist Card Styling */
 .neobrutal-card {
   --primary: #ff3e00;
@@ -3513,5 +3542,20 @@ body {
 [data-theme='light'] .help-modal-box {
   background-color: #ffffff !important; /* solid white for high-contrast light mode */
   border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Premium Glassmorphic Notification Dropdown */
+.notification-dropdown {
+  backdrop-filter: blur(28px) saturate(220%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(220%) !important;
+}
+
+[data-theme='light'] .notification-dropdown {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(36px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(36px) saturate(200%) !important;
+  box-shadow: 
+    0 4px 30px rgba(13, 30, 54, 0.08),
+    0 30px 60px -15px rgba(13, 30, 54, 0.25) !important;
 }
 

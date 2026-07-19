@@ -31,7 +31,7 @@ export default function MeterWorkstation() {
   const isSuperAdmin = role === 'ROLE_ADMIN';
 
   // Navigation Tab
-  const [activeTab, setActiveTab] = useState('workstation'); // workstation, cycles, reminders
+  const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'cycles' : 'workstation'); // workstation, cycles, reminders
 
   // Data
   const [users,     setUsers]     = useState([]);
@@ -71,6 +71,7 @@ export default function MeterWorkstation() {
   const [billCalc,    setBillCalc]    = useState(null);
   const [billStatus,  setBillStatus]  = useState(null);
   const [billLoading, setBillLoading] = useState(false);
+  const [hasLoggedNewReading, setHasLoggedNewReading] = useState(false);
 
   // Bulk Billing
   const [bulkGenerating, setBulkGenerating] = useState(false);
@@ -158,7 +159,8 @@ export default function MeterWorkstation() {
         startDate: billingCycleForm.startDate,
         endDate: billingCycleForm.endDate,
         apartmentId: parseInt(billingCycleForm.apartmentId),
-        apartmentBlock: billingCycleForm.apartmentBlock || null
+        apartmentBlock: billingCycleForm.apartmentBlock || null,
+        createdByRole: role
       });
       setActionStatus({ type: 'success', msg: `✅ Billing cycle "${billingCycleForm.cycleName}" created successfully.` });
       setBillingCycleModalOpen(false);
@@ -259,6 +261,7 @@ export default function MeterWorkstation() {
     setLogStatus(null);
     setBillStatus(null);
     setLogForm(f => ({ ...f, readingLiters: '' }));
+    setHasLoggedNewReading(false);
     computeBillCalc(u);
   };
 
@@ -322,6 +325,7 @@ export default function MeterWorkstation() {
       }, { params: { callerRole: role } });
       setLogStatus({ type: 'success', msg: `✅ ${logForm.readingLiters}L logged for ${selected.fullName || selected.username}` });
       setLogForm(f => ({ ...f, readingLiters: '' }));
+      setHasLoggedNewReading(true);
       await fetchAll();
     } catch (err) {
       setLogStatus({ type: 'error', msg: err?.response?.data?.message || 'Failed to submit log.' });
@@ -343,6 +347,7 @@ export default function MeterWorkstation() {
         billingCycleId: billForm.billingCycleId
       }, { params: { callerRole: role } });
       setBillStatus({ type: 'success', msg: `✅ Bill of ₹${billForm.amount} generated for ${selected.fullName || selected.username}` });
+      setHasLoggedNewReading(false);
       await fetchAll();
     } catch (err) {
       setBillStatus({ type: 'error', msg: err?.response?.data?.message || 'Failed to generate bill.' });
@@ -511,7 +516,7 @@ export default function MeterWorkstation() {
       {/* ── Sub-Tab Switcher ─────────────────────────────────────── */}
       <div className="flex gap-4 border-b border-border pb-4">
         {[
-          { id: 'workstation', label: 'Workstation', icon: Droplet },
+          ...(!isSuperAdmin ? [{ id: 'workstation', label: 'Workstation', icon: Droplet }] : []),
           { id: 'cycles', label: 'Billing Cycles & Periods', icon: Calendar },
           { id: 'reminders', label: 'Payment Reminders 🔔', icon: Zap }
         ].map(tab => {
@@ -554,7 +559,7 @@ export default function MeterWorkstation() {
       )}
 
       {/* ── WORKSTATION TAB CONTENT ─────────────────────────────── */}
-      {activeTab === 'workstation' && (
+      {activeTab === 'workstation' && !isSuperAdmin && (
         <motion.div
           key="workstation"
           initial={{ opacity: 0, y: 10 }}
@@ -879,12 +884,17 @@ export default function MeterWorkstation() {
                       </div>
                     )}
 
-                    {billCalc.unbilled.length === 0 && (
+                    {billCalc.unbilled.length === 0 ? (
                       <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
                         <Info className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
                         <p className="text-xs text-amber-300">No unbilled water logs found. Please submit a meter reading first using the panel on the left.</p>
                       </div>
-                    )}
+                    ) : !hasLoggedNewReading ? (
+                      <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                        <Info className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-300 font-medium">Please submit a new water reading log first using the panel on the left to enable bill generation.</p>
+                      </div>
+                    ) : null}
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -911,7 +921,7 @@ export default function MeterWorkstation() {
 
                     <button
                       type="submit"
-                      disabled={billLoading || billCalc.unbilled.length === 0 || billCalc.baseRateNotSet}
+                      disabled={billLoading || billCalc.unbilled.length === 0 || billCalc.baseRateNotSet || !hasLoggedNewReading}
                       className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
                       {billLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
@@ -943,8 +953,8 @@ export default function MeterWorkstation() {
             </div>
             <button
               onClick={() => {
-                const myColonyName = localStorage.getItem('colonyName') || '';
-                const myColony = apartments.find(a => a.name === myColonyName);
+                const myColonyName = (localStorage.getItem('colonyName') || '').trim().toLowerCase();
+                const myColony = apartments.find(a => a.name.trim().toLowerCase() === myColonyName);
                 const myColonyId = myColony?.id || '';
                 setBillingCycleForm({
                   cycleName: '',
@@ -1389,27 +1399,45 @@ export default function MeterWorkstation() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Colony / Community</label>
-                <select
-                  required
-                  value={billingCycleForm.apartmentId}
-                  onChange={e => setBillingCycleForm(prev => ({ ...prev, apartmentId: e.target.value }))}
-                  className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer"
-                >
-                  <option value="">Select Colony</option>
-                  {apartments.map(apt => (
-                    <option key={apt.id} value={apt.id}>{apt.name}</option>
-                  ))}
-                </select>
+                {isSuperAdmin ? (
+                  <select
+                    required
+                    value={billingCycleForm.apartmentId}
+                    onChange={e => setBillingCycleForm(prev => ({ ...prev, apartmentId: e.target.value }))}
+                    className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer"
+                  >
+                    <option value="">Select Colony</option>
+                    {apartments.map(apt => (
+                      <option key={apt.id} value={apt.id}>{apt.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    disabled
+                    value={apartments.find(apt => apt.id === parseInt(billingCycleForm.apartmentId))?.name || localStorage.getItem('colonyName') || 'My Colony'}
+                    className="w-full bg-surface-lighter/50 border border-border rounded-xl px-3 py-2.5 text-sm text-text-muted cursor-not-allowed"
+                  />
+                )}
               </div>
               <div>
                 <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Building / Block</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Block A (Leave empty for all)"
-                  value={billingCycleForm.apartmentBlock}
-                  onChange={e => setBillingCycleForm(prev => ({ ...prev, apartmentBlock: e.target.value }))}
-                  className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60"
-                />
+                {isSuperAdmin ? (
+                  <input
+                    type="text"
+                    placeholder="e.g. Block A (Leave empty for all)"
+                    value={billingCycleForm.apartmentBlock}
+                    onChange={e => setBillingCycleForm(prev => ({ ...prev, apartmentBlock: e.target.value }))}
+                    className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60"
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    disabled
+                    value={billingCycleForm.apartmentBlock || block || 'N/A'}
+                    className="w-full bg-surface-lighter/50 border border-border rounded-xl px-3 py-2.5 text-sm text-text-muted cursor-not-allowed"
+                  />
+                )}
               </div>
               <button
                 type="submit" disabled={actionLoading}

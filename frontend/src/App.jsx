@@ -73,6 +73,15 @@ const AuthLayout = ({ children }) => {
   );
 };
 
+// A route wrapper to restrict access only to Community Admins
+const CommunityAdminRoute = ({ children }) => {
+  const role = localStorage.getItem('role');
+  if (role !== 'ROLE_COMMUNITY_ADMIN') {
+    return <Navigate to="/admin" replace />;
+  }
+  return children;
+};
+
 function App() {
   return (
     <Router>
@@ -96,7 +105,7 @@ function App() {
           <Route path="/usage" element={<AuthLayout><MyUsage /></AuthLayout>} />
           <Route path="/profile" element={<AuthLayout><Profile /></AuthLayout>} />
           <Route path="/support" element={<AuthLayout><Support /></AuthLayout>} />
-          <Route path="/tariff" element={<AuthLayout><TariffSettings /></AuthLayout>} />
+          <Route path="/tariff" element={<AuthLayout><CommunityAdminRoute><TariffSettings /></CommunityAdminRoute></AuthLayout>} />
           <Route path="/meter-workstation" element={<AuthLayout><MeterWorkstation /></AuthLayout>} />
           <Route path="/water-billing-history" element={<AuthLayout><WaterBillingHistory /></AuthLayout>} />
           

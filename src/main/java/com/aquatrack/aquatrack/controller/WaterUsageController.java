@@ -119,7 +119,7 @@ public class WaterUsageController {
             String house = resident.getHouseNumber();
             String block = resident.getApartmentBlock();
             if (house != null && block != null) {
-                csvContent.append(String.format("%s,%s,%s,0.0,DAILY\n", house, block, today.toString()));
+                csvContent.append(String.format("%s,%s,%s,,MONTHLY\n", house, block, today.toString()));
             }
         }
 
@@ -151,7 +151,7 @@ public class WaterUsageController {
                 // Skip header row
                 if (lineNumber == 1 && (line.toLowerCase().contains("housenumber") || line.toLowerCase().contains("householdid"))) continue;
 
-                String[] parts = line.split(",");
+                String[] parts = line.split(",", -1);
                 if (parts.length < 4) {
                     errors.add("Line " + lineNumber + ": insufficient columns");
                     continue;
@@ -161,9 +161,16 @@ public class WaterUsageController {
                     String houseNumber = parts[0].trim();
                     String apartmentBlock = parts[1].trim();
                     LocalDate readingDate = LocalDate.parse(parts[2].trim());
-                    Double readingLiters = Double.parseDouble(parts[3].trim());
-                    String logType = "DAILY";
-                    if (parts.length >= 5) {
+                    
+                    String readingLitersStr = parts[3].trim();
+                    if (readingLitersStr.isEmpty()) {
+                        // Skip blank rows where the community admin didn't input a reading
+                        continue;
+                    }
+                    Double readingLiters = Double.parseDouble(readingLitersStr);
+                    
+                    String logType = "MONTHLY";
+                    if (parts.length >= 5 && !parts[4].trim().isEmpty()) {
                         String typeVal = parts[4].trim().toUpperCase();
                         if ("DAILY".equals(typeVal) || "MONTHLY".equals(typeVal)) {
                             logType = typeVal;

@@ -14,11 +14,19 @@ export default function Bills() {
   const [successMsg, setSuccessMsg] = useState('');
   const [payQrModalBill, setPayQrModalBill] = useState(null);
   const [invoiceModalBill, setInvoiceModalBill] = useState(null);
+  const [adminName, setAdminName] = useState('Community Admin');
 
-  const handleMarkBillPaid = async (bill) => {
+  const handleMarkBillPaid = async (bill, paymentData = null) => {
     try {
+      const residentName = localStorage.getItem('fullName') || localStorage.getItem('username') || '';
       const updatedRes = await api.get(`/bills/${bill.id}`);
-      setInvoiceModalBill(updatedRes.data);
+      const enrichedBill = {
+        ...updatedRes.data,
+        residentName,
+        adminName,
+        ...(paymentData ? { paymentData } : {})
+      };
+      setInvoiceModalBill(enrichedBill);
       await fetchBills();
     } catch (err) {
       console.error('Error refreshing bill:', err);
@@ -44,6 +52,25 @@ export default function Bills() {
 
   useEffect(() => {
     fetchBills();
+    const fetchAdminName = async () => {
+      try {
+        const u = localStorage.getItem('username');
+        const role = localStorage.getItem('role');
+        if (role === 'ROLE_COMMUNITY_ADMIN') {
+          const fullName = localStorage.getItem('fullName') || 'Community Admin';
+          setAdminName(fullName);
+        } else if (u) {
+          const res = await api.get(`/users/contacts/${u}`);
+          const admin = res.data.find(c => c.role === 'ROLE_COMMUNITY_ADMIN');
+          if (admin && admin.fullName) {
+            setAdminName(admin.fullName);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch community admin name:", err);
+      }
+    };
+    fetchAdminName();
   }, []);
 
   const handleGenerateBill = async () => {
@@ -236,6 +263,71 @@ export default function Bills() {
                             </div>
                           )}
                         </div>
+
+                        {/* ── Calculation Breakdown ── */}
+                        <div className="t-breakdown">
+                          <div className="t-breakdown-title">Bill Calculation</div>
+                          <table className="t-calc-table">
+                            <thead>
+                              <tr>
+                                <th>Description</th>
+                                <th className="t-calc-right">Qty (L)</th>
+                                <th className="t-calc-right">Rate (₹)</th>
+                                <th className="t-calc-right">Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {/* Within-limit row */}
+                              {bill.monthlyLimitLiters > 0 ? (
+                                <>
+                                  <tr>
+                                    <td>
+                                      <span className="t-calc-label">Safe Limit Usage</span>
+                                      <span className="t-calc-sub">≤ {(bill.monthlyLimitLiters || 0).toLocaleString()} L limit</span>
+                                    </td>
+                                    <td className="t-calc-right">{(bill.withinLimitLiters || 0).toLocaleString()}</td>
+                                    <td className="t-calc-right">₹{(bill.baseRatePerLiter || 0).toFixed(2)}</td>
+                                    <td className="t-calc-right t-calc-green">₹{((bill.withinLimitLiters || 0) * (bill.baseRatePerLiter || 0)).toFixed(2)}</td>
+                                  </tr>
+                                  {(bill.excessLiters || 0) > 0 && (
+                                    <tr className="t-calc-excess-row">
+                                      <td>
+                                        <span className="t-calc-label t-calc-red">Excess Usage</span>
+                                        <span className="t-calc-sub t-calc-red">Above safe limit</span>
+                                      </td>
+                                      <td className="t-calc-right t-calc-red">{(bill.excessLiters || 0).toLocaleString()}</td>
+                                      <td className="t-calc-right t-calc-red">₹{(bill.excessRatePerLiter || 0).toFixed(2)}</td>
+                                      <td className="t-calc-right t-calc-red">+₹{((bill.excessLiters || 0) * (bill.excessRatePerLiter || 0)).toFixed(2)}</td>
+                                    </tr>
+                                  )}
+                                </>
+                              ) : (
+                                <tr>
+                                  <td>
+                                    <span className="t-calc-label">Water Consumption</span>
+                                    <span className="t-calc-sub">Standard rate</span>
+                                  </td>
+                                  <td className="t-calc-right">{(bill.consumptionLiters || 0).toLocaleString()}</td>
+                                  <td className="t-calc-right">
+                                    ₹{bill.baseRatePerLiter
+                                      ? Number(bill.baseRatePerLiter).toFixed(2)
+                                      : bill.consumptionLiters
+                                        ? (bill.amount / bill.consumptionLiters).toFixed(2)
+                                        : '0.00'}
+                                  </td>
+                                  <td className="t-calc-right">₹{(bill.amount || 0).toFixed(2)}</td>
+                                </tr>
+                              )}
+                            </tbody>
+                            <tfoot>
+                              <tr className="t-calc-total-row">
+                                <td colSpan="3" className="t-calc-total-label">TOTAL AMOUNT</td>
+                                <td className="t-calc-right t-calc-total-value">₹{(bill.amount || 0).toFixed(2)}</td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+
                       </div>
                       <div
                         className="t-perforation"
@@ -299,7 +391,10 @@ export default function Bills() {
                   </button>
                 ) : (
                   <button
-                    onClick={() => setInvoiceModalBill(bill)}
+                    onClick={() => {
+                      const residentName = localStorage.getItem('fullName') || localStorage.getItem('username') || '';
+                      setInvoiceModalBill({ ...bill, residentName, adminName });
+                    }}
                     className="pay-btn cursor-pointer !bg-blue-600 hover:!bg-blue-700"
                     style={{ width: '100%', justifyContent: 'center' }}
                   >
@@ -320,10 +415,10 @@ export default function Bills() {
         <RazorpayModal
           bill={payQrModalBill}
           onClose={() => setPayQrModalBill(null)}
-          onSuccess={async () => {
+          onSuccess={async (paymentData) => {
             setPayQrModalBill(null);
             setSuccessMsg(`Payment successful for bill #${payQrModalBill.id}!`);
-            await handleMarkBillPaid(payQrModalBill);
+            await handleMarkBillPaid(payQrModalBill, paymentData);
           }}
         />
       )}
@@ -331,17 +426,17 @@ export default function Bills() {
       {/* Invoice Modal */}
       {invoiceModalBill && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto pt-16 pb-10">
-          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-surface border border-border w-full max-w-2xl rounded-2xl shadow-2xl relative my-8 overflow-hidden">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 w-full max-w-2xl rounded-2xl shadow-2xl relative my-8 overflow-hidden">
             
             {/* Header block with gradient */}
-            <div className="bg-gradient-to-r from-blue-600/20 via-primary/10 to-transparent p-6 border-b border-border flex items-center justify-between">
+            <div className="bg-gradient-to-r from-blue-600/20 via-blue-500/10 to-transparent p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-500/20">
                   A
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-text">AquaTrack Invoice</h3>
-                  <p className="text-xs text-text-muted">Water Utility Bill Receipt</p>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">AquaTrack Invoice</h3>
+                  <p className="text-xs text-slate-500">Water Utility Bill Receipt</p>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -351,70 +446,73 @@ export default function Bills() {
                 >
                   ⬇ Download / Print PDF
                 </button>
-                <button onClick={() => setInvoiceModalBill(null)} className="text-text-muted hover:text-text cursor-pointer p-1.5 hover:bg-surface-lighter rounded-lg transition-colors"><X className="w-5 h-5" /></button>
+                <button onClick={() => setInvoiceModalBill(null)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
               </div>
             </div>
 
             {/* On-screen Modal Content */}
-            <div className="p-8 space-y-6">
+            <div className="p-8 space-y-6 bg-white dark:bg-slate-900">
               
               {/* Brand & Inv Meta */}
               <div className="flex justify-between items-start">
                 <div>
-                  <div className="font-black text-2xl text-blue-500">AquaTrack</div>
-                  <p className="text-xs text-text-muted">High-Quality Water Utility Management</p>
+                  <div className="font-black text-2xl text-blue-600">AquaTrack</div>
+                  <p className="text-xs text-slate-500">High-Quality Water Utility Management</p>
                 </div>
                 <div className="text-right">
-                  <h2 className="text-xl font-bold text-text">INVOICE</h2>
-                  <p className="text-xs text-text-muted mt-1">Invoice ID: <span className="font-semibold text-text">#AQ-{String(invoiceModalBill.id).padStart(5, '0')}</span></p>
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">INVOICE</h2>
+                  <p className="text-xs text-slate-500 mt-1">Invoice ID: <span className="font-semibold text-slate-800 dark:text-slate-200">#AQ-{String(invoiceModalBill.id).padStart(5, '0')}</span></p>
                   <span className={`mt-2 inline-block px-3 py-1 rounded-full text-xs font-bold ${
-                    invoiceModalBill.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    invoiceModalBill.status === 'PAID' ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-amber-100 text-amber-700 border border-amber-300'
                   }`}>
                     {invoiceModalBill.status}
                   </span>
                 </div>
               </div>
 
-              <hr className="border-border/50" />
+              <hr className="border-slate-200 dark:border-slate-700" />
 
               {/* Billing details columns */}
               <div className="grid grid-cols-2 gap-8 text-sm">
                 <div>
-                  <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">Invoice From</p>
-                  <p className="font-semibold text-text">AquaTrack Water Authority</p>
-                  <p className="text-xs text-text-muted mt-1">Managed by Community Administration</p>
-                  <p className="text-xs text-text-muted">Smart Billing System</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Invoice From</p>
+                  <p className="font-semibold text-slate-900 dark:text-white">AquaTrack Water Authority</p>
+                  <p className="text-xs text-slate-500 mt-1">Managed by Community Administration</p>
+                  <p className="text-xs text-slate-500">Smart Billing System</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">Invoice To</p>
-                  <p className="font-bold text-text">Resident of House {invoiceModalBill.houseNumber}</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Invoice To</p>
+                  {invoiceModalBill.residentName && (
+                    <p className="font-bold text-slate-900 dark:text-white">{invoiceModalBill.residentName}</p>
+                  )}
+                  <p className="text-xs text-slate-500 font-medium">Resident of House {invoiceModalBill.houseNumber}</p>
                   {invoiceModalBill.apartmentBlock && (
-                    <p className="text-xs text-text-muted mt-1">Block: {invoiceModalBill.apartmentBlock}</p>
+                    <p className="text-xs text-slate-500 mt-1">Block: {invoiceModalBill.apartmentBlock}</p>
                   )}
                   {invoiceModalBill.meterId && (
-                    <p className="text-xs text-text-muted mt-0.5">Meter ID: <span className="font-semibold text-text">{invoiceModalBill.meterId}</span></p>
+                    <p className="text-xs text-slate-500 mt-0.5">Meter ID: <span className="font-semibold text-slate-700 dark:text-slate-300">{invoiceModalBill.meterId}</span></p>
                   )}
-                  <p className="text-xs text-text-muted">AquaTrack Registered Consumer</p>
+                  <p className="text-xs text-slate-500">AquaTrack Registered Consumer</p>
                 </div>
               </div>
 
               {/* Date metadata box */}
-              <div className="bg-surface-lighter rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+              <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                 <div>
-                  <span className="text-text-muted block">Issue Date</span>
-                  <span className="font-semibold text-text text-sm">{invoiceModalBill.generatedDate}</span>
+                  <span className="text-slate-400 block">Issue Date</span>
+                  <span className="font-semibold text-slate-800 dark:text-white text-sm">{invoiceModalBill.generatedDate}</span>
                 </div>
                 <div>
-                  <span className="text-text-muted block">Due Date</span>
-                  <span className="font-semibold text-text text-sm">{invoiceModalBill.dueDate}</span>
+                  <span className="text-slate-400 block">Due Date</span>
+                  <span className="font-semibold text-slate-800 dark:text-white text-sm">{invoiceModalBill.dueDate}</span>
                 </div>
                 <div>
-                  <span className="text-text-muted block">Consumption</span>
-                  <span className="font-semibold text-text text-sm">{(invoiceModalBill.consumptionLiters || 0).toLocaleString()} L</span>
+                  <span className="text-slate-400 block">Consumption</span>
+                  <span className="font-semibold text-slate-800 dark:text-white text-sm">{(invoiceModalBill.consumptionLiters || 0).toLocaleString()} L</span>
                 </div>
                 <div>
-                  <span className="text-text-muted block">Rate / Liter</span>
-                  <span className="font-semibold text-text text-sm">
+                  <span className="text-slate-400 block">Rate / Liter</span>
+                  <span className="font-semibold text-slate-800 dark:text-white text-sm">
                     ₹{invoiceModalBill.baseRatePerLiter
                       ? Number(invoiceModalBill.baseRatePerLiter).toFixed(4)
                       : invoiceModalBill.consumptionLiters
@@ -425,62 +523,61 @@ export default function Bills() {
               </div>
 
               {/* Tariff Breakdown Table */}
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
                 <table className="w-full text-sm text-left border-collapse">
                   <thead>
-                    <tr className="bg-surface-lighter/60 border-b border-border">
-                      <th className="py-3 px-3 font-semibold text-text-muted rounded-tl-lg">Item Description</th>
-                      <th className="py-3 px-3 text-right font-semibold text-text-muted">Qty (Liters)</th>
-                      <th className="py-3 px-3 text-right font-semibold text-text-muted">Unit Rate (₹)</th>
-                      <th className="py-3 px-3 text-right font-semibold text-text-muted rounded-tr-lg">Amount (₹)</th>
+                    <tr className="bg-slate-800 text-white">
+                      <th className="py-3 px-3 font-semibold">Item Description</th>
+                      <th className="py-3 px-3 text-right font-semibold">Qty (Liters)</th>
+                      <th className="py-3 px-3 text-right font-semibold">Unit Rate (₹)</th>
+                      <th className="py-3 px-3 text-right font-semibold">Amount (₹)</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {/* Row 1: Within-limit usage */}
                     {invoiceModalBill.monthlyLimitLiters > 0 ? (
                       <>
-                        <tr className="border-b border-border/50 hover:bg-surface-lighter/30">
+                        <tr className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                           <td className="py-3.5 px-3">
-                            <div className="font-medium text-text">Standard Usage Charge</div>
-                            <div className="text-xs text-emerald-400 mt-0.5">Within monthly limit ({(invoiceModalBill.monthlyLimitLiters || 0).toLocaleString()} L)</div>
+                            <div className="font-medium text-slate-800 dark:text-white">Standard Usage Charge</div>
+                            <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">Within monthly limit ({(invoiceModalBill.monthlyLimitLiters || 0).toLocaleString()} L)</div>
                           </td>
-                          <td className="py-3.5 px-3 text-right text-text">{(invoiceModalBill.withinLimitLiters || 0).toLocaleString()} L</td>
-                          <td className="py-3.5 px-3 text-right text-text">₹{(invoiceModalBill.baseRatePerLiter || 0).toFixed(4)}</td>
-                          <td className="py-3.5 px-3 text-right font-semibold text-emerald-400">
+                          <td className="py-3.5 px-3 text-right text-slate-700 dark:text-slate-300">{(invoiceModalBill.withinLimitLiters || 0).toLocaleString()} L</td>
+                          <td className="py-3.5 px-3 text-right text-slate-700 dark:text-slate-300">₹{(invoiceModalBill.baseRatePerLiter || 0).toFixed(4)}</td>
+                          <td className="py-3.5 px-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
                             ₹{((invoiceModalBill.withinLimitLiters || 0) * (invoiceModalBill.baseRatePerLiter || 0)).toFixed(2)}
                           </td>
                         </tr>
                         {(invoiceModalBill.excessLiters || 0) > 0 && (
-                          <tr className="border-b border-border/50 bg-red-500/5 hover:bg-red-500/8">
+                          <tr className="border-b border-slate-100 dark:border-slate-700 bg-red-50 dark:bg-red-900/10">
                             <td className="py-3.5 px-3">
-                              <div className="font-medium text-red-400">⚠ Excess Consumption Charge</div>
-                              <div className="text-xs text-red-400/70 mt-0.5">
+                              <div className="font-medium text-red-600 dark:text-red-400">⚠ Excess Consumption Charge</div>
+                              <div className="text-xs text-red-500/70 mt-0.5">
                                 {(invoiceModalBill.excessLiters || 0).toLocaleString()} L above limit — penalty rate applies
                               </div>
                             </td>
-                            <td className="py-3.5 px-3 text-right text-red-400">{(invoiceModalBill.excessLiters || 0).toLocaleString()} L</td>
-                            <td className="py-3.5 px-3 text-right text-red-400">₹{(invoiceModalBill.excessRatePerLiter || 0).toFixed(4)}</td>
-                            <td className="py-3.5 px-3 text-right font-semibold text-red-400">
+                            <td className="py-3.5 px-3 text-right text-red-600 dark:text-red-400">{(invoiceModalBill.excessLiters || 0).toLocaleString()} L</td>
+                            <td className="py-3.5 px-3 text-right text-red-600 dark:text-red-400">₹{(invoiceModalBill.excessRatePerLiter || 0).toFixed(4)}</td>
+                            <td className="py-3.5 px-3 text-right font-semibold text-red-600 dark:text-red-400">
                               +₹{((invoiceModalBill.excessLiters || 0) * (invoiceModalBill.excessRatePerLiter || 0)).toFixed(2)}
                             </td>
                           </tr>
                         )}
                       </>
                     ) : (
-                      <tr className="border-b border-border/50 hover:bg-surface-lighter/30">
+                      <tr className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                         <td className="py-3.5 px-3">
-                          <div className="font-medium text-text">Water Utility Consumption Fee</div>
-                          <div className="text-xs text-text-muted mt-0.5">Total usage billed at standard rate</div>
+                          <div className="font-medium text-slate-800 dark:text-white">Water Utility Consumption Fee</div>
+                          <div className="text-xs text-slate-400 mt-0.5">Total usage billed at standard rate</div>
                         </td>
-                        <td className="py-3.5 px-3 text-right text-text">{(invoiceModalBill.consumptionLiters || 0).toLocaleString()} L</td>
-                        <td className="py-3.5 px-3 text-right text-text">
+                        <td className="py-3.5 px-3 text-right text-slate-700 dark:text-slate-300">{(invoiceModalBill.consumptionLiters || 0).toLocaleString()} L</td>
+                        <td className="py-3.5 px-3 text-right text-slate-700 dark:text-slate-300">
                           ₹{invoiceModalBill.baseRatePerLiter
                             ? Number(invoiceModalBill.baseRatePerLiter).toFixed(4)
                             : invoiceModalBill.consumptionLiters
                               ? (invoiceModalBill.amount / invoiceModalBill.consumptionLiters).toFixed(4)
                               : '0.0000'}
                         </td>
-                        <td className="py-3.5 px-3 text-right font-semibold text-text">₹{invoiceModalBill.amount?.toFixed(2)}</td>
+                        <td className="py-3.5 px-3 text-right font-semibold text-slate-800 dark:text-white">₹{invoiceModalBill.amount?.toFixed(2)}</td>
                       </tr>
                     )}
                   </tbody>
@@ -492,25 +589,49 @@ export default function Bills() {
                 <table className="w-64 text-sm">
                   <tbody>
                     <tr>
-                      <td className="py-2 text-text-muted">Subtotal</td>
-                      <td className="py-2 text-right font-medium text-text">₹{invoiceModalBill.amount?.toFixed(2)}</td>
+                      <td className="py-2 text-slate-500">Subtotal</td>
+                      <td className="py-2 text-right font-medium text-slate-800 dark:text-white">₹{invoiceModalBill.amount?.toFixed(2)}</td>
                     </tr>
                     <tr>
-                      <td className="py-2 text-text-muted">Tax & GST (0%)</td>
-                      <td className="py-2 text-right font-medium text-text">₹0.00</td>
+                      <td className="py-2 text-slate-500">Tax & GST (0%)</td>
+                      <td className="py-2 text-right font-medium text-slate-800 dark:text-white">₹0.00</td>
                     </tr>
-                    <tr className="border-t border-border">
-                      <td className="py-3 font-bold text-text text-lg">Total Amount</td>
-                      <td className="py-3 text-right font-black text-primary text-xl">₹{invoiceModalBill.amount?.toFixed(2)}</td>
+                    <tr className="border-t border-slate-200 dark:border-slate-700">
+                      <td className="py-3 font-bold text-slate-900 dark:text-white text-lg">Total Amount</td>
+                      <td className="py-3 text-right font-black text-blue-600 text-xl">₹{invoiceModalBill.amount?.toFixed(2)}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
 
+              {/* Razorpay Payment Receipt — shown only when payment data available */}
+              {invoiceModalBill.paymentData && (
+                <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/10 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <p className="font-bold text-sm text-emerald-700 dark:text-emerald-400">Payment Receipt — Razorpay</p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <span className="text-slate-400 block uppercase tracking-wider text-[10px] font-semibold">Payment ID</span>
+                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{invoiceModalBill.paymentData.paymentId}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block uppercase tracking-wider text-[10px] font-semibold">Order ID</span>
+                      <span className="font-mono text-slate-700 dark:text-slate-300">{invoiceModalBill.paymentData.orderId}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block uppercase tracking-wider text-[10px] font-semibold">Paid At</span>
+                      <span className="text-slate-700 dark:text-slate-300">{invoiceModalBill.paymentData.paidAt}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Footer */}
-              <div className="text-center pt-6 border-t border-border/50 text-xs text-text-muted">
+              <div className="text-center pt-6 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-400">
                 <p>Thank you for using AquaTrack Water Management System. Please ensure timely payments to avoid supply cuts.</p>
-                <p className="mt-1 font-bold">Generated electronically. No signature required.</p>
+                <p className="mt-1 font-bold text-slate-500">Generated electronically. No signature required.</p>
               </div>
 
             </div>
@@ -519,5 +640,6 @@ export default function Bills() {
       )}
 
     </div>
+
   );
 }

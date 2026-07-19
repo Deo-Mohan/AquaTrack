@@ -328,3 +328,96 @@
     transform 0.2s ease,
     opacity 0.2s ease;
 }
+
+/* ── Bill Calculation Breakdown ── */
+.t-breakdown {
+  margin-top: 1.8em;
+  border-top: 1px dashed rgba(59, 130, 246, 0.3);
+  padding-top: 1.4em;
+}
+
+.t-breakdown-title {
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+  color: var(--t-text-muted);
+  margin-bottom: 0.9em;
+}
+
+.t-calc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.t-calc-table thead tr {
+  border-bottom: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.t-calc-table th {
+  padding: 0.4em 0.5em;
+  font-size: 0.78em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--t-text-muted);
+}
+
+.t-calc-table td {
+  padding: 0.55em 0.5em;
+  vertical-align: top;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  color: var(--t-text-main);
+}
+
+.t-calc-right {
+  text-align: right;
+}
+
+.t-calc-label {
+  display: block;
+  font-weight: 700;
+  font-size: 1em;
+  color: var(--t-text-main);
+}
+
+.t-calc-sub {
+  display: block;
+  font-size: 0.82em;
+  color: var(--t-text-muted);
+  margin-top: 0.15em;
+}
+
+.t-calc-green {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.t-calc-red {
+  color: #dc2626;
+}
+
+.t-calc-excess-row {
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.t-calc-table tfoot .t-calc-total-row td {
+  border-top: 2px solid rgba(59, 130, 246, 0.35);
+  border-bottom: none;
+  padding-top: 0.8em;
+}
+
+.t-calc-total-label {
+  font-weight: 800;
+  font-size: 1em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--t-text-main);
+}
+
+.t-calc-total-value {
+  font-weight: 900;
+  font-size: 1.2em;
+  color: var(--color-primary);
+}

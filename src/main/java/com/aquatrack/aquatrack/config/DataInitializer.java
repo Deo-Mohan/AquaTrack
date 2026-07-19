@@ -45,9 +45,9 @@ public class DataInitializer implements CommandLineRunner {
             admin.setEmail(ADMIN_EMAIL);
             admin.setPassword(passwordEncoder.encode(ADMIN_PASSWORD)); // BCrypt only runs once
             admin.setRole("ROLE_ADMIN");
-            admin.setHouseNumber("N/A");
-            admin.setColonyName("System");
-            admin.setApartmentBlock("N/A");
+            admin.setHouseNumber("313");
+            admin.setColonyName("KRISHNA");
+            admin.setApartmentBlock("Block B");
             admin.setGender("Male");
             admin.setFullName("Krishna");
             admin.setMobileNumber("9876543210");

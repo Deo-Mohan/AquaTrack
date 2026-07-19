@@ -8,6 +8,15 @@ import api from '../api';
 function loadRazorpayScript() {
   return new Promise((resolve) => {
     if (window.Razorpay) { resolve(true); return; }
+    
+    // Check if script element already exists in document to prevent double injection
+    const existingScript = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve(true));
+      existingScript.addEventListener('error', () => resolve(false));
+      return;
+    }
+
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.onload = () => resolve(true);
@@ -19,7 +28,9 @@ function loadRazorpayScript() {
 export default function RazorpayModal({ bill, onClose, onSuccess }) {
   const [step, setStep] = useState('loading'); // loading | paying | success | failed
   const [error, setError] = useState('');
+  const [paymentData, setPaymentData] = useState(null); // razorpay response after success
   const amount = bill?.amount || 0;
+  const isProcessing = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -37,17 +48,40 @@ export default function RazorpayModal({ bill, onClose, onSuccess }) {
   }, []);
 
   const triggerPayment = async () => {
+    if (isProcessing.current) return;
+    isProcessing.current = true;
     setError('');
     setStep('loading');
     
     try {
-      // 1. Request Order Creation from Backend
-      const orderRes = await api.post(`/bills/${bill.id}/create-order`);
-      const { orderId, keyId } = orderRes.data;
+      let orderId, keyId;
+      const cacheKey = `rzp_order_${bill.id}`;
+      const cachedOrder = sessionStorage.getItem(cacheKey);
+
+      if (cachedOrder) {
+        try {
+          const parsed = JSON.parse(cachedOrder);
+          orderId = parsed.orderId;
+          keyId = parsed.keyId;
+        } catch (e) {
+          sessionStorage.removeItem(cacheKey);
+        }
+      }
+
+      if (!orderId || !keyId) {
+        // 1. Request Order Creation from Backend
+        const orderRes = await api.post(`/bills/${bill.id}/create-order`);
+        orderId = orderRes.data.orderId;
+        keyId = orderRes.data.keyId;
+
+        // Cache the order details in session storage to avoid hitting API rate limits on retries/reopens
+        sessionStorage.setItem(cacheKey, JSON.stringify({ orderId, keyId }));
+      }
 
       if (!window.Razorpay) {
         setStep('failed');
         setError('Razorpay SDK not loaded correctly.');
+        isProcessing.current = false;
         return;
       }
 
@@ -85,6 +119,7 @@ export default function RazorpayModal({ bill, onClose, onSuccess }) {
           ondismiss: () => {
             setStep('failed');
             setError('Payment checkout cancelled.');
+            isProcessing.current = false;
           },
         },
         handler: async function (response) {
@@ -96,13 +131,25 @@ export default function RazorpayModal({ bill, onClose, onSuccess }) {
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature
             });
+            
+            // Clear order cache on successful payment
+            sessionStorage.removeItem(`rzp_order_${bill.id}`);
+
+            const pData = {
+              paymentId: response.razorpay_payment_id,
+              orderId: response.razorpay_order_id,
+              paidAt: new Date().toLocaleString('en-IN', { day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' }),
+              method: 'Razorpay'
+            };
+            setPaymentData(pData);
             setStep('success');
             setTimeout(() => {
-              onSuccess && onSuccess();
-            }, 2000);
+              onSuccess && onSuccess(pData);
+            }, 2500);
           } catch (e) {
             setStep('failed');
             setError(e.response?.data || 'Signature verification failed.');
+            isProcessing.current = false;
           }
         },
       };
@@ -112,12 +159,15 @@ export default function RazorpayModal({ bill, onClose, onSuccess }) {
       rzp.on('payment.failed', function (resp) {
         setStep('failed');
         setError(resp.error?.description || 'Payment execution failed.');
+        isProcessing.current = false;
       });
       rzp.open();
 
     } catch (err) {
       setStep('failed');
       setError(err.response?.data || 'Failed to create payment order on backend.');
+    } finally {
+      isProcessing.current = false;
     }
   };
 
@@ -271,6 +321,23 @@ export default function RazorpayModal({ bill, onClose, onSuccess }) {
                   <p className="font-bold text-lg text-emerald-400">Payment Successful!</p>
                   <p className="text-xs text-slate-400">Receipt generated for House {bill?.houseNumber}</p>
                 </div>
+                {paymentData && (
+                  <div className="w-full bg-emerald-500/5 border border-emerald-500/15 rounded-xl p-3 text-left space-y-1.5 text-[11px]">
+                    <p className="font-bold text-emerald-400 border-b border-emerald-500/10 pb-1">Transaction Details</p>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Payment ID</span>
+                      <span className="font-mono font-bold text-emerald-300 text-[10px]">{paymentData.paymentId}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Order ID</span>
+                      <span className="font-mono text-slate-300 text-[10px]">{paymentData.orderId}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Paid At</span>
+                      <span className="text-slate-300">{paymentData.paidAt}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -286,15 +353,27 @@ export default function RazorpayModal({ bill, onClose, onSuccess }) {
                 </div>
 
                 {/* Quick Credentials Info Box for Test Mode */}
-                <div className="w-full bg-amber-500/5 border border-amber-500/10 rounded-xl p-4 text-left space-y-2 text-[11px] text-amber-300">
-                  <p className="font-bold border-b border-amber-500/10 pb-1 mb-1">Razorpay Test Credentials</p>
-                  <div className="flex justify-between">
-                    <span>Card Number</span>
-                    <span className="font-mono font-bold">4111 1111 1111 1111</span>
+                <div className="w-full bg-amber-500/5 border border-amber-500/10 rounded-xl p-4 text-left space-y-3 text-[11px] text-amber-300">
+                  <p className="font-bold border-b border-amber-500/10 pb-1.5 mb-0.5 text-amber-200">Razorpay Test Mode — How to Pay</p>
+
+                  {/* Option 1: Netbanking — always works */}
+                  <div>
+                    <p className="font-bold text-emerald-400 mb-1">✅ Option 1: Netbanking (Recommended)</p>
+                    <p className="text-amber-300/80 leading-relaxed">Select <strong>Netbanking</strong> → pick any bank → click <strong>Pay Now</strong> → on the bank test page, click <strong>Success</strong>.</p>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Expiry / CVV</span>
-                    <span className="font-mono">Any future / 123</span>
+
+                  {/* Option 2: UPI */}
+                  <div>
+                    <p className="font-bold text-blue-400 mb-1">✅ Option 2: UPI</p>
+                    <p className="text-amber-300/80">Enter UPI ID: <span className="font-mono font-bold">success@razorpay</span></p>
+                  </div>
+
+                  {/* Option 3: Card */}
+                  <div>
+                    <p className="font-bold text-amber-300 mb-1">💳 Option 3: Card</p>
+                    <div className="flex justify-between"><span>Number</span><span className="font-mono font-bold">4111 1111 1111 1111</span></div>
+                    <div className="flex justify-between mt-0.5"><span>Expiry / CVV</span><span className="font-mono">12/28 / 123</span></div>
+                    <p className="text-[10px] text-amber-300/50 mt-1">Note: May be rejected as international on some test accounts.</p>
                   </div>
                 </div>
 

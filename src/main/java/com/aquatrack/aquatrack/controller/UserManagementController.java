@@ -687,6 +687,14 @@ public class UserManagementController {
 
                 String fullName = parts[0].replaceAll("^\"|\"$", "").trim();
                 String email = parts[1].replaceAll("^\"|\"$", "").trim().toLowerCase();
+                String houseNumber = parts.length > 2 ? parts[2].replaceAll("^\"|\"$", "").trim() : null;
+                if (houseNumber != null && houseNumber.isEmpty()) {
+                    houseNumber = null;
+                }
+                String meterId = parts.length > 3 ? parts[3].replaceAll("^\"|\"$", "").trim() : null;
+                if (meterId != null && meterId.isEmpty()) {
+                    meterId = null;
+                }
 
                 if (fullName.isEmpty() || email.isEmpty()) {
                     failed++;
@@ -748,8 +756,9 @@ public class UserManagementController {
                     invitation.setStatus("PENDING");
                     invitation.setColonyName(communityAdmin.getColonyName());
                     invitation.setApartmentBlock(callerBlock);
-                    // houseNumber not available in bulk CSV; resident fills it during registration
+                    invitation.setHouseNumber(houseNumber);
                     invitation.setInvitedBy(callerUsername);
+                    invitation.setMeterId(meterId);
                 } else {
                     invitation = new Invitation(
                             email,
@@ -758,9 +767,10 @@ public class UserManagementController {
                             expiry,
                             communityAdmin.getColonyName(),
                             callerBlock,
-                            null, // houseNumber not available in bulk CSV
+                            houseNumber,
                             callerUsername
                     );
+                    invitation.setMeterId(meterId);
                 }
                 invitationRepository.save(invitation);
 

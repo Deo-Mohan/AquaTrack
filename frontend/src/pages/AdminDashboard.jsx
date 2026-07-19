@@ -16,6 +16,13 @@ import { printInvoice } from '../utils/invoiceGenerator';
 
 const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#f43f5e', '#06b6d4', '#6366f1', '#f97316'];
 
+const getGreeting = () => {
+  const hr = new Date().getHours();
+  if (hr < 12) return 'Good morning';
+  if (hr < 17) return 'Good afternoon';
+  return 'Good evening';
+};
+
 const extractErrorMessage = (err, defaultMsg = 'An error occurred') => {
   if (err?.response?.data) {
     const data = err.response.data;
@@ -72,12 +79,45 @@ export default function AdminDashboard() {
   const role = localStorage.getItem('role') || 'ROLE_COMMUNITY_ADMIN';
   const isSuperAdmin = role === 'ROLE_ADMIN';
   const block = localStorage.getItem('apartmentBlock') || 'Block A';
+  const colony = localStorage.getItem('colonyName') || 'Qutub Minar';
+  const adminUsername = localStorage.getItem('username') || 'Admin';
+  const adminFullName = localStorage.getItem('fullName') || adminUsername;
   
   // Data lists
   const [users, setUsers] = useState([]);
   const [usageLogs, setUsageLogs] = useState([]);
   const [bills, setBills] = useState([]);
   const [pendingApprovals, setPendingApprovals] = useState([]);
+  const [dismissedAlerts, setDismissedAlerts] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('dismissedAlerts') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const [dismissedSecurityLogs, setDismissedSecurityLogs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('dismissedSecurityLogs') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  const handleDismissAlert = (id) => {
+    setDismissedAlerts(prev => {
+      const next = [...prev, id];
+      localStorage.setItem('dismissedAlerts', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleDismissSecurityLog = (id) => {
+    setDismissedSecurityLogs(prev => {
+      const next = [...prev, id];
+      localStorage.setItem('dismissedSecurityLogs', JSON.stringify(next));
+      return next;
+    });
+  };
   
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -124,7 +164,7 @@ export default function AdminDashboard() {
   const [selectedAdminAnalytics, setSelectedAdminAnalytics] = useState(null);
   
   const [billingSubTab, setBillingSubTab] = useState('cycles'); // cycles, records
-  const [approvalSubTab, setApprovalSubTab] = useState('registrations'); // registrations, verifications
+  const [approvalSubTab, setApprovalSubTab] = useState(isSuperAdmin ? 'registrations' : 'verifications'); // registrations (super admin only), verifications
   const [billingCycles, setBillingCycles] = useState([]);
   const [apartments, setApartments] = useState([]);
   const [billingCycleModalOpen, setBillingCycleModalOpen] = useState(false);
@@ -466,7 +506,8 @@ export default function AdminDashboard() {
         startDate: billingCycleForm.startDate,
         endDate: billingCycleForm.endDate,
         apartmentId: parseInt(billingCycleForm.apartmentId),
-        apartmentBlock: billingCycleForm.apartmentBlock || null
+        apartmentBlock: billingCycleForm.apartmentBlock || null,
+        createdByRole: role
       });
       setStatusMessage(`Billing cycle "${billingCycleForm.cycleName}" created successfully.`);
       setBillingCycleModalOpen(false);
@@ -813,8 +854,8 @@ export default function AdminDashboard() {
   };
 
   const downloadCsvTemplate = () => {
-    const headers = "Full Name,Email\n";
-    const sampleData = "John Doe,johndoe@example.com\nJane Smith,janesmith@example.com\n";
+    const headers = "Full Name,Email,House Number,Meter ID\n";
+    const sampleData = "John Doe,johndoe@example.com,APT-101,MTR-90218\nJane Smith,janesmith@example.com,APT-102,MTR-90219\n";
     const blob = new Blob([headers + sampleData], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -1379,9 +1420,11 @@ export default function AdminDashboard() {
       });
     });
 
+    const activeLogs = logs.filter(log => !dismissedSecurityLogs.includes(log.id));
+
     // Fallback if empty
-    if (logs.length === 0) {
-      logs.push({
+    if (activeLogs.length === 0) {
+      activeLogs.push({
         id: 'system-ok',
         title: 'Server Health Normal',
         message: 'No security logs or pending actions. System running optimally.',
@@ -1390,7 +1433,7 @@ export default function AdminDashboard() {
       });
     }
 
-    return logs;
+    return activeLogs;
   };
 
   const getCommunityAlerts = () => {
@@ -1426,8 +1469,10 @@ export default function AdminDashboard() {
       });
     });
 
-    if (alerts.length === 0) {
-      alerts.push({
+    const activeAlerts = alerts.filter(alert => !dismissedAlerts.includes(alert.id));
+
+    if (activeAlerts.length === 0) {
+      activeAlerts.push({
         id: 'all-good',
         title: 'All Systems Normal',
         message: 'No abnormal water consumption or pending registration alerts.',
@@ -1435,7 +1480,7 @@ export default function AdminDashboard() {
       });
     }
 
-    return alerts;
+    return activeAlerts;
   };
 
   const getCommunityAnalytics = () => {
@@ -1699,13 +1744,34 @@ export default function AdminDashboard() {
               ? 'User Directory' 
               : isSuperAdmin ? 'Super Admin Panel' : 'Community Admin Dashboard'}
           </h1>
-          <p className="text-text-muted mt-1">
-            {activeTab === 'users'
-              ? (isSuperAdmin ? 'Manage and monitor all users and admins across communities.' : `Manage, search, and invite residents for ${block}.`)
-              : isSuperAdmin 
-                ? 'Global administrative overview, user onboarding & database administration.' 
-                : `Block Level Water & Account Management for ${block}`}
-          </p>
+          <div className="text-text-muted mt-1">
+            {isSuperAdmin ? (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1 text-sm text-text-muted">
+                <span>{getGreeting()}, <span className="font-extrabold text-amber-500 dark:text-amber-400">{adminFullName}</span></span>
+                {activeTab === 'users' && (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-border shrink-0 hidden sm:inline" />
+                    <span className="text-xs font-medium text-text-muted">
+                      Manage and monitor all users and admins across communities.
+                    </span>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1 text-sm text-text-muted">
+                <span>{getGreeting()}, <span className="font-extrabold text-amber-500 dark:text-amber-400">{adminFullName}</span></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-border shrink-0 hidden sm:inline" />
+                <div className="flex items-center gap-1.5 bg-surface-lighter/50 px-2.5 py-0.5 rounded-full border border-border/60 text-xs">
+                  <span className="text-text-muted font-medium">Block:</span>
+                  <strong className="text-primary font-semibold">{block}</strong>
+                </div>
+                <div className="flex items-center gap-1.5 bg-surface-lighter/50 px-2.5 py-0.5 rounded-full border border-border/60 text-xs">
+                  <span className="text-text-muted font-medium">Community/Area:</span>
+                  <strong className="text-emerald-400 font-semibold">{colony}</strong>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1965,12 +2031,23 @@ export default function AdminDashboard() {
                       }
 
                       return (
-                        <div key={log.id} className={`flex items-start gap-3 p-3 rounded-lg border ${bgColor}`}>
-                          <Icon className="w-5 h-5 mt-0.5" style={{ color: isWarning ? '#fbbf24' : isOk ? '#34d399' : '#60a5fa' }} />
-                          <div>
-                            <p className={`text-sm font-medium ${textColor}`}>{log.title}</p>
-                            <p className={`text-xs ${subColor} mt-1`}>{log.message}</p>
+                        <div key={log.id} className={`flex items-start justify-between gap-3 p-3 rounded-lg border ${bgColor} group/log relative`}>
+                          <div className="flex items-start gap-3">
+                            <Icon className="w-5 h-5 mt-0.5" style={{ color: isWarning ? '#fbbf24' : isOk ? '#34d399' : '#60a5fa' }} />
+                            <div>
+                              <p className={`text-sm font-medium ${textColor}`}>{log.title}</p>
+                              <p className={`text-xs ${subColor} mt-1`}>{log.message}</p>
+                            </div>
                           </div>
+                          {log.id !== 'system-ok' && (
+                            <button 
+                              onClick={() => handleDismissSecurityLog(log.id)}
+                              className="p-1 rounded-full text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer focus:outline-none shrink-0"
+                              title="Dismiss log"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       );
                     })
@@ -1994,12 +2071,23 @@ export default function AdminDashboard() {
                       }
 
                       return (
-                        <div key={alert.id} className={`flex items-start gap-3 p-3.5 rounded-xl transition-all ${alertClass}`}>
-                          <Icon className="w-5 h-5 mt-0.5 shrink-0" />
-                          <div>
-                            <p className="text-sm font-bold alert-title">{alert.title}</p>
-                            <p className="text-xs alert-message mt-1 font-medium">{alert.message}</p>
+                        <div key={alert.id} className={`flex items-start justify-between gap-3 p-3.5 rounded-xl transition-all ${alertClass} group/alert relative`}>
+                          <div className="flex items-start gap-3">
+                            <Icon className="w-5 h-5 mt-0.5 shrink-0" />
+                            <div>
+                              <p className="text-sm font-bold alert-title">{alert.title}</p>
+                              <p className="text-xs alert-message mt-1 font-medium">{alert.message}</p>
+                            </div>
                           </div>
+                          {alert.id !== 'all-good' && (
+                            <button 
+                              onClick={() => handleDismissAlert(alert.id)}
+                              className="p-1 rounded-full text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer focus:outline-none shrink-0"
+                              title="Dismiss alert"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       );
                     })
@@ -2515,27 +2603,29 @@ export default function AdminDashboard() {
             exit={{ opacity: 0, y: -10 }}
             className="space-y-6"
           >
-            {/* Elegant Sub-tabs switcher */}
+            {/* Sub-tabs: Registration Requests is Super Admin only */}
             <div className="flex bg-surface-lighter/50 p-1.5 rounded-2xl border border-border/40 max-w-lg shadow-sm">
-              <button
-                onClick={() => setApprovalSubTab('registrations')}
-                className={`flex-1 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                  approvalSubTab === 'registrations'
-                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                    : 'text-text-muted hover:text-text'
-                }`}
-              >
-                <span>Registration Requests</span>
-                {pendingApprovals.length > 0 && (
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                    approvalSubTab === 'registrations' 
-                      ? 'bg-white/25 text-white' 
-                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                  }`}>
-                    {pendingApprovals.length}
-                  </span>
-                )}
-              </button>
+              {isSuperAdmin && (
+                <button
+                  onClick={() => setApprovalSubTab('registrations')}
+                  className={`flex-1 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    approvalSubTab === 'registrations'
+                      ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                      : 'text-text-muted hover:text-text'
+                  }`}
+                >
+                  <span>Registration Requests</span>
+                  {pendingApprovals.length > 0 && (
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                      approvalSubTab === 'registrations' 
+                        ? 'bg-white/25 text-white' 
+                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    }`}>
+                      {pendingApprovals.length}
+                    </span>
+                  )}
+                </button>
+              )}
               <button
                 onClick={() => setApprovalSubTab('verifications')}
                 className={`flex-1 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
@@ -2558,7 +2648,7 @@ export default function AdminDashboard() {
             </div>
 
             <AnimatePresence mode="wait">
-              {approvalSubTab === 'registrations' ? (
+              {isSuperAdmin && approvalSubTab === 'registrations' ? (
                 <motion.div
                   key="registrations-subtab"
                   initial={{ opacity: 0, x: -10 }}
@@ -2568,7 +2658,7 @@ export default function AdminDashboard() {
                 >
                   <div>
                     <h3 className="font-semibold text-text text-lg">Pending Registration Approvals</h3>
-                    <p className="text-text-muted text-sm mt-0.5">Approve or reject new resident sign-up requests.</p>
+                    <p className="text-text-muted text-sm mt-0.5">Approve or reject new Community Admin /Admin sign-up requests.</p>
                   </div>
 
                   <div className="glass-card overflow-hidden">
@@ -3104,8 +3194,8 @@ export default function AdminDashboard() {
               {/* CSV Format Info */}
               <div className="mt-4 p-3.5 rounded-xl bg-primary/5 border border-primary/15 text-xs text-primary/90 space-y-1.5">
                 <p className="font-semibold flex items-center gap-1.5">📋 Required CSV Format</p>
-                <p className="text-text-muted">Two columns: <code className="bg-surface-lighter px-1.5 py-0.5 rounded font-mono">Full Name</code> and <code className="bg-surface-lighter px-1.5 py-0.5 rounded font-mono">Email</code></p>
-                <p className="text-text-muted">Row 1 must be the header. Residents can set their house number when registering.</p>
+                <p className="text-text-muted">Four columns: <code className="bg-surface-lighter px-1.5 py-0.5 rounded font-mono">Full Name</code>, <code className="bg-surface-lighter px-1.5 py-0.5 rounded font-mono">Email</code>, <code className="bg-surface-lighter px-1.5 py-0.5 rounded font-mono">House Number</code>, and <code className="bg-surface-lighter px-1.5 py-0.5 rounded font-mono">Meter ID</code> (last two are optional)</p>
+                <p className="text-text-muted">Row 1 must be the header. Prefilling house number and meter ID helps speed up onboarding.</p>
                 <button
                   type="button"
                   onClick={downloadCsvTemplate}

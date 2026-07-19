@@ -52,6 +52,9 @@ public class BillingCycle {
     @Column(name = "apartment_block")
     private String apartmentBlock;
 
+    @Column(name = "created_by_role")
+    private String createdByRole;
+
     public BillingCycle() {}
 
     public BillingCycle(String cycleName, LocalDate startDate, LocalDate endDate, Long apartmentId, String apartmentBlock) {
@@ -60,6 +63,16 @@ public class BillingCycle {
         this.endDate = endDate;
         this.apartmentId = apartmentId;
         this.apartmentBlock = apartmentBlock;
+        this.status = "OPEN";
+    }
+
+    public BillingCycle(String cycleName, LocalDate startDate, LocalDate endDate, Long apartmentId, String apartmentBlock, String createdByRole) {
+        this.cycleName = cycleName;
+        this.startDate = startDate;
+        this.endDate = endDate;
+        this.apartmentId = apartmentId;
+        this.apartmentBlock = apartmentBlock;
+        this.createdByRole = createdByRole;
         this.status = "OPEN";
     }
 
@@ -86,4 +99,6 @@ public class BillingCycle {
     public void setSharedAreaCost(Double sharedAreaCost) { this.sharedAreaCost = sharedAreaCost; }
     public LocalDate getFinalizedDate() { return finalizedDate; }
     public void setFinalizedDate(LocalDate finalizedDate) { this.finalizedDate = finalizedDate; }
+    public String getCreatedByRole() { return createdByRole; }
+    public void setCreatedByRole(String createdByRole) { this.createdByRole = createdByRole; }
 }

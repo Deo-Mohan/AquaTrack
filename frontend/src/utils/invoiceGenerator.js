@@ -323,18 +323,42 @@ export function generateInvoiceHTML(bill) {
     }
 
     /* ---- PAYMENT TERMS ---- */
-    .terms {
-      background: #fffbeb;
-      border: 1px solid #fde68a;
-      border-left: 4px solid #f59e0b;
-      border-radius: 8px;
-      padding: 12px 16px;
+    .terms-container {
+      background: linear-gradient(135deg, #fffdf5 0%, #fffbeb 100%);
+      border: 1px solid #fbd38d;
+      border-left: 5px solid #dd6b20;
+      border-radius: 10px;
+      padding: 14px 18px;
       margin: 24px 0;
-      font-size: 11px;
-      color: #78350f;
+      box-shadow: 0 2px 5px rgba(221, 107, 32, 0.05);
     }
-
-    .terms strong { font-weight: 700; }
+    .terms-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .terms-icon {
+      font-size: 14px;
+      color: #dd6b20;
+      font-weight: bold;
+    }
+    .terms-title {
+      font-size: 10.5px;
+      font-weight: 800;
+      color: #dd6b20;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+    .terms-content {
+      font-size: 11px;
+      color: #744210;
+      line-height: 1.6;
+    }
+    .terms-highlight {
+      font-weight: 700;
+      color: #9c4221;
+    }
 
     /* ---- FOOTER ---- */
     .footer {
@@ -365,14 +389,29 @@ export function generateInvoiceHTML(bill) {
       line-height: 1.7;
     }
 
+    .sig-block {
+      margin-top: 28px;
+    }
+
+    .sig-name {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 14px;
+      font-weight: 800;
+      color: #1e3a8a;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+
     .sig-line {
-      border-top: 1.5px solid #1e293b;
-      width: 160px;
-      margin-top: 36px;
+      border-top: 1.5px solid #94a3b8;
+      width: 200px;
       padding-top: 6px;
-      font-size: 10px;
-      font-weight: 600;
-      color: #334155;
+      font-size: 9.5px;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
     }
 
     .footer-bottom {
@@ -396,14 +435,17 @@ export function generateInvoiceHTML(bill) {
     .seal-wrapper {
       display: flex;
       justify-content: flex-end;
-      margin-top: -10px;
+      margin-top: -38px;
       margin-bottom: 12px;
+      padding-right: 15px;
     }
 
     .seal-svg {
-      opacity: 0.13;
-      width: 120px;
-      height: 120px;
+      opacity: 0.65;
+      width: 135px;
+      height: 135px;
+      transform: rotate(-10deg);
+      filter: drop-shadow(1px 2px 4px rgba(37, 99, 235, 0.15));
     }
 
     /* ---- GENERATION BAR ---- */
@@ -492,7 +534,8 @@ export function generateInvoiceHTML(bill) {
     </div>
     <div class="party" style="text-align: right;">
       <div class="party-label">Billed To</div>
-      <div class="party-name">Resident &mdash; House ${bill.houseNumber}</div>
+      ${bill.residentName ? `<div class="party-name" style="margin-bottom: 2px;">${bill.residentName}</div>` : ''}
+      <div class="party-detail" style="font-weight: 600; color: #475569; margin-bottom: 4px;">Resident &mdash; House ${bill.houseNumber}</div>
       ${bill.apartmentBlock ? `<div class="party-detail">Apartment Block: ${bill.apartmentBlock}</div>` : ''}
       <div class="party-detail">AquaTrack Consumer ID: AQ-USR-${String(bill.id).padStart(6, '0')}</div>
       <div class="party-detail">Meter No: ${bill.meterId ? bill.meterId : 'MT' + String(bill.id * 31 + 1007).padStart(8, '0')}</div>
@@ -600,11 +643,42 @@ export function generateInvoiceHTML(bill) {
   </div>
 
   <!-- PAYMENT TERMS NOTICE -->
-  <div class="terms">
-    <strong>⚠ Payment Terms:</strong> This invoice is due on <strong>${bill.dueDate || 'the date indicated above'}</strong>. Late payment
-    may result in a <strong>2% penalty surcharge</strong> per month and potential suspension of water supply.
-    For disputes or queries, contact your Community Admin or call our helpline <strong>1800-AQA-HELP</strong>.
+  <div class="terms-container">
+    <div class="terms-header">
+      <span class="terms-icon">⚠</span>
+      <span class="terms-title">Important Payment Terms &amp; Policies</span>
+    </div>
+    <div class="terms-content">
+      This invoice is due on <span class="terms-highlight">${bill.dueDate || 'the date indicated above'}</span>. Late payment may result in a <span class="terms-highlight">2% penalty surcharge</span> per month and potential suspension of water supply. For disputes or queries, contact your Community Admin or call our helpline <span class="terms-highlight">1800-AQA-HELP</span>.
+    </div>
   </div>
+
+  ${bill.paymentData ? `
+  <!-- RAZORPAY PAYMENT RECEIPT -->
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-left:4px solid #22c55e;border-radius:10px;padding:14px 18px;margin:0 0 24px 0;">
+    <div style="font-size:12px;font-weight:800;color:#166534;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+      ✅ &nbsp;Payment Confirmed — Razorpay Transaction Receipt
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <tr>
+        <td style="padding:4px 0;color:#6b7280;width:140px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;font-size:10px;">Payment ID</td>
+        <td style="padding:4px 0;font-family:monospace;font-weight:700;color:#111827;">${bill.paymentData.paymentId}</td>
+      </tr>
+      <tr>
+        <td style="padding:4px 0;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;font-size:10px;">Order ID</td>
+        <td style="padding:4px 0;font-family:monospace;color:#374151;">${bill.paymentData.orderId}</td>
+      </tr>
+      <tr>
+        <td style="padding:4px 0;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;font-size:10px;">Paid At</td>
+        <td style="padding:4px 0;color:#374151;font-weight:600;">${bill.paymentData.paidAt}</td>
+      </tr>
+      <tr>
+        <td style="padding:4px 0;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;font-size:10px;">Gateway</td>
+        <td style="padding:4px 0;color:#374151;">Razorpay Payments Pvt. Ltd.</td>
+      </tr>
+    </table>
+  </div>
+  ` : ''}
 
   <!-- FOOTER -->
   <div class="footer">
@@ -617,7 +691,10 @@ export function generateInvoiceHTML(bill) {
           Bank: State Water Utility Bank<br/>
           A/C: 00AQWU9087312 &bull; IFSC: AQUA0001234
         </div>
-        <div class="sig-line">Authorized Signatory</div>
+        <div class="sig-block">
+          <div class="sig-name">${bill.adminName || 'Community Admin'}</div>
+          <div class="sig-line">Authorized Signatory</div>
+        </div>
       </div>
       <div style="text-align: right;">
         <div class="footer-block-label">Important Notices</div>
@@ -647,21 +724,19 @@ export function generateInvoiceHTML(bill) {
         <circle cx="8" cy="100" r="3" fill="#2563eb"/>
         <circle cx="192" cy="100" r="3" fill="#2563eb"/>
         <!-- Curved top text: AQUATRACK WATER AUTHORITY -->
-        <path id="topArc" fill="none"
-          d="M 18,100 A 82,82 0 0,1 182,100"/>
-        <text font-family="Arial" font-weight="800" font-size="14" fill="#1e293b" letter-spacing="2">
-          <textPath href="#topArc" startOffset="5%">AQUATRACK WATER AUTHORITY</textPath>
+        <path id="topArc" fill="none" d="M 22,100 A 78,78 0 0,1 178,100"/>
+        <text font-family="'Inter', 'Arial', sans-serif" font-weight="900" font-size="12" fill="#2563eb" letter-spacing="1.2">
+          <textPath href="#topArc" startOffset="50%" text-anchor="middle">AQUATRACK WATER AUTHORITY</textPath>
         </text>
-        <!-- Curved bottom text: date -->
-        <path id="botArc" fill="none"
-          d="M 18,100 A 82,82 0 0,0 182,100"/>
-        <text font-family="Arial" font-size="11" fill="#1e293b" letter-spacing="1.5">
-          <textPath href="#botArc" startOffset="12%">${bill.generatedDate || generatedOn}</textPath>
+        <!-- Curved bottom text: date/status -->
+        <path id="botArc" fill="none" d="M 22,100 A 78,78 0 0,0 178,100"/>
+        <text font-family="'Inter', 'Arial', sans-serif" font-weight="700" font-size="10.5" fill="#1e40af" letter-spacing="1">
+          <textPath href="#botArc" startOffset="50%" text-anchor="middle">ISSUED: ${bill.generatedDate || 'SYSTEM VALIDATED'}</textPath>
         </text>
         <!-- Center logo letter -->
-        <text x="100" y="90" text-anchor="middle" font-family="Arial" font-weight="900" font-size="30" fill="#2563eb">A</text>
-        <text x="100" y="110" text-anchor="middle" font-family="Arial" font-weight="700" font-size="10" fill="#1e293b" letter-spacing="1">OFFICIAL SEAL</text>
-        <text x="100" y="124" text-anchor="middle" font-family="Arial" font-size="8" fill="#64748b">ISO 9001:2015</text>
+        <text x="100" y="86" text-anchor="middle" font-family="'Inter', 'Arial', sans-serif" font-weight="900" font-size="34" fill="#2563eb">A</text>
+        <text x="100" y="112" text-anchor="middle" font-family="'Inter', 'Arial', sans-serif" font-weight="800" font-size="9.5" fill="#1e40af" letter-spacing="1.2">OFFICIAL SEAL</text>
+        <text x="100" y="126" text-anchor="middle" font-family="'Inter', 'Arial', sans-serif" font-weight="600" font-size="8" fill="#3b82f6" letter-spacing="0.5">ISO 9001:2015</text>
       </svg>
     </div>
 
