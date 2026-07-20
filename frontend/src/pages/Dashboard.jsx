@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Droplets, Receipt, AlertTriangle, TrendingDown, Upload, FileText, CheckCircle2, ShieldAlert, ShieldCheck, X, AlertCircle, Loader2, ArrowRight, Clock, Info, Zap, BarChart3, Lightbulb } from 'lucide-react';
+import { Droplets, Receipt, AlertTriangle, TrendingDown, Upload, FileText, CheckCircle2, ShieldAlert, ShieldCheck, X, AlertCircle, Loader2, ArrowRight, Clock, Info, Zap, BarChart3, Lightbulb, ChevronLeft, ChevronRight } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, LineChart, Line, Cell
@@ -111,13 +111,22 @@ export default function Dashboard() {
   const [quickHelpModalOpen, setQuickHelpModalOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const [safeWaterLimit, setSafeWaterLimit] = useState(0); // monthlyLimitLiters from CA tariff
+  const [baseRatePerLiter, setBaseRatePerLiter] = useState(0);
+  const [excessRatePerLiter, setExcessRatePerLiter] = useState(0);
   const [monthlyChartType, setMonthlyChartType] = useState('area'); // area, bar, line
   const [weeklyChartType, setWeeklyChartType] = useState('bar'); // bar, line, area
+  const [currentAlertIndex, setCurrentAlertIndex] = useState(0);
 
   const handleRemoveAlert = async (id) => {
     try {
       await api.delete(`/notifications/${id}`);
-      setAlerts(prev => prev.filter(alert => alert.id !== id));
+      setAlerts(prev => {
+        const nextAlerts = prev.filter(alert => alert.id !== id);
+        if (currentAlertIndex >= nextAlerts.length && nextAlerts.length > 0) {
+          setCurrentAlertIndex(nextAlerts.length - 1);
+        }
+        return nextAlerts;
+      });
     } catch (err) {
       console.error("Error deleting notification:", err);
     }
@@ -181,10 +190,30 @@ export default function Dashboard() {
               if (profileRes.data.fullName) {
                 setDisplayName(profileRes.data.fullName);
               }
-              // Load the safe water limit set by the community admin
-              if (profileRes.data.monthlyLimitLiters != null && profileRes.data.monthlyLimitLiters > 0) {
-                setSafeWaterLimit(profileRes.data.monthlyLimitLiters);
+              
+              let limit = profileRes.data.monthlyLimitLiters || 0;
+              let baseRate = profileRes.data.waterRatePerLiter || 0;
+              let excessRate = profileRes.data.excessRatePerLiter || 0;
+
+              // Fallback to fetch from block tariff configured by Community Admin
+              if (limit === 0 || baseRate === 0 || excessRate === 0) {
+                try {
+                  const tariffRes = await api.get(`/tariff?callerUsername=${username}`);
+                  if (tariffRes.data) {
+                    if (limit === 0) limit = tariffRes.data.monthlyLimitLiters || 0;
+                    if (baseRate === 0) baseRate = tariffRes.data.baseRatePerLiter || 0;
+                    if (excessRate === 0) excessRate = tariffRes.data.excessRatePerLiter || 0;
+                  }
+                } catch (err) {
+                  console.error("Error fetching block tariff fallback:", err);
+                }
               }
+
+              if (limit > 0) {
+                setSafeWaterLimit(limit);
+              }
+              setBaseRatePerLiter(baseRate);
+              setExcessRatePerLiter(excessRate);
             }
           } catch (e) {
             console.error("Error fetching user profile:", e);
@@ -573,26 +602,30 @@ export default function Dashboard() {
               </span>
             )}
           </div>
-          <div className="space-y-3">
+          <div className="space-y-3 min-h-[110px] flex flex-col justify-between">
             {alerts.length > 0 ? (
-              alerts.slice(0, 2).map((alert, idx) => (
-                <div key={alert.id || idx} className="flex items-start justify-between gap-3 p-3.5 rounded-xl transition-all alert-card-warning group/alert relative">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-sm font-bold alert-title">{alert.title}</p>
-                      <p className="text-xs alert-message mt-1 font-medium">{alert.message}</p>
+              (() => {
+                const alert = alerts[currentAlertIndex];
+                if (!alert) return null;
+                return (
+                  <div key={alert.id || currentAlertIndex} className="flex items-start justify-between gap-3 p-3.5 rounded-xl transition-all alert-card-warning group/alert relative animate-fadeIn">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-sm font-bold alert-title">{alert.title}</p>
+                        <p className="text-xs alert-message mt-1 font-medium">{alert.message}</p>
+                      </div>
                     </div>
+                    <button 
+                      onClick={() => handleRemoveAlert(alert.id)}
+                      className="p-1 rounded-full text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer focus:outline-none shrink-0"
+                      title="Dismiss alert"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => handleRemoveAlert(alert.id)}
-                    className="p-1 rounded-full text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer focus:outline-none shrink-0"
-                    title="Dismiss alert"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ))
+                );
+              })()
             ) : (
               <div className="flex items-start gap-3 p-3.5 rounded-xl transition-all alert-card-success">
                 <CheckCircle2 className="w-5 h-5 mt-0.5 shrink-0" />
@@ -600,6 +633,28 @@ export default function Dashboard() {
                   <p className="text-sm font-bold alert-title">System Healthy</p>
                   <p className="text-xs alert-message mt-1 font-medium">No active alerts or overuse notifications.</p>
                 </div>
+              </div>
+            )}
+
+            {alerts.length > 1 && (
+              <div className="flex items-center justify-between border-t border-border/30 pt-3 mt-1">
+                <button
+                  onClick={() => setCurrentAlertIndex(prev => (prev - 1 + alerts.length) % alerts.length)}
+                  className="p-1.5 rounded-lg bg-surface-lighter hover:bg-surface-lighter/80 text-text-muted hover:text-text border border-border/40 hover:border-border transition-all cursor-pointer focus:outline-none shrink-0"
+                  title="Previous Alert"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-xs font-semibold text-text-muted/80">
+                  Alert {currentAlertIndex + 1} of {alerts.length}
+                </span>
+                <button
+                  onClick={() => setCurrentAlertIndex(prev => (prev + 1) % alerts.length)}
+                  className="p-1.5 rounded-lg bg-surface-lighter hover:bg-surface-lighter/80 text-text-muted hover:text-text border border-border/40 hover:border-border transition-all cursor-pointer focus:outline-none shrink-0"
+                  title="Next Alert"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             )}
           </div>
@@ -853,6 +908,72 @@ export default function Dashboard() {
               </p>
             </div>
           )}
+        </div>
+
+        {/* Dynamic Tariff Rates and Estimated Charges Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 mt-6 pt-6 border-t border-border/40">
+          <div className="glass-card md:col-span-3 bg-surface-lighter/15 hover:bg-surface-lighter/25 border border-border/40 hover:border-primary/40 rounded-2xl p-5 transition-all duration-300 hover:scale-[1.02] flex flex-col justify-between shadow-sm relative overflow-hidden group">
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-text-muted/80">Base Rate</span>
+              <h4 className="text-2xl font-black text-primary mt-2 flex items-baseline gap-1">
+                ₹{baseRatePerLiter.toFixed(4)} <span className="text-xs font-semibold text-text-muted">/ Liter</span>
+              </h4>
+            </div>
+            <div className="mt-4 pt-3 border-t border-border/20 text-xs text-text-muted/95 flex items-center justify-between">
+              <span>Equivalent KL:</span>
+              <strong className="text-text font-bold">₹{(baseRatePerLiter * 1000).toFixed(2)} / KL</strong>
+            </div>
+            <div className="absolute -right-6 -bottom-6 w-16 h-16 bg-primary/5 rounded-full blur-xl group-hover:bg-primary/10 transition-colors" />
+          </div>
+
+          <div className="glass-card md:col-span-3 bg-surface-lighter/15 hover:bg-surface-lighter/25 border border-border/40 hover:border-rose-500/30 rounded-2xl p-5 transition-all duration-300 hover:scale-[1.02] flex flex-col justify-between shadow-sm relative overflow-hidden group">
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-text-muted/80">Excess Usage Rate</span>
+              <h4 className="text-2xl font-black text-rose-400 mt-2 flex items-baseline gap-1">
+                ₹{excessRatePerLiter.toFixed(4)} <span className="text-xs font-semibold text-text-muted">/ Liter</span>
+              </h4>
+            </div>
+            <div className="mt-4 pt-3 border-t border-border/20 text-xs text-text-muted/95 flex items-center justify-between">
+              <span>Equivalent KL:</span>
+              <strong className="text-rose-400/90 font-bold">₹{(excessRatePerLiter * 1000).toFixed(2)} / KL</strong>
+            </div>
+            <div className="absolute -right-6 -bottom-6 w-16 h-16 bg-rose-500/5 rounded-full blur-xl group-hover:bg-rose-500/10 transition-colors" />
+          </div>
+
+          <div className="glass-card md:col-span-6 bg-surface-lighter/15 hover:bg-surface-lighter/25 border border-border/40 hover:border-emerald-500/30 rounded-2xl p-5 transition-all duration-300 hover:scale-[1.02] flex flex-col justify-between shadow-sm relative overflow-hidden group">
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-text-muted/80">Est. Charge (Latest Reading)</span>
+              <h4 className="text-2xl font-black text-emerald-400 mt-2">
+                ₹{((Math.min(latestVal, avgVal) * baseRatePerLiter) + (Math.max(0, latestVal - avgVal) * excessRatePerLiter)).toFixed(2)}
+              </h4>
+            </div>
+            <div className="mt-4 pt-3 border-t border-border/20 text-xs text-text-muted/95">
+              {latestVal > 0 ? (
+                latestVal > avgVal && avgVal > 0 ? (
+                  <p className="font-mono text-xs md:text-sm leading-relaxed text-text mt-1 bg-surface-lighter/10 p-2.5 rounded-xl border border-border/25 shadow-inner">
+                    <span className="font-bold text-text">{avgVal}</span> * <span className="text-primary font-bold">{baseRatePerLiter}</span>
+                    {" + "}
+                    <span className="font-bold text-rose-400">{latestVal - avgVal}</span> * <span className="text-rose-400 font-bold">{excessRatePerLiter}</span>
+                    {" = "}
+                    <span className="text-text font-bold">₹{(avgVal * baseRatePerLiter).toFixed(2)}</span> base
+                    {" + "}
+                    <span className="text-rose-400 font-bold">₹{((latestVal - avgVal) * excessRatePerLiter).toFixed(2)}</span> penalty
+                    {" = "}
+                    <strong className="text-emerald-400 font-extrabold">₹{((avgVal * baseRatePerLiter) + ((latestVal - avgVal) * excessRatePerLiter)).toFixed(2)}</strong> total
+                  </p>
+                ) : (
+                  <p className="font-mono text-xs md:text-sm leading-relaxed text-text mt-1 bg-surface-lighter/10 p-2.5 rounded-xl border border-border/25 shadow-inner">
+                    <span className="font-bold text-text">{latestVal}</span> * <span className="text-primary font-bold">{baseRatePerLiter}</span>
+                    {" = "}
+                    <strong className="text-emerald-400 font-extrabold">₹{(latestVal * baseRatePerLiter).toFixed(2)}</strong> total
+                  </p>
+                )
+              ) : (
+                <p className="italic text-text-muted/60">No usage logged</p>
+              )}
+            </div>
+            <div className="absolute -right-6 -bottom-6 w-16 h-16 bg-emerald-500/5 rounded-full blur-xl group-hover:bg-emerald-500/10 transition-colors" />
+          </div>
         </div>
       </motion.div>
 

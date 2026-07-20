@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Home, Droplet, AlertCircle, Server, Settings, Database, Activity, 
@@ -67,6 +67,7 @@ const CustomTooltip = ({ active, payload }) => {
 
 export default function AdminDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const activeTab = searchParams.get('tab') || 'overview';
   const setActiveTab = (tabId) => {
     setSearchParams({ tab: tabId });
@@ -1577,19 +1578,20 @@ export default function AdminDashboard() {
     document.body.removeChild(link);
   };
 
-  const StatCard = ({ title, value, icon: Icon, color, delay }) => (
+  const StatCard = ({ title, value, icon: Icon, color, delay, onClick }) => (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.4 }}
-      className="glass-card p-6 relative overflow-hidden group"
+      onClick={onClick}
+      className={`glass-card p-6 relative overflow-hidden group transition-all duration-300 ${onClick ? 'cursor-pointer hover:scale-[1.02] hover:bg-surface-lighter/25 hover:border-primary/30 border-border/65' : ''}`}
     >
       <div className="flex justify-between items-start">
         <div>
           <p className="text-text-muted text-sm font-medium mb-1">{title}</p>
           <h3 className="text-3xl font-bold text-text tracking-tight">{value}</h3>
         </div>
-        <div className={`p-3 rounded-xl bg-${color}-500/10 text-${color}-400`}>
+        <div className={`p-3 rounded-xl bg-${color}-500/10 text-${color}-400 group-hover:scale-110 transition-transform duration-300`}>
           <Icon className="w-6 h-6" />
         </div>
       </div>
@@ -1856,14 +1858,14 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <StatCard title="Total Buildings" value={stats ? `${stats.totalApartments}` : '...'} icon={Home} color="blue" delay={0.1} />
                 <StatCard title="Community Admins" value={stats ? `${stats.totalCommunityAdmins}` : '...'} icon={Users} color="emerald" delay={0.2} />
-                <StatCard title="Registered Residents" value={stats ? `${stats.totalHouseholdUsers}` : '...'} icon={Users} color="purple" delay={0.3} />
+                <StatCard title="Registered Residents" value={stats ? `${stats.totalHouseholdUsers}` : '...'} icon={Users} color="purple" delay={0.3} onClick={() => setActiveTab('users')} />
                 <StatCard title="Total Platform Users" value={stats ? `${stats.totalUsers}` : '...'} icon={Settings} color="pink" delay={0.4} />
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <StatCard title="Total Houses" value={stats ? `${stats.totalHouseholds}` : '...'} icon={Home} color="blue" delay={0.1} />
-                <StatCard title="Registered Residents" value={stats ? `${stats.totalResidents}` : '...'} icon={Users} color="emerald" delay={0.2} />
-                <StatCard title={`Total Block Usage (${new Date().toLocaleString('default', { month: 'long' })})`} value={stats ? `${stats.totalUsageThisMonth} Liters` : '...'} icon={Droplet} color="purple" delay={0.3} />
+                <StatCard title="Registered Residents" value={stats ? `${stats.totalResidents}` : '...'} icon={Users} color="emerald" delay={0.2} onClick={() => setActiveTab('users')} />
+                <StatCard title={`Total Block Usage (${new Date().toLocaleString('default', { month: 'long' })})`} value={stats ? `${stats.totalUsageThisMonth} Liters` : '...'} icon={Droplet} color="purple" delay={0.3} onClick={() => navigate('/water-billing-history')} />
               </div>
             )}
 
