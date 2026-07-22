@@ -414,7 +414,7 @@ export default function MeterWorkstation() {
     setShowAllDropdown(false);
     setLogStatus(null);
     setBillStatus(null);
-    setLogForm(f => ({ ...f, readingLiters: '' }));
+    setLogForm({ readingLiters: '', readingDate: new Date().toISOString().split('T')[0], logType: 'DAILY' });
     setHasLoggedNewReading(false);
     computeBillCalc(u);
   };
@@ -1146,9 +1146,9 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                     </div>
 
                     {(selected.meterId || selected.meterNumber) && (
-                      <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/8 border border-blue-500/20 rounded-xl">
-                        <Zap className="w-4 h-4 text-blue-300 flex-shrink-0" />
-                        <p className="text-xs text-blue-200">Meter ID: <strong>{selected.meterId || selected.meterNumber}</strong></p>
+                      <div className="meter-pill w-full px-5 py-2">
+                        <Zap className="w-4 h-4 flex-shrink-0 mr-2.5" style={{ color: '#92600a', filter: 'drop-shadow(0 0 5px rgba(200,134,10,0.6))' }} />
+                        <p className="text-xs font-semibold tracking-wide" style={{ color: '#6b4500' }}>Meter ID: <strong style={{ color: '#92600a', fontWeight: 900 }}>{selected.meterId || selected.meterNumber}</strong></p>
                       </div>
                     )}
 
@@ -1291,9 +1291,9 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                                     isActive
                                       ? 'bg-primary text-text shadow-md shadow-primary/20'
                                       : hasLogs && !isFinalized
-                                      ? 'bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30'
+                                      ? 'bg-amber-500/20 border border-amber-500/40 text-amber-400 hover:bg-amber-500/30'
                                       : isFinalized
-                                      ? 'bg-rose-500/10 border border-rose-500/25 text-rose-400 hover:bg-rose-500/15'
+                                      ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25'
                                       : 'bg-surface border border-border hover:border-text-muted text-text-muted hover:text-text'
                                   }`}
                                 >

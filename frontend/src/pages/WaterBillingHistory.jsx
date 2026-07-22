@@ -72,6 +72,16 @@ export default function WaterBillingHistory() {
     );
     return resident ? (resident.fullName || resident.username) : 'Unknown Resident';
   };
+
+  // Returns the community admin name responsible for a given apartment block
+  const getAdminForBlock = (aptBlk) => {
+    if (!aptBlk) return '—';
+    const admin = users.find(
+      u => u.role === 'ROLE_COMMUNITY_ADMIN' &&
+           String(u.apartmentBlock).toLowerCase() === String(aptBlk).toLowerCase()
+    );
+    return admin ? (admin.fullName || admin.username) : '—';
+  };
   const flash = (msg, type = 'success') => {
     setStatusMsg({ msg, type });
     setTimeout(() => setStatusMsg(null), 4000);
@@ -331,7 +341,7 @@ export default function WaterBillingHistory() {
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="border-b border-border bg-surface-lighter/50">
-                                {['Resident', 'House #', 'Block', 'Reading (L)', 'Type', 'Date', 'Actions'].map(h => (
+                                {['Resident', 'House #', 'Block', ...(isSuperAdmin ? ['Community Admin'] : []), 'Reading (L)', 'Type', 'Date', 'Actions'].map(h => (
                                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">{h}</th>
                                 ))}
                               </tr>
@@ -348,6 +358,13 @@ export default function WaterBillingHistory() {
                                     <td className="px-4 py-3 font-semibold text-text">{getUserName(log.houseNumber, log.apartmentBlock)}</td>
                                     <td className="px-4 py-3 font-semibold text-text">{log.houseNumber}</td>
                                     <td className="px-4 py-3 text-text-muted">{log.apartmentBlock}</td>
+                                    {isSuperAdmin && (
+                                      <td className="px-4 py-3">
+                                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border text-violet-400 bg-violet-500/10 border-violet-500/20 whitespace-nowrap">
+                                          {getAdminForBlock(log.apartmentBlock)}
+                                        </span>
+                                      </td>
+                                    )}
                                     <td className={`px-4 py-3 font-bold ${billed ? 'text-emerald-400' : 'text-blue-400'}`}>{log.readingLiters} L</td>
                                     <td className="px-4 py-3">
                                       <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${logTypeColor(log.logType)}`}>
@@ -425,7 +442,7 @@ export default function WaterBillingHistory() {
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="border-b border-border bg-surface-lighter/50">
-                                {['Resident', 'House #', 'Block', 'Amount', 'Status', 'Due Date', 'Generated', 'Actions'].map(h => (
+                                {['Resident', 'House #', 'Block', ...(isSuperAdmin ? ['Community Admin'] : []), 'Amount', 'Status', 'Due Date', 'Generated', 'Actions'].map(h => (
                                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">{h}</th>
                                 ))}
                               </tr>
@@ -436,6 +453,13 @@ export default function WaterBillingHistory() {
                                   <td className="px-4 py-3 font-semibold text-text">{getUserName(bill.houseNumber, bill.apartmentBlock)}</td>
                                   <td className="px-4 py-3 font-semibold text-text">{bill.houseNumber}</td>
                                   <td className="px-4 py-3 text-text-muted">{bill.apartmentBlock}</td>
+                                  {isSuperAdmin && (
+                                     <td className="px-4 py-3">
+                                       <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border text-violet-400 bg-violet-500/10 border-violet-500/20 whitespace-nowrap">
+                                         {getAdminForBlock(bill.apartmentBlock)}
+                                       </span>
+                                     </td>
+                                   )}
                                   <td className="px-4 py-3 font-bold text-emerald-400">₹{bill.amount}</td>
                                   <td className="px-4 py-3">
                                     <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${statusColor(bill.status)}`}>

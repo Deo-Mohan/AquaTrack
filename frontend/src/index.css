@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 @variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
@@ -3557,5 +3557,41 @@ body {
   box-shadow: 
     0 4px 30px rgba(13, 30, 54, 0.08),
     0 30px 60px -15px rgba(13, 30, 54, 0.25) !important;
+}
+
+
+/* -- Meter ID pill � golden shimmer --------------------------- */
+.meter-pill {
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(to right, #77530a, #ffd277, #77530a, #77530a, #ffd277, #77530a);
+  background-size: 250%;
+  background-position: left;
+  position: relative;
+  display: flex;
+  align-items: center;
+  transition: background-position 1s ease, transform 0.15s ease;
+  overflow: hidden;
+  padding: 2px;
+  cursor: default;
+}
+
+.meter-pill::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 10px;
+  background: rgba(255, 253, 245, 0.92);
+  z-index: 0;
+}
+
+.meter-pill:hover {
+  background-position: right;
+  transition-duration: 1s;
+}
+
+.meter-pill > * {
+  position: relative;
+  z-index: 1;
 }
 

@@ -65,6 +65,10 @@ public class DashboardStatsService {
         // Bills summary
         stats.put("totalBills", billRepository.findByApartmentBlock(apartmentBlock).size());
 
+        // Pending collections – sum of all UNPAID + OVERDUE bills in this block
+        Double pendingCollections = billRepository.sumUnpaidByBlock(apartmentBlock);
+        stats.put("pendingCollections", pendingCollections != null ? pendingCollections : 0.0);
+
         return stats;
     }
 

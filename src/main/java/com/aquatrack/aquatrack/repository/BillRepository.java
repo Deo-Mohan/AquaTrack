@@ -18,4 +18,7 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
 
     @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bill b WHERE b.houseNumber = :houseNumber AND b.status IN ('UNPAID', 'OVERDUE')")
     Double sumUnpaidByHousehold(@Param("houseNumber") String houseNumber);
+
+    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Bill b WHERE b.apartmentBlock = :apartmentBlock AND b.status IN ('UNPAID', 'OVERDUE')")
+    Double sumUnpaidByBlock(@Param("apartmentBlock") String apartmentBlock);
 }
