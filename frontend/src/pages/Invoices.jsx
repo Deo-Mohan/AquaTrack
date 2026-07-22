@@ -180,10 +180,19 @@ export default function Invoices() {
             </div>
 
             {/* On-screen Modal Content */}
-            <div className="p-8 space-y-6">
+            <div className="p-8 space-y-6 relative overflow-hidden">
               
+              {/* PAID Watermark */}
+              {invoiceModalBill.status === 'PAID' && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
+                  <div className="text-emerald-500/10 dark:text-emerald-400/8 text-[120px] font-black tracking-widest uppercase rotate-[-25deg]">
+                    PAID
+                  </div>
+                </div>
+              )}
+
               {/* Brand & Inv Meta */}
-              <div className="flex justify-between items-start">
+              <div className="flex justify-between items-start relative z-10">
                 <div>
                   <div className="font-black text-2xl text-blue-500">AquaTrack</div>
                   <p className="text-xs text-text-muted">High-Quality Water Utility Management</p>
