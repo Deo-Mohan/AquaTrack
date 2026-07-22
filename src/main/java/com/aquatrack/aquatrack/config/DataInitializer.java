@@ -57,14 +57,18 @@ public class DataInitializer implements CommandLineRunner {
             userRepository.save(admin);
             System.out.println("[AquaTrack] Super Admin seeded: " + ADMIN_USERNAME);
         } else {
-            // Admin already exists — ensure status/role are correct without re-hashing password
+            // Admin already exists — ensure password, status, role, and email are strictly synced
             User admin = existing.get();
             boolean changed = false;
+            if (!passwordEncoder.matches(ADMIN_PASSWORD, admin.getPassword())) {
+                admin.setPassword(passwordEncoder.encode(ADMIN_PASSWORD));
+                changed = true;
+            }
             if (!"APPROVED".equals(admin.getStatus()))       { admin.setStatus("APPROVED");      changed = true; }
             if (!"ROLE_ADMIN".equals(admin.getRole()))       { admin.setRole("ROLE_ADMIN");       changed = true; }
             if (!ADMIN_EMAIL.equalsIgnoreCase(admin.getEmail())) { admin.setEmail(ADMIN_EMAIL);   changed = true; }
             if (changed) userRepository.save(admin);
-            System.out.println("[AquaTrack] Super Admin verified: " + ADMIN_USERNAME);
+            System.out.println("[AquaTrack] Super Admin verified and password updated: " + ADMIN_USERNAME);
         }
     }
 }

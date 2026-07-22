@@ -110,26 +110,30 @@ class AquatrackApplicationTests {
 
 	@Test
 	void testWaterUsageLoggingSecurity() {
-		// Prepare a Community Admin user for Block A
-		userRepository.findByUsername("admin_test").ifPresentOrElse(u -> {
-			u.setHouseNumber("APT-TEST-999");
-			u.setRole("ROLE_COMMUNITY_ADMIN");
+		// Prepare a Resident user for Block A
+		userRepository.findByUsername("resident_log_test").ifPresentOrElse(u -> {
+			u.setHouseNumber("APT-TEST-123");
+			u.setRole("ROLE_RESIDENT");
 			userRepository.save(u);
 		}, () -> {
-			User u = new User("admin_test", "admin_test@test.com", "password", "ROLE_COMMUNITY_ADMIN", "APT-TEST-999", "Colony 1", "Block A", "Male");
+			User u = new User("resident_log_test", "res_log@test.com", "password", "ROLE_RESIDENT", "APT-TEST-123", "Colony 1", "Block A", "Male");
 			u.setStatus("APPROVED");
 			userRepository.save(u);
 		});
 
-		// Log usage for a Community Admin using a non-Admin role: should fail (403 status code)
-		WaterUsageLog log = new WaterUsageLog("APT-TEST-999", "Block A", java.time.LocalDate.now(), 500.0, "MANUAL");
+		WaterUsageLog log = new WaterUsageLog("APT-TEST-123", "Block A", java.time.LocalDate.now(), 500.0, "MANUAL");
 		
-		org.springframework.http.ResponseEntity<?> responseCoAdmin = waterUsageController.logWaterUsage(log, "ROLE_COMMUNITY_ADMIN");
-		org.junit.jupiter.api.Assertions.assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, responseCoAdmin.getStatusCode());
+		// Log usage for a Resident using a Resident role: should fail (403 status code)
+		org.springframework.http.ResponseEntity<?> responseResident = waterUsageController.logWaterUsage(log, "ROLE_RESIDENT");
+		org.junit.jupiter.api.Assertions.assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, responseResident.getStatusCode());
 
-		// Log usage for a Community Admin using Admin role: should succeed
+		// Log usage for a Resident using Admin role: should fail (403 status code)
 		org.springframework.http.ResponseEntity<?> responseSuperAdmin = waterUsageController.logWaterUsage(log, "ROLE_ADMIN");
-		org.junit.jupiter.api.Assertions.assertEquals(org.springframework.http.HttpStatus.OK, responseSuperAdmin.getStatusCode());
+		org.junit.jupiter.api.Assertions.assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, responseSuperAdmin.getStatusCode());
+
+		// Log usage for a Resident using Community Admin role: should succeed (200 status code)
+		org.springframework.http.ResponseEntity<?> responseCoAdmin = waterUsageController.logWaterUsage(log, "ROLE_COMMUNITY_ADMIN");
+		org.junit.jupiter.api.Assertions.assertEquals(org.springframework.http.HttpStatus.OK, responseCoAdmin.getStatusCode());
 	}
 
 	@Test
@@ -144,6 +148,10 @@ class AquatrackApplicationTests {
 			u.setStatus("APPROVED");
 			userRepository.save(u);
 		});
+
+		// Directly save a water usage log for the household to pass duplicate billing validation checks
+		WaterUsageLog log = new WaterUsageLog("APT-TEST-999", "Block A", java.time.LocalDate.now(), 500.0, "MANUAL");
+		waterUsageRepository.save(log);
 
 		// Generate bill for a Community Admin using a non-Admin role: should fail (403 status code)
 		Bill bill = new Bill();
@@ -241,7 +249,7 @@ class AquatrackApplicationTests {
 		userRepository.save(u2);
 
 		// Download template for "Block CSV"
-		org.springframework.http.ResponseEntity<String> templateResponse = waterUsageController.downloadTemplate("Block CSV");
+		org.springframework.http.ResponseEntity<String> templateResponse = waterUsageController.downloadTemplate("Block CSV", null, null);
 		org.junit.jupiter.api.Assertions.assertEquals(org.springframework.http.HttpStatus.OK, templateResponse.getStatusCode());
 		String csvBody = templateResponse.getBody();
 		org.junit.jupiter.api.Assertions.assertNotNull(csvBody);
@@ -258,7 +266,7 @@ class AquatrackApplicationTests {
 				"file", "water_usage_template.csv", "text/csv", csvData.getBytes()
 		);
 
-		org.springframework.http.ResponseEntity<?> uploadResponse = waterUsageController.uploadCsvReadings(mockFile, "ROLE_ADMIN");
+		org.springframework.http.ResponseEntity<?> uploadResponse = waterUsageController.uploadCsvReadings(mockFile, "ROLE_COMMUNITY_ADMIN");
 		org.junit.jupiter.api.Assertions.assertEquals(org.springframework.http.HttpStatus.OK, uploadResponse.getStatusCode());
 		org.junit.jupiter.api.Assertions.assertTrue(uploadResponse.getBody().toString().contains("Processed 2 readings successfully"));
 

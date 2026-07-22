@@ -82,6 +82,7 @@ public class AuthController {
             return ResponseEntity.badRequest().body("Error: Email must contain '@' and be a valid address.");
         }
         
+        signUpRequest.setUsername(signUpRequest.getUsername().trim());
         signUpRequest.setEmail(signUpRequest.getEmail().trim().toLowerCase());
 
         // Strictly restrict public registration to COMMUNITY_ADMIN. RESIDENT is Invitation Only!
@@ -89,11 +90,11 @@ public class AuthController {
             return ResponseEntity.badRequest().body("Error: Household registration is disabled on the public portal. You must register via invitation link sent by your Community Admin.");
         }
 
-        if (userRepository.existsByUsername(signUpRequest.getUsername())) {
+        if (userRepository.existsByUsernameIgnoreCase(signUpRequest.getUsername())) {
             return ResponseEntity.badRequest().body("Error: Username is already taken!");
         }
 
-        if (userRepository.existsByEmail(signUpRequest.getEmail())) {
+        if (userRepository.existsByEmailIgnoreCase(signUpRequest.getEmail())) {
             return ResponseEntity.badRequest().body("Error: Email is already in use!");
         }
 
@@ -147,15 +148,11 @@ public class AuthController {
         String loginInput = loginRequest.getUsername().trim();
         Optional<User> userOpt;
 
-        // Auto-detect username or email
+        // Auto-detect username or email with robust case-insensitive matching
         if (loginInput.contains("@")) {
-            // Find by Email
-            userOpt = userRepository.findAll().stream()
-                    .filter(u -> loginInput.equalsIgnoreCase(u.getEmail()))
-                    .findFirst();
+            userOpt = userRepository.findByEmailIgnoreCase(loginInput.toLowerCase());
         } else {
-            // Find by Username
-            userOpt = userRepository.findByUsername(loginInput);
+            userOpt = userRepository.findByUsernameIgnoreCase(loginInput);
         }
 
         if (userOpt.isEmpty()) {
@@ -411,16 +408,15 @@ public class AuthController {
     // 8. FORGOT PASSWORD - REQUEST OTP
     @PostMapping("/forgot-password")
     public ResponseEntity<?> requestPasswordOtp(@RequestBody Map<String, String> request) {
-        String email = request.get("email");
-        if (email == null || email.trim().isEmpty()) {
+        String emailInput = request.get("email");
+        if (emailInput == null || emailInput.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Error: Email is required.");
         }
-
-        final String finalEmail = email.trim().toLowerCase();
+        final String email = emailInput.trim().toLowerCase();
 
         // Check if user exists
         long userCount = userRepository.findAll().stream()
-                .filter(u -> finalEmail.equalsIgnoreCase(u.getEmail()))
+                .filter(u -> email.equalsIgnoreCase(u.getEmail()))
                 .count();
 
         if (userCount == 0) {
@@ -479,20 +475,19 @@ public class AuthController {
         return ResponseEntity.ok(Collections.singletonMap("verified", true));
     }
 
-    // 10. FORGOT PASSWORD - CHANGE PASSWORD
     @PostMapping("/reset-password-otp")
     public ResponseEntity<?> resetPasswordWithOtp(@RequestBody Map<String, String> body) {
-        String email = body.get("email");
+        String emailInput = body.get("email");
         String otpCode = body.get("otpCode");
         String newPassword = body.get("newPassword");
 
-        if (email == null || otpCode == null || newPassword == null) {
+        if (emailInput == null || otpCode == null || newPassword == null) {
             return ResponseEntity.badRequest().body("Error: Email, OTP, and New Password are required.");
         }
 
-        final String finalEmail = email.trim().toLowerCase();
+        final String email = emailInput.trim().toLowerCase();
 
-        Optional<OtpToken> otpOpt = otpTokenRepository.findTopByEmailAndOtpCodeOrderByCreatedAtDesc(finalEmail, otpCode);
+        Optional<OtpToken> otpOpt = otpTokenRepository.findTopByEmailAndOtpCodeOrderByCreatedAtDesc(email, otpCode);
         if (otpOpt.isEmpty() || !otpOpt.get().isVerified()) {
             return ResponseEntity.badRequest().body("Error: OTP must be verified before resetting password.");
         }
@@ -504,7 +499,7 @@ public class AuthController {
 
         // Find users matching email and update passwords
         Optional<User> userOpt = userRepository.findAll().stream()
-                .filter(u -> finalEmail.equalsIgnoreCase(u.getEmail()))
+                .filter(u -> email.equalsIgnoreCase(u.getEmail()))
                 .findFirst();
 
         if (userOpt.isEmpty()) {

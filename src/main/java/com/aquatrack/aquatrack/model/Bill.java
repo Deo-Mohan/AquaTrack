@@ -79,6 +79,10 @@ public class Bill {
     @Column(name = "monthly_limit_liters")
     private Double monthlyLimitLiters = 0.0;
 
+    // Explicit human-readable billing period label, e.g. "June 2026"
+    @Column(name = "billing_period")
+    private String billingPeriod;
+
     // Default Constructor
     public Bill() {}
 
@@ -151,4 +155,7 @@ public class Bill {
 
     public Double getMonthlyLimitLiters() { return monthlyLimitLiters; }
     public void setMonthlyLimitLiters(Double monthlyLimitLiters) { this.monthlyLimitLiters = monthlyLimitLiters; }
+
+    public String getBillingPeriod() { return billingPeriod; }
+    public void setBillingPeriod(String billingPeriod) { this.billingPeriod = billingPeriod; }
 }

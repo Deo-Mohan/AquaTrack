@@ -187,9 +187,33 @@ public class EmailService {
     public void sendBillGeneratedEmail(String toEmail, String fullName, String houseNumber, Double amount,
             java.time.LocalDate generatedDate, java.time.LocalDate dueDate, Double consumption, String meterId,
             Double withinLimitLiters, Double excessLiters, Double baseRatePerLiter, Double excessRatePerLiter, Double monthlyLimitLiters) {
-        String subject = "New Water Bill Generated for House " + houseNumber;
+        sendBillGeneratedEmail(toEmail, fullName, houseNumber, amount, generatedDate, dueDate, consumption, meterId,
+                withinLimitLiters, excessLiters, baseRatePerLiter, excessRatePerLiter, monthlyLimitLiters, null);
+    }
+
+    // Full overload including explicit billingPeriod label
+    public void sendBillGeneratedEmail(String toEmail, String fullName, String houseNumber, Double amount,
+            java.time.LocalDate generatedDate, java.time.LocalDate dueDate, Double consumption, String meterId,
+            Double withinLimitLiters, Double excessLiters, Double baseRatePerLiter, Double excessRatePerLiter,
+            Double monthlyLimitLiters, String billingPeriod) {
+
+        // Derive the billing cycle period label from billingPeriod field first,
+        // then fall back to formatting generatedDate as "Month Year" (e.g. "June 2026")
+        String billingPeriodLabel;
+        if (billingPeriod != null && !billingPeriod.trim().isEmpty()) {
+            billingPeriodLabel = billingPeriod;
+        } else if (generatedDate != null) {
+            billingPeriodLabel = generatedDate.getMonth().getDisplayName(
+                java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH)
+                + " " + generatedDate.getYear();
+        } else {
+            billingPeriodLabel = java.time.LocalDate.now().getMonth().getDisplayName(
+                java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH)
+                + " " + java.time.LocalDate.now().getYear();
+        }
+
+        String subject = "Water Bill for " + billingPeriodLabel + " — House " + houseNumber;
         String formattedDate = generatedDate != null ? generatedDate.toString() : java.time.LocalDate.now().toString();
-        String monthName = generatedDate != null ? generatedDate.getMonth().toString() : java.time.LocalDate.now().getMonth().toString();
 
         boolean hasTariffBreakdown = monthlyLimitLiters != null && monthlyLimitLiters > 0
                 && baseRatePerLiter != null && baseRatePerLiter > 0;
@@ -201,10 +225,10 @@ public class EmailService {
                     ? excessLiters * excessRatePerLiter : 0.0;
             breakdownHtml =
                 "      <tr><td colspan=\"2\"><hr style=\"border-color:#30363d; margin: 8px 0;\"/></td></tr>" +
-                "      <tr><td style=\"padding: 6px 0; color: #8b949e; font-size: 13px;\">Monthly Limit:</td><td style=\"padding: 6px 0; font-weight: bold; text-align: right; font-size: 13px; color: #f0f6fc;\">" + (monthlyLimitLiters != null ? monthlyLimitLiters.intValue() : 0) + " L</td></tr>" +
-                "      <tr><td style=\"padding: 6px 0; color: #8b949e; font-size: 13px;\">Within-Limit Usage:</td><td style=\"padding: 6px 0; font-weight: bold; text-align: right; font-size: 13px; color: #10b981;\">" + (withinLimitLiters != null ? withinLimitLiters.intValue() : 0) + " L × ₹" + String.format("%.4f", baseRatePerLiter != null ? baseRatePerLiter : 0.0) + " = ₹" + String.format("%.2f", baseCharge) + "</td></tr>" +
+                "      <tr><td style=\"padding: 6px 0; color: #8b949e; font-size: 13px;\">Monthly Limit:</td><td style=\"padding: 6px 0; font-weight: bold; text-align: right; font-size: 13px; color: #f0f6fc;\"" + ">" + (monthlyLimitLiters != null ? monthlyLimitLiters.intValue() : 0) + " L</td></tr>" +
+                "      <tr><td style=\"padding: 6px 0; color: #8b949e; font-size: 13px;\">Within-Limit Usage:</td><td style=\"padding: 6px 0; font-weight: bold; text-align: right; font-size: 13px; color: #10b981;\">" + (withinLimitLiters != null ? withinLimitLiters.intValue() : 0) + " L &times; \u20b9" + String.format("%.4f", baseRatePerLiter != null ? baseRatePerLiter : 0.0) + " = \u20b9" + String.format("%.2f", baseCharge) + "</td></tr>" +
                 (excessLiters != null && excessLiters > 0 && excessRatePerLiter != null ?
-                "      <tr><td style=\"padding: 6px 0; color: #f87171; font-size: 13px;\">⚠ Excess Consumption:</td><td style=\"padding: 6px 0; font-weight: bold; text-align: right; font-size: 13px; color: #f87171;\">" + excessLiters.intValue() + " L × ₹" + String.format("%.4f", excessRatePerLiter) + " = +₹" + String.format("%.2f", excessChg) + "</td></tr>" : "");
+                "      <tr><td style=\"padding: 6px 0; color: #f87171; font-size: 13px;\">&#9888; Excess Consumption:</td><td style=\"padding: 6px 0; font-weight: bold; text-align: right; font-size: 13px; color: #f87171;\">" + excessLiters.intValue() + " L &times; \u20b9" + String.format("%.4f", excessRatePerLiter) + " = +\u20b9" + String.format("%.2f", excessChg) + "</td></tr>" : "");
         }
 
         String htmlContent = "<div style=\"font-family: 'Segoe UI', Arial, sans-serif; background-color: #0d1117; color: #c9d1d9; padding: 40px 20px; text-align: center;\">" +
@@ -216,15 +240,16 @@ public class EmailService {
                 "    <p style=\"font-size: 16px; line-height: 1.6;\">Dear <strong>" + fullName + "</strong>,</p>" +
                 "    <p style=\"font-size: 16px; line-height: 1.6;\">A new water utility bill has been generated for your household (House " + houseNumber + ") by the Community Admin.</p>" +
                 "    <div style=\"background: rgba(0, 242, 254, 0.05); border: 1px solid #30363d; padding: 20px; margin: 25px 0; border-radius: 8px;\">" +
-                "      <h3 style=\"margin-top: 0; color: #00f2fe; border-bottom: 1px solid #30363d; padding-bottom: 10px;\">Bill Summary (" + monthName + ")</h3>" +
+                "      <h3 style=\"margin-top: 0; color: #00f2fe; border-bottom: 1px solid #30363d; padding-bottom: 10px;\">Bill Summary &mdash; " + billingPeriodLabel + "</h3>" +
                 "      <table style=\"width: 100%; border-collapse: collapse; font-size: 15px; color: #c9d1d9;\">" +
+                "        <tr><td style=\"padding: 8px 0; color: #58a6ff; font-weight: 600;\">Billing Cycle:</td><td style=\"padding: 8px 0; font-weight: bold; text-align: right; color: #00f2fe;\">" + billingPeriodLabel + "</td></tr>" +
                 "        <tr><td style=\"padding: 8px 0; color: #8b949e;\">Generated Date:</td><td style=\"padding: 8px 0; font-weight: bold; text-align: right;\">" + formattedDate + "</td></tr>" +
                 "        <tr><td style=\"padding: 8px 0; color: #8b949e;\">Due Date:</td><td style=\"padding: 8px 0; font-weight: bold; text-align: right;\">" + dueDate + "</td></tr>" +
                 (meterId != null && !meterId.trim().isEmpty() ?
                 "        <tr><td style=\"padding: 8px 0; color: #8b949e;\">Meter ID:</td><td style=\"padding: 8px 0; font-weight: bold; text-align: right;\">" + meterId.trim() + "</td></tr>" : "") +
                 "        <tr><td style=\"padding: 8px 0; color: #8b949e;\">Total Consumption:</td><td style=\"padding: 8px 0; font-weight: bold; text-align: right;\">" + (consumption != null ? consumption.intValue() : 0) + " Liters</td></tr>" +
                 breakdownHtml +
-                "        <tr style=\"border-top: 1px solid #30363d;\"><td style=\"padding: 12px 0 0 0; color: #8b949e; font-size: 16px;\">Total Amount:</td><td style=\"padding: 12px 0 0 0; font-weight: 800; font-size: 18px; color: #00f2fe; text-align: right;\">₹" + String.format("%.2f", amount) + "</td></tr>" +
+                "        <tr style=\"border-top: 1px solid #30363d;\"><td style=\"padding: 12px 0 0 0; color: #8b949e; font-size: 16px;\">Total Amount:</td><td style=\"padding: 12px 0 0 0; font-weight: 800; font-size: 18px; color: #00f2fe; text-align: right;\">&thinsp;&#8377;" + String.format("%.2f", amount) + "</td></tr>" +
                 "      </table>" +
                 "    </div>" +
                 "    <div style=\"text-align: center; margin: 35px 0;\">" +

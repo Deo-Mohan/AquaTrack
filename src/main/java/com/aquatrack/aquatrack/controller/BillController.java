@@ -46,47 +46,44 @@ public class BillController {
 
     @Autowired
     private com.aquatrack.aquatrack.service.EmailService emailService;
-    private void validateBillGeneration(String houseNumber) {
+    private void validateBillGeneration(String houseNumber, java.time.LocalDate generatedDate) {
         if (houseNumber == null || houseNumber.trim().isEmpty()) {
             return;
+        }
+        if (generatedDate == null) {
+            generatedDate = java.time.LocalDate.now();
         }
 
         // 1. Get all usage logs for this household
         List<com.aquatrack.aquatrack.model.WaterUsageLog> logs = waterUsageRepository.findByHouseNumber(houseNumber);
-        if (logs.isEmpty()) {
-            throw new IllegalArgumentException("No water usage details found. Contact your Community Admin to log usage first.");
-        }
-
-        // 2. Find the latest log date
-        java.time.LocalDate latestLogDate = null;
+        
+        // 2. Check if logs exist for the specific billing month and year
+        int targetYear = generatedDate.getYear();
+        int targetMonth = generatedDate.getMonthValue();
+        boolean hasLogsInMonth = false;
         for (com.aquatrack.aquatrack.model.WaterUsageLog log : logs) {
-            java.time.LocalDate d = log.getReadingDate();
-            if (d != null) {
-                if (latestLogDate == null || d.isAfter(latestLogDate)) {
-                    latestLogDate = d;
-                }
+            if (log.getReadingDate() != null 
+                    && log.getReadingDate().getYear() == targetYear 
+                    && log.getReadingDate().getMonthValue() == targetMonth) {
+                hasLogsInMonth = true;
+                break;
             }
         }
 
-        if (latestLogDate == null) {
-            throw new IllegalArgumentException("No valid water usage reading dates found.");
+        if (!hasLogsInMonth) {
+            throw new IllegalArgumentException("No water usage details found for " + generatedDate.getMonth().name() + " " + targetYear + ". Contact your Community Admin to log usage first.");
         }
 
-        // 3. Find the latest generated bill date
+        // 3. Find if there is already a bill generated in the same month & year
         List<Bill> existingBills = repository.findByHouseNumber(houseNumber);
         if (!existingBills.isEmpty()) {
-            java.time.LocalDate latestBillDate = null;
             for (Bill b : existingBills) {
-                java.time.LocalDate d = b.getGeneratedDate();
-                if (d != null) {
-                    if (latestBillDate == null || d.isAfter(latestBillDate)) {
-                        latestBillDate = d;
-                    }
+                if (b.getGeneratedDate() != null 
+                        && b.getGeneratedDate().getYear() == targetYear 
+                        && b.getGeneratedDate().getMonthValue() == targetMonth) {
+                    throw new IllegalArgumentException("A bill has already been generated for this household for " 
+                            + generatedDate.getMonth().name() + " " + targetYear + ".");
                 }
-            }
-
-            if (latestBillDate != null && !latestLogDate.isAfter(latestBillDate)) {
-                throw new IllegalArgumentException("A bill has already been generated for all current water usage logs. No new usage to bill.");
             }
         }
     }
@@ -97,6 +94,10 @@ public class BillController {
             @Valid @RequestBody Bill bill,
             @RequestParam(required = false) String callerRole) {
         
+        if (bill.getGeneratedDate() == null) {
+            bill.setGeneratedDate(java.time.LocalDate.now());
+        }
+
         if (bill.getHouseNumber() != null) {
             java.util.Optional<com.aquatrack.aquatrack.model.User> targetUser = userRepository.findByHouseNumber(bill.getHouseNumber());
             if (targetUser.isPresent() && "ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(targetUser.get().getRole())) {
@@ -107,15 +108,12 @@ public class BillController {
 
             // Validate to prevent duplicate billing
             try {
-                validateBillGeneration(bill.getHouseNumber());
+                validateBillGeneration(bill.getHouseNumber(), bill.getGeneratedDate());
             } catch (IllegalArgumentException e) {
                 return ResponseEntity.badRequest().body(e.getMessage());
             }
         }
 
-        if (bill.getGeneratedDate() == null) {
-            bill.setGeneratedDate(java.time.LocalDate.now());
-        }
         if (bill.getHouseNumber() != null) {
             java.util.Optional<com.aquatrack.aquatrack.model.User> residentOpt = userRepository.findByHouseNumber(bill.getHouseNumber());
             if (residentOpt.isPresent()) {
@@ -124,20 +122,18 @@ public class BillController {
                 // --- Auto-populate consumption and tariff breakdown from unbilled usage logs ---
                 com.aquatrack.aquatrack.model.User resUser = residentOpt.get();
 
-                // Find unbilled logs (after the latest existing bill date)
+                // Find logs for the selected month and year
                 List<com.aquatrack.aquatrack.model.WaterUsageLog> allLogs = waterUsageRepository.findByHouseNumber(bill.getHouseNumber());
-                List<com.aquatrack.aquatrack.model.Bill> existingBills = repository.findByHouseNumber(bill.getHouseNumber());
-                java.time.LocalDate latestBillDate = existingBills.stream()
-                        .map(b -> b.getGeneratedDate())
-                        .filter(d -> d != null)
-                        .max(java.util.Comparator.naturalOrder())
-                        .orElse(null);
-                final java.time.LocalDate cutOff = latestBillDate;
-                List<com.aquatrack.aquatrack.model.WaterUsageLog> unbilledLogs = allLogs.stream()
-                        .filter(log -> cutOff == null || log.getReadingDate().isAfter(cutOff))
+                int targetYear = bill.getGeneratedDate().getYear();
+                int targetMonth = bill.getGeneratedDate().getMonthValue();
+                
+                List<com.aquatrack.aquatrack.model.WaterUsageLog> monthLogs = allLogs.stream()
+                        .filter(log -> log.getReadingDate() != null 
+                                && log.getReadingDate().getYear() == targetYear 
+                                && log.getReadingDate().getMonthValue() == targetMonth)
                         .collect(java.util.stream.Collectors.toList());
 
-                double totalLiters = unbilledLogs.stream()
+                double totalLiters = monthLogs.stream()
                         .mapToDouble(log -> log.getReadingLiters() != null ? log.getReadingLiters() : 0.0)
                         .sum();
 
@@ -178,10 +174,15 @@ public class BillController {
                     bill.setMonthlyLimitLiters(monthlyLimit != null ? monthlyLimit : 0.0);
                     bill.setBaseCharge(baseCharge);
                     bill.setExcessCharge(excessCharge);
-                    // Only override amount if admin didn't manually set one
-                    if (bill.getAmount() == null || bill.getAmount() <= 0) {
-                        bill.setAmount(computedAmount);
+                    // Set billing period label from the generatedDate (which represents the billing month)
+                    if (bill.getBillingPeriod() == null || bill.getBillingPeriod().trim().isEmpty()) {
+                        String bpl = bill.getGeneratedDate().getMonth().getDisplayName(
+                            java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH)
+                            + " " + bill.getGeneratedDate().getYear();
+                        bill.setBillingPeriod(bpl);
                     }
+                    // Always use backend-computed amount (backend is source of truth for billing)
+                    bill.setAmount(computedAmount);
                 }
             }
         }
@@ -220,7 +221,8 @@ public class BillController {
                             savedBill.getExcessLiters(),
                             savedBill.getBaseRatePerLiter(),
                             savedBill.getExcessRatePerLiter(),
-                            savedBill.getMonthlyLimitLiters()
+                            savedBill.getMonthlyLimitLiters(),
+                            savedBill.getBillingPeriod()
                         );
                     } catch (Exception e) {
                         System.err.println("SMTP dispatch failed for custom bill generated email: " + e.getMessage());
@@ -230,6 +232,114 @@ public class BillController {
         }
 
         return ResponseEntity.ok(savedBill);
+    }
+
+    // POST: Recalculate an existing bill's consumption and amount from its generatedDate month logs
+    // This fixes bills that were created with stale/incorrect breakdown data
+    @PostMapping("/{id}/recalculate")
+    public ResponseEntity<?> recalculateBill(@PathVariable Long id,
+            @RequestParam(required = false) String callerRole) {
+        Bill bill = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Bill not found with ID: " + id));
+
+        if ("PAID".equalsIgnoreCase(bill.getStatus())) {
+            return ResponseEntity.badRequest().body("Cannot recalculate a PAID bill.");
+        }
+
+        if (bill.getGeneratedDate() == null) {
+            return ResponseEntity.badRequest().body("Bill has no generatedDate; cannot determine billing month.");
+        }
+
+        int targetYear  = bill.getGeneratedDate().getYear();
+        int targetMonth = bill.getGeneratedDate().getMonthValue();
+
+        // Re-fetch all logs for this house number filtered to the billing month
+        List<com.aquatrack.aquatrack.model.WaterUsageLog> allLogs =
+                waterUsageRepository.findByHouseNumber(bill.getHouseNumber());
+
+        List<com.aquatrack.aquatrack.model.WaterUsageLog> monthLogs = allLogs.stream()
+                .filter(log -> log.getReadingDate() != null
+                        && log.getReadingDate().getYear()       == targetYear
+                        && log.getReadingDate().getMonthValue() == targetMonth)
+                .collect(java.util.stream.Collectors.toList());
+
+        double totalLiters = monthLogs.stream()
+                .mapToDouble(log -> log.getReadingLiters() != null ? log.getReadingLiters() : 0.0)
+                .sum();
+
+        if (totalLiters <= 0) {
+            return ResponseEntity.badRequest().body("No water usage logs found for "
+                    + bill.getGeneratedDate().getMonth().getDisplayName(
+                        java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH)
+                    + " " + targetYear + ". Cannot recalculate.");
+        }
+
+        // Resolve tariff from resident → community admin fallback
+        java.util.Optional<com.aquatrack.aquatrack.model.User> resOpt =
+                userRepository.findByHouseNumber(bill.getHouseNumber());
+        Double waterRate    = null;
+        Double monthlyLimit = null;
+        Double excessRate   = null;
+
+        if (resOpt.isPresent()) {
+            com.aquatrack.aquatrack.model.User res = resOpt.get();
+            waterRate    = res.getWaterRatePerLiter();
+            monthlyLimit = res.getMonthlyLimitLiters();
+            excessRate   = res.getExcessRatePerLiter();
+
+            if ((waterRate == null || waterRate <= 0) || monthlyLimit == null || excessRate == null) {
+                String blk = res.getApartmentBlock();
+                if (blk != null && !blk.trim().isEmpty()) {
+                    List<com.aquatrack.aquatrack.model.User> admins =
+                            userRepository.findByRoleAndApartmentBlock("ROLE_COMMUNITY_ADMIN", blk);
+                    for (com.aquatrack.aquatrack.model.User adm : admins) {
+                        if ((waterRate == null || waterRate <= 0) && adm.getWaterRatePerLiter() != null && adm.getWaterRatePerLiter() > 0)
+                            waterRate = adm.getWaterRatePerLiter();
+                        if (monthlyLimit == null && adm.getMonthlyLimitLiters() != null)
+                            monthlyLimit = adm.getMonthlyLimitLiters();
+                        if (excessRate == null && adm.getExcessRatePerLiter() != null)
+                            excessRate = adm.getExcessRatePerLiter();
+                        if (waterRate != null && waterRate > 0 && monthlyLimit != null && excessRate != null) break;
+                    }
+                }
+            }
+        }
+
+        if (waterRate == null || waterRate <= 0) {
+            return ResponseEntity.badRequest().body("Water rate not configured for this household. Cannot recalculate.");
+        }
+
+        // Apply tiered tariff
+        double withinLimit  = totalLiters;
+        double excessLiters = 0.0;
+        double excessCharge = 0.0;
+        if (monthlyLimit != null && monthlyLimit > 0 && excessRate != null && totalLiters > monthlyLimit) {
+            withinLimit  = monthlyLimit;
+            excessLiters = totalLiters - monthlyLimit;
+            excessCharge = excessLiters * excessRate;
+        }
+        double baseCharge    = withinLimit * waterRate;
+        double computedAmount = Math.round((baseCharge + excessCharge) * 100.0) / 100.0;
+
+        // Update all fields from fresh calculation
+        bill.setConsumptionLiters(totalLiters);
+        bill.setWithinLimitLiters(withinLimit);
+        bill.setExcessLiters(excessLiters);
+        bill.setBaseRatePerLiter(waterRate);
+        bill.setExcessRatePerLiter(excessRate != null ? excessRate : 0.0);
+        bill.setMonthlyLimitLiters(monthlyLimit != null ? monthlyLimit : 0.0);
+        bill.setBaseCharge(baseCharge);
+        bill.setExcessCharge(excessCharge);
+        bill.setAmount(computedAmount);
+
+        // Refresh billingPeriod label
+        String periodLabel = bill.getGeneratedDate().getMonth().getDisplayName(
+                java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH)
+                + " " + targetYear;
+        bill.setBillingPeriod(periodLabel);
+
+        Bill updated = repository.save(bill);
+        return ResponseEntity.ok(updated);
     }
 
     // GET: Retrieve all bills (Admin)
@@ -280,9 +390,11 @@ public class BillController {
             return ResponseEntity.status(404).body("User not found for house number: " + houseNumber);
         }
 
+        java.time.LocalDate targetDate = java.time.LocalDate.now();
+
         // Validate to prevent duplicate billing
         try {
-            validateBillGeneration(houseNumber);
+            validateBillGeneration(houseNumber, targetDate);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -292,33 +404,26 @@ public class BillController {
         // 1. Get all usage logs
         List<com.aquatrack.aquatrack.model.WaterUsageLog> logs = waterUsageRepository.findByHouseNumber(houseNumber);
 
-        // 2. Find the cut-off date (latest generated bill date)
-        List<Bill> existingBills = repository.findByHouseNumber(houseNumber);
-        java.time.LocalDate latestBillDate = null;
-        if (!existingBills.isEmpty()) {
-            latestBillDate = existingBills.stream()
-                    .map(b -> b.getGeneratedDate())
-                    .filter(d -> d != null)
-                    .max((d1, d2) -> d1.compareTo(d2))
-                    .orElse(null);
+        // 2. Filter for logs in the target month and year
+        int targetYear = targetDate.getYear();
+        int targetMonth = targetDate.getMonthValue();
+        
+        List<com.aquatrack.aquatrack.model.WaterUsageLog> monthLogs = logs.stream()
+                .filter(log -> log.getReadingDate() != null 
+                        && log.getReadingDate().getYear() == targetYear 
+                        && log.getReadingDate().getMonthValue() == targetMonth)
+                        .collect(java.util.stream.Collectors.toList());
+
+        if (monthLogs.isEmpty()) {
+            return ResponseEntity.badRequest().body("No water usage detail found for this month, contact community admin");
         }
 
-        // 3. Filter for unbilled logs
-        final java.time.LocalDate cutOffDate = latestBillDate;
-        List<com.aquatrack.aquatrack.model.WaterUsageLog> unbilledLogs = logs.stream()
-                .filter(log -> cutOffDate == null || log.getReadingDate().isAfter(cutOffDate))
-                .collect(java.util.stream.Collectors.toList());
-
-        if (unbilledLogs.isEmpty()) {
-            return ResponseEntity.badRequest().body("No water usage detail found, contact community admin");
-        }
-
-        double totalLiters = unbilledLogs.stream()
+        double totalLiters = monthLogs.stream()
                 .mapToDouble(log -> log.getReadingLiters() != null ? log.getReadingLiters() : 0.0)
                 .sum();
 
         if (totalLiters <= 0) {
-            return ResponseEntity.badRequest().body("No water usage detail found, contact community admin");
+            return ResponseEntity.badRequest().body("No water usage detail found for this month, contact community admin");
         }
 
         // 4. Resolve water rate and tariff settings from user or their community admin

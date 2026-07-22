@@ -16,6 +16,84 @@ export default function Bills() {
   const [invoiceModalBill, setInvoiceModalBill] = useState(null);
   const [adminName, setAdminName] = useState('Community Admin');
 
+  // Filter & Sort States
+  const [sortBy, setSortBy] = useState('date-desc'); // date-desc, date-asc, amount-desc, amount-asc
+  const [filterStatus, setFilterStatus] = useState('all'); // all, paid, pending
+  const [filterMonth, setFilterMonth] = useState('all'); // all, 1-12
+  const [filterYear, setFilterYear] = useState('all'); // all, years...
+
+  const getBillAmount = (bill) => {
+    if (bill.monthlyLimitLiters > 0) {
+      return ((bill.withinLimitLiters || 0) * (bill.baseRatePerLiter || 0)) + 
+             ((bill.excessLiters || 0) * (bill.excessRatePerLiter || 0));
+    }
+    return bill.amount || 0;
+  };
+
+  const getBillMonth = (bill) => {
+    if (bill.billingPeriod) {
+      const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+      const parts = bill.billingPeriod.toLowerCase().split(' ');
+      const mIdx = months.indexOf(parts[0]);
+      if (mIdx !== -1) return mIdx + 1;
+    }
+    const d = new Date(bill.generatedDate);
+    return d.getMonth() + 1;
+  };
+
+  const getBillYear = (bill) => {
+    if (bill.billingPeriod) {
+      const parts = bill.billingPeriod.split(' ');
+      if (parts.length > 1) {
+        const yr = parseInt(parts[1], 10);
+        if (!isNaN(yr)) return yr;
+      }
+    }
+    const d = new Date(bill.generatedDate);
+    return d.getFullYear();
+  };
+
+  // Derive unique years dynamically
+  const availableYears = Array.from(
+    new Set(bills.map(bill => getBillYear(bill)))
+  ).sort((a, b) => b - a);
+
+  // Filter and Sort Billing list
+  const filteredAndSortedBills = bills
+    .filter(bill => {
+      const bMonth = getBillMonth(bill);
+      const bYear = getBillYear(bill);
+      
+      const matchesStatus = filterStatus === 'all' || 
+        (filterStatus === 'pending' && (bill.status?.toLowerCase() === 'unpaid' || bill.status?.toLowerCase() === 'pending')) ||
+        (filterStatus !== 'pending' && bill.status?.toLowerCase() === filterStatus.toLowerCase());
+      const matchesMonth = filterMonth === 'all' || 
+        bMonth === parseInt(filterMonth, 10);
+      const matchesYear = filterYear === 'all' || 
+        bYear === parseInt(filterYear, 10);
+      return matchesStatus && matchesMonth && matchesYear;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.dueDate || a.generatedDate);
+      const dateB = new Date(b.dueDate || b.generatedDate);
+      const amtA = getBillAmount(a);
+      const amtB = getBillAmount(b);
+
+      if (sortBy === 'date-desc') {
+        return dateB - dateA;
+      }
+      if (sortBy === 'date-asc') {
+        return dateA - dateB;
+      }
+      if (sortBy === 'amount-desc') {
+        return amtB - amtA;
+      }
+      if (sortBy === 'amount-asc') {
+        return amtA - amtB;
+      }
+      return 0;
+    });
+
   const handleMarkBillPaid = async (bill, paymentData = null) => {
     try {
       const residentName = localStorage.getItem('fullName') || localStorage.getItem('username') || '';
@@ -73,49 +151,6 @@ export default function Bills() {
     fetchAdminName();
   }, []);
 
-  const handleGenerateBill = async () => {
-    setGenerating(true);
-    setErrorMsg('');
-    setSuccessMsg('');
-    try {
-      const houseNumber = localStorage.getItem('houseNumber');
-      if (!houseNumber) {
-        setErrorMsg('House number not found in local storage.');
-        return;
-      }
-      const res = await api.post(`/bills/household/${houseNumber}/generate`);
-      setSuccessMsg(`Bill generated successfully! Amount: ₹${res.data.amount.toFixed(2)}`);
-      await fetchBills();
-    } catch (err) {
-      console.error("Error generating bill:", err);
-      if (err.response && err.response.data) {
-        setErrorMsg(err.response.data);
-      } else {
-        setErrorMsg('Failed to generate bill. Please try again.');
-      }
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch(status) {
-      case 'PAID': return <CheckCircle className="w-5 h-5 text-emerald-400" />;
-      case 'UNPAID': return <Clock className="w-5 h-5 text-amber-400" />;
-      case 'OVERDUE': return <AlertCircle className="w-5 h-5 text-red-400" />;
-      default: return <Receipt className="w-5 h-5 text-text-muted" />;
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'PAID': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-      case 'UNPAID': return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-      case 'OVERDUE': return 'bg-red-500/10 text-red-400 border-red-500/20';
-      default: return 'bg-surface-lighter text-text-muted border-border';
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -123,23 +158,6 @@ export default function Bills() {
           <h1 className="text-2xl font-bold text-text">My Bills</h1>
           <p className="text-text-muted mt-1">View and manage your water utility bills.</p>
         </div>
-        <button
-          onClick={handleGenerateBill}
-          disabled={generating}
-          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-        >
-          {generating ? (
-            <>
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <Receipt className="w-4 h-4" />
-              Generate Bill
-            </>
-          )}
-        </button>
       </div>
 
       {errorMsg && (
@@ -179,8 +197,69 @@ export default function Bills() {
         animate={{ opacity: 1, y: 0 }}
         className="glass-card overflow-hidden"
       >
-        <div className="p-6 border-b border-border">
+        <div className="p-6 border-b border-border flex items-center justify-between">
           <h3 className="font-semibold text-text">Billing History</h3>
+          <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
+            Total Bills: {filteredAndSortedBills.length}
+          </span>
+        </div>
+
+        {/* Filter & Sort Controls Row */}
+        <div className="p-6 border-b border-border bg-surface-lighter/20 grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1.5">Filter by Month</label>
+            <select
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+              className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer font-bold shadow-sm"
+            >
+              <option value="all">All Months</option>
+              {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((mName, idx) => (
+                <option key={mName} value={idx + 1}>{mName}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1.5">Filter by Year</label>
+            <select
+              value={filterYear}
+              onChange={(e) => setFilterYear(e.target.value)}
+              className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer font-bold shadow-sm"
+            >
+              <option value="all">All Years</option>
+              {availableYears.map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1.5">Status Filter</label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer font-bold shadow-sm"
+            >
+              <option value="all">All Statuses</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1.5">Sort Order</label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer font-bold shadow-sm"
+            >
+              <option value="date-desc">Newest Due Date</option>
+              <option value="date-asc">Oldest Due Date</option>
+              <option value="amount-desc">Highest Amount</option>
+              <option value="amount-asc">Lowest Amount</option>
+            </select>
+          </div>
         </div>
         
         {loading ? (
@@ -189,14 +268,15 @@ export default function Bills() {
             <div className="h-72 rounded-2xl skeleton-pulse" />
             <div className="h-72 rounded-2xl skeleton-pulse" />
           </div>
-        ) : bills.length === 0 ? (
-          <div className="p-8 text-center text-text-muted flex flex-col items-center">
+        ) : filteredAndSortedBills.length === 0 ? (
+          <div className="p-12 text-center text-text-muted flex flex-col items-center">
             <Receipt className="w-12 h-12 mb-3 opacity-20" />
-            <p>You have no bills on record.</p>
+            <p className="font-bold text-sm">No bills match the selected filters.</p>
+            <p className="text-xs text-text-muted mt-1">Try resetting the dropdown filters to see all invoices.</p>
           </div>
         ) : (
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center bg-background/50">
-            {bills.map((bill, index) => (
+            {filteredAndSortedBills.map((bill, index) => (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -233,11 +313,13 @@ export default function Bills() {
                           <div className="t-detail-item">
                             <span className="t-label">Billing Month</span>
                             <span className="t-value">
-                              {(() => {
-                                if (!bill.generatedDate) return 'N/A';
-                                const d = new Date(bill.generatedDate);
-                                return isNaN(d.getTime()) ? bill.generatedDate : d.toLocaleString('default', { month: 'long', year: 'numeric' });
-                              })()}
+                              {bill.billingPeriod
+                                ? bill.billingPeriod
+                                : (() => {
+                                    if (!bill.generatedDate) return 'N/A';
+                                    const d = new Date(bill.generatedDate);
+                                    return isNaN(d.getTime()) ? bill.generatedDate : d.toLocaleString('default', { month: 'long', year: 'numeric' });
+                                  })()}
                             </span>
                           </div>
                           <div className="t-detail-item">
@@ -246,7 +328,11 @@ export default function Bills() {
                           </div>
                           <div className="t-detail-item">
                             <span className="t-label">Consumption</span>
-                            <span className="t-value">{bill.consumptionLiters ? bill.consumptionLiters.toLocaleString() : 0} L</span>
+                            <span className="t-value">
+                              {bill.monthlyLimitLiters > 0
+                                ? ((bill.withinLimitLiters || 0) + (bill.excessLiters || 0)).toLocaleString()
+                                : (bill.consumptionLiters || 0).toLocaleString()} L
+                            </span>
                           </div>
                           <div className="t-detail-item">
                             <span className="t-label">Apt Block</span>
@@ -278,30 +364,37 @@ export default function Bills() {
                             </thead>
                             <tbody>
                               {/* Within-limit row */}
-                              {bill.monthlyLimitLiters > 0 ? (
-                                <>
-                                  <tr>
-                                    <td>
-                                      <span className="t-calc-label">Safe Limit Usage</span>
-                                      <span className="t-calc-sub">≤ {(bill.monthlyLimitLiters || 0).toLocaleString()} L limit</span>
-                                    </td>
-                                    <td className="t-calc-right">{(bill.withinLimitLiters || 0).toLocaleString()}</td>
-                                    <td className="t-calc-right">₹{(bill.baseRatePerLiter || 0).toFixed(2)}</td>
-                                    <td className="t-calc-right t-calc-green">₹{((bill.withinLimitLiters || 0) * (bill.baseRatePerLiter || 0)).toFixed(2)}</td>
-                                  </tr>
-                                  {(bill.excessLiters || 0) > 0 && (
-                                    <tr className="t-calc-excess-row">
+                              {bill.monthlyLimitLiters > 0 ? (() => {
+                                // Compute the true total from stored breakdown fields
+                                // (guards against stale bill.amount in DB)
+                                const baseCharge = (bill.withinLimitLiters || 0) * (bill.baseRatePerLiter || 0);
+                                const excessCharge = (bill.excessLiters || 0) * (bill.excessRatePerLiter || 0);
+                                const computedTotal = baseCharge + excessCharge;
+                                return (
+                                  <>
+                                    <tr>
                                       <td>
-                                        <span className="t-calc-label t-calc-red">Excess Usage</span>
-                                        <span className="t-calc-sub t-calc-red">Above safe limit</span>
+                                        <span className="t-calc-label">Safe Limit Usage</span>
+                                        <span className="t-calc-sub">≤ {(bill.monthlyLimitLiters || 0).toLocaleString()} L limit</span>
                                       </td>
-                                      <td className="t-calc-right t-calc-red">{(bill.excessLiters || 0).toLocaleString()}</td>
-                                      <td className="t-calc-right t-calc-red">₹{(bill.excessRatePerLiter || 0).toFixed(2)}</td>
-                                      <td className="t-calc-right t-calc-red">+₹{((bill.excessLiters || 0) * (bill.excessRatePerLiter || 0)).toFixed(2)}</td>
+                                      <td className="t-calc-right">{(bill.withinLimitLiters || 0).toLocaleString()}</td>
+                                      <td className="t-calc-right">₹{(bill.baseRatePerLiter || 0).toFixed(2)}</td>
+                                      <td className="t-calc-right t-calc-green">₹{baseCharge.toFixed(2)}</td>
                                     </tr>
-                                  )}
-                                </>
-                              ) : (
+                                    {(bill.excessLiters || 0) > 0 && (
+                                      <tr className="t-calc-excess-row">
+                                        <td>
+                                          <span className="t-calc-label t-calc-red">Excess Usage</span>
+                                          <span className="t-calc-sub t-calc-red">Above safe limit</span>
+                                        </td>
+                                        <td className="t-calc-right t-calc-red">{(bill.excessLiters || 0).toLocaleString()}</td>
+                                        <td className="t-calc-right t-calc-red">₹{(bill.excessRatePerLiter || 0).toFixed(2)}</td>
+                                        <td className="t-calc-right t-calc-red">+₹{excessCharge.toFixed(2)}</td>
+                                      </tr>
+                                    )}
+                                  </>
+                                );
+                              })() : (
                                 <tr>
                                   <td>
                                     <span className="t-calc-label">Water Consumption</span>
@@ -322,7 +415,11 @@ export default function Bills() {
                             <tfoot>
                               <tr className="t-calc-total-row">
                                 <td colSpan="3" className="t-calc-total-label">TOTAL AMOUNT</td>
-                                <td className="t-calc-right t-calc-total-value">₹{(bill.amount || 0).toFixed(2)}</td>
+                                <td className="t-calc-right t-calc-total-value">
+                                  ₹{bill.monthlyLimitLiters > 0
+                                    ? (((bill.withinLimitLiters || 0) * (bill.baseRatePerLiter || 0)) + ((bill.excessLiters || 0) * (bill.excessRatePerLiter || 0))).toFixed(2)
+                                    : (bill.amount || 0).toFixed(2)}
+                                </td>
                               </tr>
                             </tfoot>
                           </table>
@@ -343,7 +440,11 @@ export default function Bills() {
                       </div>
                       <div className="t-admit">
                         <div className="t-admit-text">Amount</div>
-                        <div className={`t-admit-num ${bill.status.toLowerCase()}`}>₹{bill.amount.toFixed(0)}</div>
+                        <div className={`t-admit-num ${bill.status.toLowerCase()}`}>
+                          ₹{bill.monthlyLimitLiters > 0
+                            ? (((bill.withinLimitLiters || 0) * (bill.baseRatePerLiter || 0)) + ((bill.excessLiters || 0) * (bill.excessRatePerLiter || 0))).toFixed(0)
+                            : (bill.amount || 0).toFixed(0)}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -497,7 +598,17 @@ export default function Bills() {
               </div>
 
               {/* Date metadata box */}
-              <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+              <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
+                <div>
+                  <span className="text-slate-400 block">Billing Cycle</span>
+                  <span className="font-semibold text-blue-600 dark:text-blue-400 text-sm">
+                    {invoiceModalBill.billingPeriod
+                      ? invoiceModalBill.billingPeriod
+                      : invoiceModalBill.generatedDate
+                        ? new Date(invoiceModalBill.generatedDate).toLocaleString('default', { month: 'long', year: 'numeric' })
+                        : '—'}
+                  </span>
+                </div>
                 <div>
                   <span className="text-slate-400 block">Issue Date</span>
                   <span className="font-semibold text-slate-800 dark:text-white text-sm">{invoiceModalBill.generatedDate}</span>

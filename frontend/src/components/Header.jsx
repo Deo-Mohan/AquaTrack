@@ -228,14 +228,7 @@ export default function Header({ toggleSidebar }) {
       </div>
 
       <div className="flex items-center gap-4 lg:gap-6">
-        <div className="relative hidden md:block">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-          <input 
-            type="text" 
-            placeholder="Search..." 
-            className="w-64 bg-surface-lighter/50 border border-border rounded-full pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all text-text placeholder-text-muted/70"
-          />
-        </div>
+
 
         <label htmlFor="header-switch" className="toggle">
           <input 

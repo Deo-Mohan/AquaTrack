@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Home, Droplet, AlertCircle, Server, Settings, Database, Activity, 
   Plus, Trash2, Edit, Send, Receipt, Search, FileText, CheckCircle2, X, Info, Loader2, ShieldAlert,
-  Building2, MapPin, Upload, Download, Mail, Zap, BarChart3, Lightbulb
+  Building2, MapPin, Upload, Download, Mail, Zap, BarChart3, Lightbulb, Coins
 } from 'lucide-react';
 
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -63,6 +63,21 @@ const CustomTooltip = ({ active, payload }) => {
     );
   }
   return null;
+};
+
+const getBillingMonthLabel = (billOrDate) => {
+  // Accept either a bill object (with billingPeriod/generatedDate) or a plain date string
+  if (!billOrDate) return 'N/A';
+  // If it's a bill object with billingPeriod, use it directly
+  if (typeof billOrDate === 'object' && billOrDate.billingPeriod) return billOrDate.billingPeriod;
+  const dateStr = typeof billOrDate === 'object' ? billOrDate.generatedDate : billOrDate;
+  if (!dateStr) return 'N/A';
+  const parts = dateStr.split('-');
+  if (parts.length < 2) return 'N/A';
+  const year = parts[0];
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  const dateObj = new Date(year, monthIdx, 1);
+  return dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
 };
 
 export default function AdminDashboard() {
@@ -159,6 +174,8 @@ export default function AdminDashboard() {
   const [chartScope, setChartScope] = useState('colony'); // colony, building
   const [selectedColonyFilter, setSelectedColonyFilter] = useState('all');
   const [isChartExpanded, setIsChartExpanded] = useState(false);
+  const [selectedChartMonth, setSelectedChartMonth] = useState(new Date().getMonth() + 1); // 1-12
+  const [selectedChartYear, setSelectedChartYear] = useState(new Date().getFullYear());
   const [expandedAdmins, setExpandedAdmins] = useState({}); // { blockName: true/false }
   const [quickRateUser, setQuickRateUser] = useState(null); // for inline rate modal
   const [quickRateValue, setQuickRateValue] = useState('');
@@ -339,7 +356,7 @@ export default function AdminDashboard() {
     houseNumber: '',
     colonyName: '',
     apartmentBlock: isSuperAdmin ? 'Block A' : block,
-    gender: 'Male',
+    gender: 'male',
     waterRatePerLiter: '',
     fullName: '',
     mobileNumber: '',
@@ -670,7 +687,7 @@ export default function AdminDashboard() {
       houseNumber: '',
       colonyName: myColony,
       apartmentBlock: isSuperAdmin ? '' : block,
-      gender: 'Male',
+      gender: 'male',
       waterRatePerLiter: '',
       fullName: '',
       mobileNumber: '',
@@ -691,7 +708,7 @@ export default function AdminDashboard() {
       houseNumber: user.houseNumber || '',
       colonyName: user.colonyName || '',
       apartmentBlock: user.apartmentBlock || '',
-      gender: user.gender || 'Male',
+      gender: (user.gender || 'male').toLowerCase(),
       waterRatePerLiter: user.waterRatePerLiter || '',
       fullName: user.fullName || '',
       mobileNumber: user.mobileNumber || '',
@@ -1352,6 +1369,16 @@ export default function AdminDashboard() {
   const householdLatestLogMap = {};
 
   usageLogs.forEach(log => {
+    if (!log.readingDate) return;
+    const parts = log.readingDate.split('-');
+    if (parts.length < 2) return;
+    const logYear = parseInt(parts[0], 10);
+    const logMonth = parseInt(parts[1], 10);
+
+    if (logYear !== selectedChartYear || logMonth !== selectedChartMonth) {
+      return;
+    }
+
     const household = (log.houseNumber || 'Unknown').trim();
     if (!household) return;
 
@@ -1359,14 +1386,12 @@ export default function AdminDashboard() {
     householdUsageMap[household] = (householdUsageMap[household] || 0) + (log.readingLiters || 0);
 
     // Track latest log date
-    if (log.readingDate) {
-      const logDate = new Date(log.readingDate);
-      const currentLatest = householdLatestLogMap[household]
-        ? new Date(householdLatestLogMap[household].readingDate)
-        : null;
-      if (!currentLatest || logDate > currentLatest) {
-        householdLatestLogMap[household] = log;
-      }
+    const logDate = new Date(log.readingDate);
+    const currentLatest = householdLatestLogMap[household]
+      ? new Date(householdLatestLogMap[household].readingDate)
+      : null;
+    if (!currentLatest || logDate > currentLatest) {
+      householdLatestLogMap[household] = log;
     }
   });
 
@@ -1830,9 +1855,9 @@ export default function AdminDashboard() {
               onMouseEnter={() => setShowTooltip(true)}
               onMouseLeave={() => setShowTooltip(false)}
               onClick={() => setQuickHelpModalOpen(true)}
-              className="flex items-center justify-center w-9 h-9 rounded-xl bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.25)] hover:shadow-[0_0_25px_rgba(234,179,8,0.6)] hover:scale-105 transition-all cursor-pointer animate-pulse focus:outline-none"
+              className="flex items-center justify-center w-9 h-9 rounded-xl bg-amber-500 dark:bg-yellow-500/10 text-white dark:text-yellow-400 hover:bg-amber-600 dark:hover:bg-yellow-500/20 border border-amber-600 dark:border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.25)] hover:shadow-[0_0_25px_rgba(234,179,8,0.6)] hover:scale-105 transition-all cursor-pointer animate-pulse focus:outline-none"
             >
-              <Lightbulb className="w-5 h-5 text-yellow-400 fill-yellow-400/20" />
+              <Lightbulb className="w-5 h-5 text-white dark:text-yellow-400 fill-white/20 dark:fill-yellow-400/20" />
             </button>
             {showTooltip && (
               <div className="absolute right-0 top-11 whitespace-nowrap bg-surface-lighter border border-border text-text text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xl backdrop-blur-md z-50">
@@ -1863,7 +1888,7 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <StatCard title="Total Houses" value={stats ? `${stats.totalHouseholds}` : '...'} icon={Home} color="blue" delay={0.1} />
+                <StatCard title="Money to be Collected" value={stats && stats.pendingCollections !== undefined ? `₹${(stats.pendingCollections || 0).toLocaleString()}` : '₹0'} icon={Coins} color="amber" delay={0.1} />
                 <StatCard title="Registered Residents" value={stats ? `${stats.totalResidents}` : '...'} icon={Users} color="emerald" delay={0.2} onClick={() => setActiveTab('users')} />
                 <StatCard title={`Total Block Usage (${new Date().toLocaleString('default', { month: 'long' })})`} value={stats ? `${stats.totalUsageThisMonth} Liters` : '...'} icon={Droplet} color="purple" delay={0.3} onClick={() => navigate('/water-billing-history')} />
               </div>
@@ -1921,6 +1946,29 @@ export default function AdminDashboard() {
                       </>
                     )}
 
+                    {!isSuperAdmin && (
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={selectedChartMonth}
+                          onChange={(e) => setSelectedChartMonth(parseInt(e.target.value, 10))}
+                          className="bg-surface-lighter border border-border rounded-lg px-2.5 py-1 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer"
+                        >
+                          {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((mon, idx) => (
+                            <option key={mon} value={idx + 1}>{mon}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={selectedChartYear}
+                          onChange={(e) => setSelectedChartYear(parseInt(e.target.value, 10))}
+                          className="bg-surface-lighter border border-border rounded-lg px-2.5 py-1 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer"
+                        >
+                          {[2024, 2025, 2026, 2027, 2028, 2029, 2030].map(yr => (
+                            <option key={yr} value={yr}>{yr}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
                     <select
                       value={chartType}
                       onChange={(e) => setChartType(e.target.value)}
@@ -1933,59 +1981,75 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                  <div className={`w-full transition-all duration-300 ${isChartExpanded ? 'h-[450px]' : 'h-[250px]'}`}>
-                  <ResponsiveContainer width="100%" height="100%">
                     {(() => {
                       const rawChartData = isSuperAdmin ? blockDistributionData : dynamicUsageData;
+
+                      if (rawChartData.length === 0) {
+                        const monthName = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedChartMonth - 1];
+                        return (
+                          <div className="flex flex-col items-center justify-center h-full text-center p-6 border border-dashed border-border/40 rounded-2xl bg-surface-lighter/5 backdrop-blur-md">
+                            <Droplet className="w-12 h-12 text-primary/40 animate-pulse mb-3" />
+                            <p className="text-text font-bold text-sm">No data found for {monthName} {selectedChartYear}</p>
+                            <p className="text-text-muted text-xs mt-1">Please try logging meter readings for this cycle to populate the graph.</p>
+                          </div>
+                        );
+                      }
+
                       const chartData = isChartExpanded ? rawChartData : rawChartData.slice(0, 5);
-                      
-                      if (chartType === 'line') {
-                        return (
-                          <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                            <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                            <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                            <Tooltip content={<CustomTooltip />} />
-                            <Line type="monotone" dataKey="usage" stroke={isSuperAdmin ? '#3b82f6' : '#8b5cf6'} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                          </LineChart>
-                        );
-                      }
-                      if (chartType === 'area') {
-                        return (
-                          <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id="colorUsageAdmin" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor={isSuperAdmin ? '#3b82f6' : '#8b5cf6'} stopOpacity={0.4}/>
-                                <stop offset="95%" stopColor={isSuperAdmin ? '#3b82f6' : '#8b5cf6'} stopOpacity={0}/>
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                            <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                            <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                            <Tooltip content={<CustomTooltip />} />
-                            <Area type="monotone" dataKey="usage" stroke={isSuperAdmin ? '#3b82f6' : '#8b5cf6'} strokeWidth={3} fillOpacity={1} fill="url(#colorUsageAdmin)" />
-                          </AreaChart>
-                        );
-                      }
+
                       return (
-                        <BarChart 
-                          data={chartData} 
-                          margin={{ top: 10, right: 10, left: 0, bottom: 0 }} 
-                          layout="vertical"
-                        >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                          <XAxis type="number" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                          <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={85} />
-                          <Tooltip content={<CustomTooltip />} cursor={{ fill: '#334155', opacity: 0.2 }} />
-                          <Bar dataKey="usage" radius={[0, 4, 4, 0]} barSize={20}>
-                            {chartData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                            ))}
-                          </Bar>
-                        </BarChart>
+                        <ResponsiveContainer width="100%" height="100%">
+                          {(() => {
+                            if (chartType === 'line') {
+                              return (
+                                <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                                  <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                                  <Tooltip content={<CustomTooltip />} />
+                                  <Line type="monotone" dataKey="usage" stroke={isSuperAdmin ? '#3b82f6' : '#8b5cf6'} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                                </LineChart>
+                              );
+                            }
+                            if (chartType === 'area') {
+                              return (
+                                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                  <defs>
+                                    <linearGradient id="colorUsageAdmin" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor={isSuperAdmin ? '#3b82f6' : '#8b5cf6'} stopOpacity={0.4}/>
+                                      <stop offset="95%" stopColor={isSuperAdmin ? '#3b82f6' : '#8b5cf6'} stopOpacity={0}/>
+                                    </linearGradient>
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                                  <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                                  <Tooltip content={<CustomTooltip />} />
+                                  <Area type="monotone" dataKey="usage" stroke={isSuperAdmin ? '#3b82f6' : '#8b5cf6'} strokeWidth={3} fillOpacity={1} fill="url(#colorUsageAdmin)" />
+                                </AreaChart>
+                              );
+                            }
+                            return (
+                              <BarChart 
+                                data={chartData} 
+                                margin={{ top: 10, right: 10, left: 0, bottom: 0 }} 
+                                layout="vertical"
+                              >
+                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                                <XAxis type="number" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                                <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={85} />
+                                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#334155', opacity: 0.2 }} />
+                                <Bar dataKey="usage" radius={[0, 4, 4, 0]} barSize={20}>
+                                  {chartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                  ))}
+                                </Bar>
+                              </BarChart>
+                            );
+                          })()}
+                        </ResponsiveContainer>
                       );
                     })()}
-                  </ResponsiveContainer>
-                </div>
+                 </div>
                 {(() => {
                   const rawChartData = isSuperAdmin ? blockDistributionData : dynamicUsageData;
                   if (rawChartData.length > 5) {
@@ -2578,8 +2642,8 @@ export default function AdminDashboard() {
                             <td className="px-6 py-4 text-text-muted">{user.gender || '—'}</td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex items-center justify-end gap-2">
-                                <button onClick={() => handleOpenAddUsage(user.houseNumber)} title="Log Usage" className="p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/25 border border-blue-500/20 rounded-lg cursor-pointer"><Droplet className="w-4 h-4" /></button>
-                                <button onClick={() => handleOpenCreateBill(user.houseNumber)} title="Bill" className="p-1.5 bg-purple-500/10 text-purple-400 hover:bg-purple-500/25 border border-purple-500/20 rounded-lg cursor-pointer"><Receipt className="w-4 h-4" /></button>
+                                <button onClick={() => navigate('/meter-workstation', { state: { selectedResidentId: user.id, action: 'log' } })} title="Log Usage" className="p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/25 border border-blue-500/20 rounded-lg cursor-pointer"><Droplet className="w-4 h-4" /></button>
+                                <button onClick={() => navigate('/meter-workstation', { state: { selectedResidentId: user.id, action: 'bill' } })} title="Bill" className="p-1.5 bg-purple-500/10 text-purple-400 hover:bg-purple-500/25 border border-purple-500/20 rounded-lg cursor-pointer"><Receipt className="w-4 h-4" /></button>
                                 <button onClick={() => handleOpenNotify(user.username)} title="Notify" className="p-1.5 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/25 border border-yellow-500/20 rounded-lg cursor-pointer"><Send className="w-4 h-4" /></button>
                                 <button onClick={() => handleOpenEditUser(user)} title="Edit" className="p-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20 rounded-lg cursor-pointer"><Edit className="w-4 h-4" /></button>
                                 <button onClick={() => handleDeleteUser(user.id)} title="Delete" className="p-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/25 border border-red-500/20 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
@@ -3019,9 +3083,9 @@ export default function AdminDashboard() {
                         onChange={(e) => setUserForm({ ...userForm, gender: e.target.value })}
                         className="w-full bg-surface-lighter border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
                       >
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
                       </select>
                     </div>
 
@@ -3655,6 +3719,9 @@ export default function AdminDashboard() {
                       onChange={(e) => setUsageForm({ ...usageForm, readingDate: e.target.value })}
                       className="w-full bg-surface-lighter border border-border rounded-xl px-4 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
                     />
+                    <p className="text-[11px] text-primary mt-1.5 font-bold">
+                      Billing Cycle: <span className="text-text">{getBillingMonthLabel(usageForm.readingDate)}</span>
+                    </p>
                   </div>
                 </div>
 
@@ -3986,7 +4053,17 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Date metadata box */}
-                <div className="bg-surface-lighter rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                <div className="bg-surface-lighter rounded-xl p-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
+                  <div>
+                    <span className="text-text-muted block">Billing Cycle</span>
+                    <span className="font-semibold text-primary text-sm">
+                      {invoiceModalBill.billingPeriod
+                        ? invoiceModalBill.billingPeriod
+                        : invoiceModalBill.generatedDate
+                          ? new Date(invoiceModalBill.generatedDate).toLocaleString('default', { month: 'long', year: 'numeric' })
+                          : '—'}
+                    </span>
+                  </div>
                   <div>
                     <span className="text-text-muted block">Issue Date</span>
                     <span className="font-semibold text-text text-sm">{invoiceModalBill.generatedDate}</span>

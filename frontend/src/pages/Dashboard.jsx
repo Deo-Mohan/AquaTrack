@@ -1,13 +1,58 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Droplets, Receipt, AlertTriangle, TrendingDown, Upload, FileText, CheckCircle2, ShieldAlert, ShieldCheck, X, AlertCircle, Loader2, ArrowRight, Clock, Info, Zap, BarChart3, Lightbulb, ChevronLeft, ChevronRight } from 'lucide-react';
-import { 
+import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, LineChart, Line, Cell
 } from 'recharts';
 import api from '../api';
 
 const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#f43f5e', '#06b6d4', '#6366f1', '#f97316'];
+
+const WeeklyTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-slate-900 border border-slate-700/80 p-3 rounded-xl shadow-2xl backdrop-blur-md text-[11px] text-slate-300 max-w-[280px]">
+        <p className="font-bold text-xs text-white mb-1.5">{data.name}</p>
+        <p className="mb-2"><span className="text-slate-400">Total Usage:</span> <strong className="text-primary font-bold text-xs">{data.usage.toLocaleString()} L</strong></p>
+
+        {data.items && data.items.length > 0 ? (
+          <div className="space-y-1.5 border-t border-slate-800 pt-1.5 max-h-36 overflow-y-auto custom-scrollbar">
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Logged Entries:</p>
+            {data.items.map((item, idx) => (
+              <div key={idx} className="bg-slate-800/40 p-1.5 rounded-lg border border-slate-700/40 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-white font-semibold text-xs">{item.liters.toLocaleString()} L</p>
+                  <p className="text-slate-400 text-[9px]">{item.dayName}</p>
+                </div>
+                <span className="text-slate-500 text-[9px] whitespace-nowrap">{item.dateStr}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-slate-500 italic mt-1 text-[10px]">No readings logged for this week.</p>
+        )}
+      </div>
+    );
+  }
+  return null;
+};
+const CustomXAxisTick = ({ x, y, payload }) => {
+  if (!payload || !payload.value) return null;
+  const parts = payload.value.split(' ');
+  const weekLabel = `${parts[0] || ''} ${parts[1] || ''}`;
+  const rangeLabel = parts[2] || '';
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={0} y={0} dy={4} textAnchor="middle" fill="#94a3b8" fontSize={11} className="font-semibold">
+        <tspan x={0} dy={10}>{weekLabel}</tspan>
+        {rangeLabel && <tspan x={0} dy={14} fill="#64748b" className="font-medium text-[9px]">{rangeLabel}</tspan>}
+      </text>
+    </g>
+  );
+};
 
 const getGreeting = () => {
   const hr = new Date().getHours();
@@ -100,8 +145,42 @@ export default function Dashboard() {
     }
   };
   const [alerts, setAlerts] = useState([]);
-  const [weeklyUsage, setWeeklyUsage] = useState([]);
+  const [rawLogs, setRawLogs] = useState([]);
+  const [selectedWeeklyMonth, setSelectedWeeklyMonth] = useState(new Date().getMonth() + 1);
   const [monthlyUsageData, setMonthlyUsageData] = useState([]);
+
+  const getWeeklyDataForMonth = (logs, monthVal) => {
+    const targetYear = new Date().getFullYear();
+    const monthLogs = logs.filter(log => {
+      const d = new Date(log.readingDate);
+      return d.getFullYear() === targetYear && (d.getMonth() + 1) === monthVal;
+    });
+
+    const weeks = [
+      { name: 'Week 1 (1-7)', minDay: 1, maxDay: 7, usage: 0, items: [] },
+      { name: 'Week 2 (8-14)', minDay: 8, maxDay: 14, usage: 0, items: [] },
+      { name: 'Week 3 (15-21)', minDay: 15, maxDay: 21, usage: 0, items: [] },
+      { name: 'Week 4 (22+)', minDay: 22, maxDay: 31, usage: 0, items: [] }
+    ];
+
+    monthLogs.forEach(log => {
+      const logDate = new Date(log.readingDate);
+      const day = logDate.getDate();
+      const week = weeks.find(w => day >= w.minDay && day <= w.maxDay);
+      if (week) {
+        week.usage += log.readingLiters;
+        week.items.push({
+          liters: log.readingLiters,
+          dateStr: log.readingDate,
+          dayName: logDate.toLocaleDateString('en-US', { weekday: 'long' })
+        });
+      }
+    });
+
+    return weeks.map(w => ({ name: w.name, usage: w.usage, items: w.items }));
+  };
+
+  const weeklyUsage = getWeeklyDataForMonth(rawLogs, selectedWeeklyMonth);
   const username = localStorage.getItem('username') || 'Household User';
   const [displayName, setDisplayName] = useState(() => {
     return localStorage.getItem('fullName') || localStorage.getItem('username') || 'Household User';
@@ -132,7 +211,22 @@ export default function Dashboard() {
     }
   };
 
-  const latestVal = stats?.latestReading || 0;
+  const [comparisonDate, setComparisonDate] = useState(new Date());
+
+  const getUsageForMonth = (logs, dateObj) => {
+    const targetMonth = dateObj.getMonth();
+    const targetYear = dateObj.getFullYear();
+    let total = 0;
+    logs.forEach(log => {
+      const d = new Date(log.readingDate);
+      if (d.getMonth() === targetMonth && d.getFullYear() === targetYear) {
+        total += log.readingLiters;
+      }
+    });
+    return total;
+  };
+
+  const latestVal = getUsageForMonth(rawLogs, comparisonDate);
   const avgVal = safeWaterLimit > 0 ? safeWaterLimit : 0;
   const maxVal = Math.max(latestVal, avgVal, 1);
   const userPercentage = Math.round((latestVal * 100) / maxVal);
@@ -141,12 +235,13 @@ export default function Dashboard() {
   const getLast6MonthsData = (logs) => {
     const months = [];
     const now = new Date();
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const targetYear = now.getFullYear();
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    for (let i = 0; i < 12; i++) {
       months.push({
-        name: d.toLocaleString('en-US', { month: 'short' }),
-        year: d.getFullYear(),
-        monthNum: d.getMonth(),
+        name: monthNames[i],
+        year: targetYear,
+        monthNum: i,
         usage: 0
       });
     }
@@ -156,7 +251,7 @@ export default function Dashboard() {
         const logDate = new Date(log.readingDate);
         const logMonth = logDate.getMonth();
         const logYear = logDate.getFullYear();
-        
+
         const match = months.find(m => m.monthNum === logMonth && m.year === logYear);
         if (match) {
           match.usage += log.readingLiters;
@@ -190,7 +285,7 @@ export default function Dashboard() {
               if (profileRes.data.fullName) {
                 setDisplayName(profileRes.data.fullName);
               }
-              
+
               let limit = profileRes.data.monthlyLimitLiters || 0;
               let baseRate = profileRes.data.waterRatePerLiter || 0;
               let excessRate = profileRes.data.excessRatePerLiter || 0;
@@ -238,16 +333,10 @@ export default function Dashboard() {
               const usageRes = await api.get(`/usage/household/${houseNumber}`);
               if (usageRes.data && usageRes.data.length > 0) {
                 const sortedLogs = [...usageRes.data].sort((a, b) => new Date(a.readingDate) - new Date(b.readingDate));
-                
-                // Last 7 readings for weekly usage
-                const weekly = sortedLogs.slice(-7).map(log => ({
-                  name: new Date(log.readingDate).toLocaleDateString('en-US', { weekday: 'short' }),
-                  usage: log.readingLiters
-                }));
-                setWeeklyUsage(weekly);
+                setRawLogs(sortedLogs);
                 setMonthlyUsageData(getLast6MonthsData(sortedLogs));
               } else {
-                setWeeklyUsage([]);
+                setRawLogs([]);
                 setMonthlyUsageData(getLast6MonthsData([]));
               }
             }
@@ -382,8 +471,8 @@ export default function Dashboard() {
                       <span className="text-primary">{uploadProgress}%</span>
                     </div>
                     <div className="h-1.5 w-full bg-surface-lighter rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary transition-all duration-150" 
+                      <div
+                        className="h-full bg-primary transition-all duration-150"
                         style={{ width: `${uploadProgress}%` }}
                       />
                     </div>
@@ -500,8 +589,8 @@ export default function Dashboard() {
                       <span className="text-primary">{uploadProgress}%</span>
                     </div>
                     <div className="h-1.5 w-full bg-surface-lighter rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary transition-all duration-150" 
+                      <div
+                        className="h-full bg-primary transition-all duration-150"
                         style={{ width: `${uploadProgress}%` }}
                       />
                     </div>
@@ -554,13 +643,13 @@ export default function Dashboard() {
 
         {/* Glowing bulb for quick guide */}
         <div className="relative pb-1" style={{ zIndex: 40 }}>
-          <button 
+          <button
             onMouseEnter={() => setShowTooltip(true)}
             onMouseLeave={() => setShowTooltip(false)}
             onClick={() => setQuickHelpModalOpen(true)}
-            className="flex items-center justify-center w-9 h-9 rounded-xl bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.25)] hover:shadow-[0_0_25px_rgba(234,179,8,0.6)] hover:scale-105 transition-all cursor-pointer animate-pulse focus:outline-none"
+            className="flex items-center justify-center w-9 h-9 rounded-xl bg-amber-500 dark:bg-yellow-500/10 text-white dark:text-yellow-400 hover:bg-amber-600 dark:hover:bg-yellow-500/20 border border-amber-600 dark:border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.25)] hover:shadow-[0_0_25px_rgba(234,179,8,0.6)] hover:scale-105 transition-all cursor-pointer animate-pulse focus:outline-none"
           >
-            <Lightbulb className="w-5 h-5 text-yellow-400 fill-yellow-400/20" />
+            <Lightbulb className="w-5 h-5 text-white dark:text-yellow-400 fill-white/20 dark:fill-yellow-400/20" />
           </button>
           {showTooltip && (
             <div className="absolute right-0 top-11 whitespace-nowrap bg-surface-lighter border border-border text-text text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xl backdrop-blur-md z-50">
@@ -572,21 +661,21 @@ export default function Dashboard() {
 
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard 
-          title="Latest Meter Reading" 
-          value={`${stats.latestReading} L`} 
-          subtitle={stats.latestReadingDate !== 'N/A' ? `Logged: ${stats.latestReadingDate}` : "No usage logs"} 
-          icon={Droplets} 
+        <StatCard
+          title="Latest Meter Reading"
+          value={`${stats.latestReading} L`}
+          subtitle={stats.latestReadingDate !== 'N/A' ? `Logged: ${stats.latestReadingDate}` : "No usage logs"}
+          icon={Droplets}
           color="blue"
-          delay={0.1} 
+          delay={0.1}
         />
-        <StatCard 
-          title="Current Bill (Est)" 
-          value={`₹${stats.unpaidBillAmount.toFixed(2)}`} 
-          subtitle={stats.unpaidBillAmount > 0 ? "Pending Payment" : "No Unpaid Bills"} 
-          icon={Receipt} 
+        <StatCard
+          title="Current Bill (Est)"
+          value={`₹${stats.unpaidBillAmount.toFixed(2)}`}
+          subtitle={stats.unpaidBillAmount > 0 ? "Pending Payment" : "No Unpaid Bills"}
+          icon={Receipt}
           color="emerald"
-          delay={0.2} 
+          delay={0.2}
         />
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -616,7 +705,7 @@ export default function Dashboard() {
                         <p className="text-xs alert-message mt-1 font-medium">{alert.message}</p>
                       </div>
                     </div>
-                    <button 
+                    <button
                       onClick={() => handleRemoveAlert(alert.id)}
                       className="p-1 rounded-full text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer focus:outline-none shrink-0"
                       title="Dismiss alert"
@@ -630,8 +719,7 @@ export default function Dashboard() {
               <div className="flex items-start gap-3 p-3.5 rounded-xl transition-all alert-card-success">
                 <CheckCircle2 className="w-5 h-5 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-sm font-bold alert-title">System Healthy</p>
-                  <p className="text-xs alert-message mt-1 font-medium">No active alerts or overuse notifications.</p>
+                  <p className="text-xs alert-message font-medium">No active alerts or overuse notifications.</p>
                 </div>
               </div>
             )}
@@ -680,71 +768,73 @@ export default function Dashboard() {
               <option value="line">Line Chart</option>
             </select>
           </div>
-          <div className="h-[250px] w-full">
-            {monthlyUsageData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                {(() => {
-                  if (monthlyChartType === 'bar') {
+          <div className="overflow-x-auto w-full custom-scrollbar">
+            <div className="h-[250px] min-w-[700px]">
+              {monthlyUsageData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  {(() => {
+                    if (monthlyChartType === 'bar') {
+                      return (
+                        <BarChart data={monthlyUsageData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                          <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                          <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
+                            labelStyle={{ color: '#f8fafc' }}
+                            itemStyle={{ color: '#cbd5e1' }}
+                          />
+                          <Bar dataKey="usage" radius={[4, 4, 0, 0]}>
+                            {monthlyUsageData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      );
+                    }
+                    if (monthlyChartType === 'line') {
+                      return (
+                        <LineChart data={monthlyUsageData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                          <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                          <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
+                            labelStyle={{ color: '#f8fafc' }}
+                            itemStyle={{ color: '#cbd5e1' }}
+                          />
+                          <Line type="monotone" dataKey="usage" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                        </LineChart>
+                      );
+                    }
                     return (
-                      <BarChart data={monthlyUsageData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                      <AreaChart data={monthlyUsageData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorUsage" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                         <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                         <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                        <Tooltip 
+                        <Tooltip
                           contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                           labelStyle={{ color: '#f8fafc' }}
                           itemStyle={{ color: '#cbd5e1' }}
                         />
-                        <Bar dataKey="usage" radius={[4, 4, 0, 0]}>
-                          {monthlyUsageData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                          ))}
-                        </Bar>
-                      </BarChart>
+                        <Area type="monotone" dataKey="usage" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorUsage)" />
+                      </AreaChart>
                     );
-                  }
-                  if (monthlyChartType === 'line') {
-                    return (
-                      <LineChart data={monthlyUsageData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                        <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                        <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                        <Tooltip 
-                          contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
-                          labelStyle={{ color: '#f8fafc' }}
-                          itemStyle={{ color: '#cbd5e1' }}
-                        />
-                        <Line type="monotone" dataKey="usage" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                      </LineChart>
-                    );
-                  }
-                  return (
-                    <AreaChart data={monthlyUsageData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="colorUsage" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                      <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                      <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
-                        labelStyle={{ color: '#f8fafc' }}
-                        itemStyle={{ color: '#cbd5e1' }}
-                      />
-                      <Area type="monotone" dataKey="usage" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorUsage)" />
-                    </AreaChart>
-                  );
-                })()}
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center text-text-muted">No monthly usage data found.</div>
-            )}
+                  })()}
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-text-muted">No monthly usage data found.</div>
+              )}
+            </div>
           </div>
         </motion.div>
- 
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -753,15 +843,27 @@ export default function Dashboard() {
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
             <h3 className="font-semibold text-text">Weekly Usage (Liters)</h3>
-            <select
-              value={weeklyChartType}
-              onChange={(e) => setWeeklyChartType(e.target.value)}
-              className="bg-surface-lighter border border-border rounded-lg px-3 py-1.5 text-sm text-text focus:outline-none focus:border-primary/50 cursor-pointer"
-            >
-              <option value="bar">Bar Chart</option>
-              <option value="line">Line Chart</option>
-              <option value="area">Area Chart</option>
-            </select>
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedWeeklyMonth}
+                onChange={(e) => setSelectedWeeklyMonth(parseInt(e.target.value, 10))}
+                className="bg-surface-lighter border border-border rounded-lg px-2.5 py-1.5 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer font-bold"
+              >
+                {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((mName, idx) => (
+                  <option key={mName} value={idx + 1}>{mName}</option>
+                ))}
+              </select>
+
+              <select
+                value={weeklyChartType}
+                onChange={(e) => setWeeklyChartType(e.target.value)}
+                className="bg-surface-lighter border border-border rounded-lg px-3 py-1.5 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer font-bold"
+              >
+                <option value="bar">Bar Chart</option>
+                <option value="line">Line Chart</option>
+                <option value="area">Area Chart</option>
+              </select>
+            </div>
           </div>
           <div className="h-[250px] w-full">
             {weeklyUsage.length > 0 ? (
@@ -772,18 +874,14 @@ export default function Dashboard() {
                       <AreaChart data={weeklyUsage} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                         <defs>
                           <linearGradient id="colorUsageWeekly" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                        <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                        <XAxis dataKey="name" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={40} />
                         <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                        <Tooltip 
-                          contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
-                          labelStyle={{ color: '#f8fafc' }}
-                          itemStyle={{ color: '#cbd5e1' }}
-                        />
+                        <Tooltip content={<WeeklyTooltip />} />
                         <Area type="monotone" dataKey="usage" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorUsageWeekly)" />
                       </AreaChart>
                     );
@@ -792,13 +890,9 @@ export default function Dashboard() {
                     return (
                       <LineChart data={weeklyUsage} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                        <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                        <XAxis dataKey="name" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={40} />
                         <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                        <Tooltip 
-                          contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
-                          labelStyle={{ color: '#f8fafc' }}
-                          itemStyle={{ color: '#cbd5e1' }}
-                        />
+                        <Tooltip content={<WeeklyTooltip />} />
                         <Line type="monotone" dataKey="usage" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                       </LineChart>
                     );
@@ -806,14 +900,9 @@ export default function Dashboard() {
                   return (
                     <BarChart data={weeklyUsage} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                      <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                      <XAxis dataKey="name" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={40} />
                       <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                      <Tooltip 
-                        cursor={{ fill: '#334155', opacity: 0.4 }}
-                        contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
-                        labelStyle={{ color: '#f8fafc' }}
-                        itemStyle={{ color: '#cbd5e1' }}
-                      />
+                      <Tooltip cursor={{ fill: '#334155', opacity: 0.2 }} content={<WeeklyTooltip />} />
                       <Bar dataKey="usage" radius={[4, 4, 0, 0]}>
                         {weeklyUsage.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
@@ -836,7 +925,7 @@ export default function Dashboard() {
         transition={{ delay: 0.6, duration: 0.4 }}
         className="glass-card p-6"
       >
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h3 className="font-semibold text-text">Monthly Tariff Limit Comparison</h3>
             <p className="text-xs text-text-muted mt-0.5">
@@ -845,17 +934,43 @@ export default function Dashboard() {
                 : 'Contact your Community Admin to configure a monthly water limit'}
             </p>
           </div>
+          
+          <div className="flex items-center gap-2 bg-surface-lighter/50 px-3 py-1.5 rounded-xl border border-border/60">
+            <button
+              onClick={() => setComparisonDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+              className="p-1.5 hover:bg-surface rounded-lg text-text-muted hover:text-text cursor-pointer transition-all focus:outline-none"
+              title="Previous Month"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-xs font-bold text-text whitespace-nowrap min-w-[90px] text-center">
+              {comparisonDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </span>
+            <button
+              onClick={() => {
+                const nextDate = new Date(comparisonDate.getFullYear(), comparisonDate.getMonth() + 1, 1);
+                if (nextDate <= new Date()) {
+                  setComparisonDate(nextDate);
+                }
+              }}
+              disabled={new Date(comparisonDate.getFullYear(), comparisonDate.getMonth() + 1, 1) > new Date()}
+              className="p-1.5 hover:bg-surface rounded-lg text-text-muted hover:text-text disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer transition-all focus:outline-none"
+              title="Next Month"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-        
+
         <div className="flex flex-col md:flex-row gap-8 items-center">
           <div className="flex-1 w-full space-y-4">
             <div>
               <div className="flex justify-between text-sm mb-2">
-                <span className="text-text-muted">Your Latest Reading</span>
-                <span className="text-text font-medium">{stats.latestReading} L</span>
+                <span className="text-text-muted">Your Monthly Consumption</span>
+                <span className="text-text font-medium">{latestVal.toLocaleString()} L</span>
               </div>
               <div className="h-2 w-full bg-surface-lighter rounded-full overflow-hidden">
-                <motion.div 
+                <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${userPercentage}%` }}
                   transition={{ duration: 1, delay: 0.8 }}
@@ -863,7 +978,7 @@ export default function Dashboard() {
                 />
               </div>
             </div>
-            
+
             <div>
               <div className="flex justify-between text-sm mb-2">
                 <div className="flex items-center gap-1.5">
@@ -875,7 +990,7 @@ export default function Dashboard() {
                 </span>
               </div>
               <div className="h-2 w-full bg-surface-lighter rounded-full overflow-hidden">
-                <motion.div 
+                <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: avgVal > 0 ? `${avgPercentage}%` : '0%' }}
                   transition={{ duration: 1, delay: 0.8 }}
@@ -884,8 +999,8 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          
-          {stats.latestReading === 0 ? (
+
+          {latestVal === 0 ? (
             <div className="w-full md:w-auto p-4 rounded-xl bg-slate-500/10 border border-slate-500/20 text-center">
               <h4 className="text-xl font-bold text-text-muted mb-1">No Data</h4>
               <p className="text-sm text-text-muted/80 max-w-[200px] mx-auto">Log water readings to view tariff limit comparison.</p>
@@ -895,7 +1010,7 @@ export default function Dashboard() {
               <h4 className="text-xl font-bold text-text-muted mb-1">No Limit Set</h4>
               <p className="text-sm text-text-muted/80 max-w-[200px] mx-auto">Your Community Admin has not configured a monthly water limit yet.</p>
             </div>
-          ) : stats.latestReading <= avgVal ? (
+          ) : latestVal <= avgVal ? (
             <div className="w-full md:w-auto p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
               <h4 className="text-xl font-bold text-emerald-400 mb-1">Within Limit ✓</h4>
               <p className="text-sm text-emerald-400/80 max-w-[200px] mx-auto">You're within the safe usage limit. No excess tariff applies.</p>
@@ -904,7 +1019,7 @@ export default function Dashboard() {
             <div className="w-full md:w-auto p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
               <h4 className="text-xl font-bold text-red-400 mb-1">Limit Exceeded ⚠️</h4>
               <p className="text-sm text-red-400/80 max-w-[200px] mx-auto">
-                Over by {(stats.latestReading - avgVal).toLocaleString()} L. Excess tariff charges will apply.
+                Over by {(latestVal - avgVal).toLocaleString()} L. Excess tariff charges will apply.
               </p>
             </div>
           )}
@@ -942,7 +1057,7 @@ export default function Dashboard() {
 
           <div className="glass-card md:col-span-6 bg-surface-lighter/15 hover:bg-surface-lighter/25 border border-border/40 hover:border-emerald-500/30 rounded-2xl p-5 transition-all duration-300 hover:scale-[1.02] flex flex-col justify-between shadow-sm relative overflow-hidden group">
             <div>
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-text-muted/80">Est. Charge (Latest Reading)</span>
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-text-muted/80">Est. Charge (Monthly Usage)</span>
               <h4 className="text-2xl font-black text-emerald-400 mt-2">
                 ₹{((Math.min(latestVal, avgVal) * baseRatePerLiter) + (Math.max(0, latestVal - avgVal) * excessRatePerLiter)).toFixed(2)}
               </h4>
@@ -980,19 +1095,19 @@ export default function Dashboard() {
       {/* Quick Help Modal */}
       {quickHelpModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <motion.div 
+          <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
             className="help-modal-box border w-full max-w-2xl rounded-2xl p-6 shadow-2xl relative my-8"
           >
-            <button 
+            <button
               onClick={() => setQuickHelpModalOpen(false)}
               className="absolute top-4 right-4 text-text-muted hover:text-text cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
-            
+
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-xl bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 flex items-center justify-center shadow-[0_0_15px_rgba(234,179,8,0.25)]">
                 <Lightbulb className="w-5 h-5 text-yellow-400 fill-yellow-400/20 animate-pulse" />
@@ -1004,7 +1119,7 @@ export default function Dashboard() {
                 <p className="text-text-muted text-xs mt-0.5">Everything you need to know about navigating AquaTrack as a Resident</p>
               </div>
             </div>
-            
+
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-text">
                 <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50">
@@ -1017,7 +1132,7 @@ export default function Dashboard() {
                     <li>Compare your usage to the block average to identify conservation opportunities.</li>
                   </ul>
                 </div>
-                
+
                 <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50">
                   <p className="font-bold text-emerald-500 dark:text-emerald-400 text-base flex items-center gap-2">
                     <Receipt className="w-5 h-5" /> Bills & Payments

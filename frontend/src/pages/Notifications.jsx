@@ -71,26 +71,63 @@ export default function Notifications() {
     }
   };
 
-  const getIcon = (type) => {
-    switch (type) {
-      case 'BILL_GENERATED':
-        return <Mail className="w-5 h-5 text-indigo-400" />;
-      case 'ANOMALY':
+  const getSeverity = (type, title = '') => {
+    const t = type ? type.toUpperCase() : '';
+    const name = title ? title.toLowerCase() : '';
+
+    if (t === 'ANOMALY' || t === 'ALERT' || t === 'LEAK' || name.includes('high') || name.includes('overuse') || name.includes('leak') || name.includes('alert') || name.includes('expired')) {
+      return 'danger';
+    }
+    if (t === 'VERIFIED' || t === 'INVITATION_ACCEPTED' || name.includes('verified') || name.includes('approved') || name.includes('accepted') || name.includes('success')) {
+      return 'success';
+    }
+    if (t === 'BILL_GENERATED' || t === 'BILL' || name.includes('bill') || name.includes('invoice') || name.includes('payment')) {
+      return 'billing';
+    }
+    return 'info';
+  };
+
+  const getIcon = (type, title) => {
+    const sev = getSeverity(type, title);
+    switch (sev) {
+      case 'danger':
         return <AlertTriangle className="w-5 h-5 text-red-400" />;
+      case 'success':
+        return <Check className="w-5 h-5 text-emerald-400 font-bold" />;
+      case 'billing':
+        return <Mail className="w-5 h-5 text-indigo-400" />;
       default:
         return <Info className="w-5 h-5 text-blue-400" />;
     }
   };
 
-  const getBgColor = (type, isRead) => {
-    if (isRead) return 'bg-surface-light border-border/50';
-    switch (type) {
-      case 'ANOMALY':
-        return 'bg-red-500/10 border-red-500/25';
-      case 'BILL_GENERATED':
-        return 'bg-indigo-500/10 border-indigo-500/25';
+  const getBgColor = (type, title, isRead) => {
+    if (isRead) return 'bg-surface-light/40 dark:bg-surface-light/10 border-border/50 opacity-70';
+    const sev = getSeverity(type, title);
+    switch (sev) {
+      case 'danger':
+        return 'bg-red-500/10 dark:bg-red-500/10 border-red-500/30 dark:border-red-500/25';
+      case 'success':
+        return 'bg-emerald-500/10 dark:bg-emerald-500/10 border-emerald-500/30 dark:border-emerald-500/25';
+      case 'billing':
+        return 'bg-indigo-500/10 dark:bg-indigo-500/10 border-indigo-500/30 dark:border-indigo-500/25';
       default:
-        return 'bg-primary/10 border-primary/25';
+        return 'bg-blue-500/10 dark:bg-blue-500/10 border-blue-500/30 dark:border-blue-500/25';
+    }
+  };
+
+  const getIconContainerClass = (type, title, isRead) => {
+    if (isRead) return 'p-2.5 rounded-lg bg-surface flex-shrink-0 mt-0.5 border border-border/40';
+    const sev = getSeverity(type, title);
+    switch (sev) {
+      case 'danger':
+        return 'p-2.5 rounded-lg bg-red-500/15 border border-red-500/20 flex-shrink-0 mt-0.5';
+      case 'success':
+        return 'p-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/20 flex-shrink-0 mt-0.5';
+      case 'billing':
+        return 'p-2.5 rounded-lg bg-indigo-500/15 border border-indigo-500/20 flex-shrink-0 mt-0.5';
+      default:
+        return 'p-2.5 rounded-lg bg-blue-500/15 border border-blue-500/20 flex-shrink-0 mt-0.5';
     }
   };
 
@@ -156,11 +193,11 @@ export default function Notifications() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 10 }}
                 transition={{ delay: index * 0.05 }}
-                className={`p-4 rounded-xl border flex items-center justify-between gap-4 transition-all hover:shadow-lg ${getBgColor(notif.notificationType, notif.isRead)}`}
+                className={`p-4 rounded-xl border flex items-center justify-between gap-4 transition-all hover:shadow-lg ${getBgColor(notif.notificationType, notif.title, notif.isRead)}`}
               >
                 <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <div className="p-2.5 rounded-lg bg-surface flex-shrink-0 mt-0.5 border border-border/40">
-                    {getIcon(notif.notificationType)}
+                  <div className={getIconContainerClass(notif.notificationType, notif.title, notif.isRead)}>
+                    {getIcon(notif.notificationType, notif.title)}
                   </div>
                   <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { setSelectedNotif(notif); if (!notif.isRead) handleMarkAsRead(notif.id); }}>
                     <div className="flex items-center gap-2">

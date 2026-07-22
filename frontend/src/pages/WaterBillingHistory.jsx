@@ -2,9 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Droplet, Receipt, Trash2, Edit2, CheckCircle2, Clock,
-  Search, X, ChevronDown, ChevronUp, Loader2, AlertCircle, QrCode
+  Search, X, ChevronDown, ChevronUp, Loader2, AlertCircle, QrCode, Calendar
 } from 'lucide-react';
 import api from '../api';
+
+const getBillingMonthLabel = (dateStr) => {
+  if (!dateStr) return 'N/A';
+  const parts = dateStr.split('-');
+  if (parts.length < 2) return 'N/A';
+  const year = parts[0];
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  const dateObj = new Date(year, monthIdx, 1);
+  return dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+};
 
 export default function WaterBillingHistory() {
   const role  = localStorage.getItem('role') || 'ROLE_COMMUNITY_ADMIN';
@@ -14,12 +24,14 @@ export default function WaterBillingHistory() {
   const [activeTab,  setActiveTab]  = useState('usage');   // 'usage' | 'billing'
   const [usageLogs,  setUsageLogs]  = useState([]);
   const [bills,      setBills]      = useState([]);
+  const [users,      setUsers]      = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [searchQ,    setSearchQ]    = useState('');
   const [sortDir,    setSortDir]    = useState('desc');
   const [statusMsg,  setStatusMsg]  = useState(null);
   const [payQrModalBill, setPayQrModalBill] = useState(null); // Bill to collect via QR
   const [editingLog, setEditingLog] = useState(null); // Log to edit
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -30,16 +42,36 @@ export default function WaterBillingHistory() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [logRes, billRes] = await Promise.all([
+      const [logRes, billRes, userRes] = await Promise.all([
         isSuperAdmin ? api.get('/usage/all') : api.get(`/usage/block/${block}`),
         isSuperAdmin ? api.get('/bills/all')  : api.get(`/bills/block/${block}`),
+        api.get('/admin/users', { params: { callerRole: role, callerBlock: block } })
       ]);
       setUsageLogs(logRes.data || []);
       setBills(billRes.data || []);
-    } catch (e) { console.error(e); }
+      setUsers(userRes.data || []);
+    } catch (e) {
+      console.error(e);
+      // fallback if admin/users fails (e.g. for dev/debug convenience)
+      try {
+        const [logRes, billRes] = await Promise.all([
+          isSuperAdmin ? api.get('/usage/all') : api.get(`/usage/block/${block}`),
+          isSuperAdmin ? api.get('/bills/all')  : api.get(`/bills/block/${block}`),
+        ]);
+        setUsageLogs(logRes.data || []);
+        setBills(billRes.data || []);
+      } catch (err) { console.error(err); }
+    }
     finally { setLoading(false); }
   };
-
+  const getUserName = (houseNum, aptBlk) => {
+    if (!houseNum || !aptBlk) return 'N/A';
+    const resident = users.find(
+      u => String(u.houseNumber) === String(houseNum) && 
+           String(u.apartmentBlock).toLowerCase() === String(aptBlk).toLowerCase()
+    );
+    return resident ? (resident.fullName || resident.username) : 'Unknown Resident';
+  };
   const flash = (msg, type = 'success') => {
     setStatusMsg({ msg, type });
     setTimeout(() => setStatusMsg(null), 4000);
@@ -60,9 +92,12 @@ export default function WaterBillingHistory() {
   const handleSaveEditLog = async (e) => {
     e.preventDefault();
     if (!editingLog) return;
+    setEditLoading(true);
     const u = localStorage.getItem('username');
     try {
       await api.put(`/usage/${editingLog.id}`, {
+        houseNumber: editingLog.houseNumber,
+        apartmentBlock: editingLog.apartmentBlock,
         readingLiters: parseFloat(editingLog.readingLiters),
         readingDate: editingLog.readingDate,
         logType: editingLog.logType
@@ -74,6 +109,8 @@ export default function WaterBillingHistory() {
       fetchAll();
     } catch (err) {
       flash(err?.response?.data?.message || 'Failed to update usage log.', 'error');
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -105,18 +142,68 @@ export default function WaterBillingHistory() {
   const q = searchQ.trim().toLowerCase();
 
   const filteredLogs = [...usageLogs]
-    .filter(l => !q || [l.houseNumber, l.apartmentBlock, l.logType, String(l.readingLiters)]
+    .filter(l => !q || [l.houseNumber, l.apartmentBlock, l.logType, String(l.readingLiters), getUserName(l.houseNumber, l.apartmentBlock)]
       .some(v => v && String(v).toLowerCase().includes(q)))
     .sort((a, b) => sortDir === 'desc'
       ? new Date(b.readingDate) - new Date(a.readingDate)
       : new Date(a.readingDate) - new Date(b.readingDate));
 
   const filteredBills = [...bills]
-    .filter(b => !q || [b.houseNumber, b.apartmentBlock, b.status, String(b.amount)]
+    .filter(b => !q || [b.houseNumber, b.apartmentBlock, b.status, String(b.amount), getUserName(b.houseNumber, b.apartmentBlock)]
       .some(v => v && String(v).toLowerCase().includes(q)))
     .sort((a, b) => sortDir === 'desc'
       ? new Date(b.generatedDate || b.createdAt) - new Date(a.generatedDate || a.createdAt)
       : new Date(a.generatedDate || a.createdAt) - new Date(b.generatedDate || b.createdAt));
+
+  // Group logs by month
+  const monthlyLogsGrouped = [];
+  const processedMonths = new Set();
+  filteredLogs.forEach(log => {
+    const month = getBillingMonthLabel(log.readingDate);
+    if (!processedMonths.has(month)) {
+      processedMonths.add(month);
+      const monthLogs = filteredLogs.filter(l => getBillingMonthLabel(l.readingDate) === month);
+      const totalLiters = monthLogs.reduce((s, l) => s + (l.readingLiters || 0), 0);
+      monthlyLogsGrouped.push({
+        month,
+        totalLiters,
+        logs: monthLogs
+      });
+    }
+  });
+
+  // Group bills by month
+  const monthlyBillsGrouped = [];
+  const processedBillMonths = new Set();
+  filteredBills.forEach(bill => {
+    const month = getBillingMonthLabel(bill.generatedDate || bill.createdAt);
+    if (!processedBillMonths.has(month)) {
+      processedBillMonths.add(month);
+      const monthBills = filteredBills.filter(b => getBillingMonthLabel(b.generatedDate || b.createdAt) === month);
+      const totalAmount = monthBills.reduce((s, b) => s + (b.amount || 0), 0);
+      monthlyBillsGrouped.push({
+        month,
+        totalAmount,
+        bills: monthBills
+      });
+    }
+  });
+
+  // Returns true if this log's month+house has a bill generated (finalized)
+  const isLogBilled = (log) => {
+    if (!log.readingDate || !log.houseNumber) return false;
+    const parts = log.readingDate.split('-');
+    if (parts.length < 2) return false;
+    const logYear  = parseInt(parts[0], 10);
+    const logMonth = parseInt(parts[1], 10);
+    return bills.some(b => {
+      if (b.houseNumber !== log.houseNumber) return false;
+      const dateStr = b.generatedDate || b.createdAt;
+      if (!dateStr) return false;
+      const bp = dateStr.split('-');
+      return parseInt(bp[0], 10) === logYear && parseInt(bp[1], 10) === logMonth;
+    });
+  };
 
   const statusColor = (s) => {
     if (!s) return 'text-text-muted';
@@ -226,54 +313,85 @@ export default function WaterBillingHistory() {
                   <p className="font-medium">No usage logs found</p>
                 </div>
               ) : (
-                <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border bg-surface-lighter/50">
-                          {['House #', 'Block', 'Reading (L)', 'Type', 'Date', 'Actions'].map(h => (
-                            <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/40">
-                        {filteredLogs.map(log => (
-                          <tr key={log.id} className="hover:bg-surface-lighter/30 transition-colors">
-                            <td className="px-4 py-3 font-semibold text-text">{log.houseNumber}</td>
-                            <td className="px-4 py-3 text-text-muted">{log.apartmentBlock}</td>
-                            <td className="px-4 py-3 font-bold text-blue-400">{log.readingLiters} L</td>
-                            <td className="px-4 py-3">
-                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${logTypeColor(log.logType)}`}>
-                                {log.logType || 'DAILY'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-text-muted whitespace-nowrap">
-                              {log.readingDate ? new Date(log.readingDate).toLocaleDateString('en-IN') : '—'}
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => setEditingLog(log)}
-                                  className="p-1.5 text-text-muted hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors cursor-pointer"
-                                  title="Edit log"
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => deleteLog(log.id)}
-                                  className="p-1.5 text-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                                  title="Delete log"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="px-4 py-3 border-t border-border text-xs text-text-muted">
+                <div className="space-y-6">
+                  {monthlyLogsGrouped.map(group => (
+                    <div key={group.month} className="space-y-3">
+                      <div className="flex items-center justify-between bg-primary/10 border border-primary/20 px-5 py-3 rounded-2xl shadow-sm">
+                        <h3 className="font-bold text-text text-sm flex items-center gap-2">
+                          <Calendar className="w-4.5 h-4.5 text-primary" />
+                          {group.month}
+                        </h3>
+                        <span className="text-xs font-extrabold text-primary bg-primary/15 px-3 py-1 rounded-full border border-primary/20">
+                          Cumulative Usage: {group.totalLiters.toLocaleString()} L
+                        </span>
+                      </div>
+
+                      <div className="bg-surface border border-border rounded-2xl overflow-hidden shadow-sm">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border bg-surface-lighter/50">
+                                {['Resident', 'House #', 'Block', 'Reading (L)', 'Type', 'Date', 'Actions'].map(h => (
+                                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/40">
+                              {group.logs.map(log => {
+                                const billed = isLogBilled(log);
+                                return (
+                                  <tr key={log.id} className={`transition-colors ${
+                                    billed
+                                      ? 'bg-emerald-500/5 border-l-2 border-l-emerald-500/40'
+                                      : 'hover:bg-surface-lighter/30'
+                                  }`}>
+                                    <td className="px-4 py-3 font-semibold text-text">{getUserName(log.houseNumber, log.apartmentBlock)}</td>
+                                    <td className="px-4 py-3 font-semibold text-text">{log.houseNumber}</td>
+                                    <td className="px-4 py-3 text-text-muted">{log.apartmentBlock}</td>
+                                    <td className={`px-4 py-3 font-bold ${billed ? 'text-emerald-400' : 'text-blue-400'}`}>{log.readingLiters} L</td>
+                                    <td className="px-4 py-3">
+                                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${logTypeColor(log.logType)}`}>
+                                        {log.logType || 'DAILY'}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-text-muted whitespace-nowrap">
+                                      {log.readingDate ? new Date(log.readingDate).toLocaleDateString('en-IN') : '—'}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      {billed ? (
+                                        <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
+                                          <CheckCircle2 className="w-3 h-3" /> Billed
+                                        </span>
+                                      ) : (
+                                        <div className="flex items-center gap-1">
+                                          <button
+                                            onClick={() => setEditingLog(log)}
+                                            className="p-1.5 text-text-muted hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors cursor-pointer"
+                                            title="Edit log"
+                                          >
+                                            <Edit2 className="w-4 h-4" />
+                                          </button>
+                                          <button
+                                            onClick={() => deleteLog(log.id)}
+                                            className="p-1.5 text-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                                            title="Delete log"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="px-4 py-3 border border-border bg-surface-lighter/10 rounded-xl text-xs text-text-muted">
                     {filteredLogs.length} records · Total: {filteredLogs.reduce((s, l) => s + (l.readingLiters || 0), 0).toLocaleString()} L
                   </div>
                 </div>
@@ -289,78 +407,96 @@ export default function WaterBillingHistory() {
                   <p className="font-medium">No bills found</p>
                 </div>
               ) : (
-                <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border bg-surface-lighter/50">
-                          {['House #', 'Block', 'Amount', 'Status', 'Due Date', 'Generated', 'Actions'].map(h => (
-                            <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/40">
-                        {filteredBills.map(bill => (
-                          <tr key={bill.id} className="hover:bg-surface-lighter/30 transition-colors">
-                            <td className="px-4 py-3 font-semibold text-text">{bill.houseNumber}</td>
-                            <td className="px-4 py-3 text-text-muted">{bill.apartmentBlock}</td>
-                            <td className="px-4 py-3 font-bold text-emerald-400">₹{bill.amount}</td>
-                            <td className="px-4 py-3">
-                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${statusColor(bill.status)}`}>
-                                {bill.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-text-muted whitespace-nowrap">
-                              {bill.dueDate ? new Date(bill.dueDate).toLocaleDateString('en-IN') : '—'}
-                            </td>
-                            <td className="px-4 py-3 text-text-muted whitespace-nowrap">
-                              {bill.generatedDate ? new Date(bill.generatedDate).toLocaleDateString('en-IN') : '—'}
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-1">
-                                {bill.status !== 'PAID' && (
-                                  <>
-                                    <button
-                                      onClick={() => setPayQrModalBill(bill)}
-                                      className="p-1.5 text-text-muted hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors cursor-pointer"
-                                      title="Collect Payment"
-                                    >
-                                      <QrCode className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                      onClick={() => markPaid(bill.id)}
-                                      className="p-1.5 text-text-muted hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors cursor-pointer"
-                                      title="Mark as Paid"
-                                    >
-                                      <CheckCircle2 className="w-4 h-4" />
-                                    </button>
-                                  </>
-                                )}
-                                {bill.status !== 'PAID' && (
-                                  <button
-                                    onClick={() => deleteBill(bill.id)}
-                                    className="p-1.5 text-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                                    title="Delete bill"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                )}
-                                {bill.status === 'PAID' && (
-                                  <span
-                                    className="p-1.5 text-text-muted/30 cursor-not-allowed"
-                                    title="Paid bills are protected and cannot be deleted"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="px-4 py-3 border-t border-border flex items-center justify-between text-xs text-text-muted">
+                <div className="space-y-6">
+                  {monthlyBillsGrouped.map(group => (
+                    <div key={group.month} className="space-y-3">
+                      <div className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 px-5 py-3 rounded-2xl shadow-sm">
+                        <h3 className="font-bold text-text text-sm flex items-center gap-2">
+                          <Calendar className="w-4.5 h-4.5 text-emerald-400" />
+                          {group.month}
+                        </h3>
+                        <span className="text-xs font-extrabold text-emerald-400 bg-emerald-500/15 px-3 py-1 rounded-full border border-emerald-500/20">
+                          Total Billed: ₹{group.totalAmount.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+
+                      <div className="bg-surface border border-border rounded-2xl overflow-hidden shadow-sm">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border bg-surface-lighter/50">
+                                {['Resident', 'House #', 'Block', 'Amount', 'Status', 'Due Date', 'Generated', 'Actions'].map(h => (
+                                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/40">
+                              {group.bills.map(bill => (
+                                <tr key={bill.id} className="hover:bg-surface-lighter/30 transition-colors">
+                                  <td className="px-4 py-3 font-semibold text-text">{getUserName(bill.houseNumber, bill.apartmentBlock)}</td>
+                                  <td className="px-4 py-3 font-semibold text-text">{bill.houseNumber}</td>
+                                  <td className="px-4 py-3 text-text-muted">{bill.apartmentBlock}</td>
+                                  <td className="px-4 py-3 font-bold text-emerald-400">₹{bill.amount}</td>
+                                  <td className="px-4 py-3">
+                                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${statusColor(bill.status)}`}>
+                                      {bill.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-text-muted whitespace-nowrap">
+                                    {bill.dueDate ? new Date(bill.dueDate).toLocaleDateString('en-IN') : '—'}
+                                  </td>
+                                  <td className="px-4 py-3 text-text-muted whitespace-nowrap">
+                                    {bill.generatedDate ? new Date(bill.generatedDate).toLocaleDateString('en-IN') : '—'}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-1">
+                                      {bill.status !== 'PAID' && (
+                                        <>
+                                          <button
+                                            onClick={() => setPayQrModalBill(bill)}
+                                            className="p-1.5 text-text-muted hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors cursor-pointer"
+                                            title="Collect Payment"
+                                          >
+                                            <QrCode className="w-4 h-4" />
+                                          </button>
+                                          <button
+                                            onClick={() => markPaid(bill.id)}
+                                            className="p-1.5 text-text-muted hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors cursor-pointer"
+                                            title="Mark as Paid"
+                                          >
+                                            <CheckCircle2 className="w-4 h-4" />
+                                          </button>
+                                        </>
+                                      )}
+                                      {bill.status !== 'PAID' && (
+                                        <button
+                                          onClick={() => deleteBill(bill.id)}
+                                          className="p-1.5 text-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                                          title="Delete bill"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      )}
+                                      {bill.status === 'PAID' && (
+                                        <span
+                                          className="p-1.5 text-text-muted/30 cursor-not-allowed"
+                                          title="Paid bills are protected and cannot be deleted"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="px-4 py-3 border border-border bg-surface-lighter/10 rounded-xl flex items-center justify-between text-xs text-text-muted">
                     <span>{filteredBills.length} bills</span>
                     <span>
                       Paid: {filteredBills.filter(b => b.status === 'PAID').length} ·
@@ -442,6 +578,9 @@ export default function WaterBillingHistory() {
                   onChange={e => setEditingLog({ ...editingLog, readingDate: e.target.value })}
                   className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer"
                 />
+                <p className="text-[11px] text-primary mt-1.5 font-bold">
+                  Billing Cycle: <span className="text-text">{getBillingMonthLabel(editingLog.readingDate)}</span>
+                </p>
               </div>
 
               <div>
@@ -459,7 +598,9 @@ export default function WaterBillingHistory() {
 
               <div className="flex gap-3 justify-end pt-2">
                 <button type="button" onClick={() => setEditingLog(null)} className="px-4 py-2 bg-surface border border-border text-text hover:bg-surface-lighter rounded-xl text-sm font-semibold transition-colors cursor-pointer">Cancel</button>
-                <button type="submit" className="px-6 py-2 bg-primary text-white hover:bg-primary/95 rounded-xl text-sm font-bold transition-colors cursor-pointer">Save Changes</button>
+                <button type="submit" disabled={editLoading} className="px-6 py-2 bg-primary text-white hover:bg-primary/95 disabled:opacity-50 rounded-xl text-sm font-bold transition-colors cursor-pointer">
+                  {editLoading ? 'Saving...' : 'Save Changes'}
+                </button>
               </div>
             </form>
           </motion.div>

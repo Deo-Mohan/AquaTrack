@@ -807,16 +807,20 @@ export default function Register() {
               <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-primary via-blue-500 to-emerald-500" />
               
               <div className="flex justify-center mb-6">
-                <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-                  <Clock className="w-10 h-10 animate-pulse" />
+                <div className="w-16 h-16 rounded-full border-2 border-primary/30 flex items-center justify-center overflow-hidden shadow-lg bg-surface-lighter">
+                  <img src="/logo.png" alt="AquaTrack Logo" className="w-full h-full object-cover rounded-full scale-110" />
                 </div>
               </div>
 
               <h3 className="text-xl font-bold text-text mb-3">Application Submitted</h3>
               
-              <p className="text-text-muted text-sm leading-relaxed mb-6">
+              <p className="text-text-muted text-sm leading-relaxed mb-4">
                 {modalMessage}
               </p>
+
+              <div className="text-xs font-semibold text-primary tracking-wide mb-6">
+                @AquaTrack Team
+              </div>
 
               <button
                 type="button"

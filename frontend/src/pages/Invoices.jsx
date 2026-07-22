@@ -109,12 +109,30 @@ export default function Invoices() {
 
                 <div className="grid grid-cols-2 gap-4 text-xs pt-2 border-t border-border/45">
                   <div>
+                    <span className="text-text-muted block">Billing Month</span>
+                    <span className="font-semibold text-text">
+                      {bill.billingPeriod || (() => {
+                        if (!bill.generatedDate) return 'N/A';
+                        const d = new Date(bill.generatedDate);
+                        return isNaN(d.getTime()) ? bill.generatedDate : d.toLocaleString('default', { month: 'long', year: 'numeric' });
+                      })()}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-text-muted block">Consumption</span>
+                    <span className="font-semibold text-text">
+                      {bill.monthlyLimitLiters > 0
+                        ? ((bill.withinLimitLiters || 0) + (bill.excessLiters || 0)).toLocaleString()
+                        : (bill.consumptionLiters || 0).toLocaleString()} Liters
+                    </span>
+                  </div>
+                  <div>
                     <span className="text-text-muted block">Paid Date</span>
                     <span className="font-semibold text-text">{bill.generatedDate}</span>
                   </div>
                   <div>
-                    <span className="text-text-muted block">Consumption</span>
-                    <span className="font-semibold text-text">{bill.consumptionLiters || 0} Liters</span>
+                    <span className="text-text-muted block">Invoice ID</span>
+                    <span className="font-semibold text-text font-mono">#AQ-{String(bill.id).padStart(5, '0')}</span>
                   </div>
                 </div>
               </div>
@@ -208,7 +226,17 @@ export default function Invoices() {
               </div>
 
               {/* Date metadata box */}
-              <div className="bg-surface-lighter rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+              <div className="bg-surface-lighter rounded-xl p-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
+                <div>
+                  <span className="text-text-muted block">Billing Cycle</span>
+                  <span className="font-semibold text-primary text-sm">
+                    {invoiceModalBill.billingPeriod
+                      ? invoiceModalBill.billingPeriod
+                      : invoiceModalBill.generatedDate
+                        ? new Date(invoiceModalBill.generatedDate).toLocaleString('default', { month: 'long', year: 'numeric' })
+                        : '—'}
+                  </span>
+                </div>
                 <div>
                   <span className="text-text-muted block">Issue Date</span>
                   <span className="font-semibold text-text text-sm">{invoiceModalBill.generatedDate}</span>

@@ -205,10 +205,10 @@ export default function TariffSettings() {
             </div>
 
             {/* Info Banner */}
-            <div className="flex items-start gap-3 p-3.5 bg-blue-500/8 border border-blue-500/15 rounded-xl text-xs text-blue-300">
-              <Info className="w-4 h-4 mt-0.5 shrink-0 text-blue-400" />
+            <div className="flex items-start gap-3 p-4 bg-blue-50/60 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl text-xs text-blue-800 dark:text-blue-300 shadow-sm transition-colors">
+              <Info className="w-4.5 h-4.5 mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
               <div>
-                <strong className="text-blue-300">Auto-Propagation:</strong> Saving these settings will instantly update
+                <strong className="text-blue-900 dark:text-blue-200 font-bold">Auto-Propagation:</strong> Saving these settings will instantly update
                 rates for all residents in your block. Existing bills are not affected — only future bills will use the new tariff.
               </div>
             </div>
@@ -297,12 +297,12 @@ export default function TariffSettings() {
                     </td>
                   </tr>
                   {excessLiters > 0 ? (
-                    <tr className="bg-red-500/5">
+                    <tr className="bg-red-50/30 dark:bg-red-500/5">
                       <td className="px-3 py-2.5">
-                        <div className="font-medium text-red-400">Excess Consumption ⚠</div>
-                        <div className="text-[10px] text-red-400/70">{excessLiters.toLocaleString()} L × ₹{excess.toFixed(4)}</div>
+                        <div className="font-medium text-red-700 dark:text-red-400 font-bold">Excess Consumption ⚠️</div>
+                        <div className="text-[10px] text-red-600/80 dark:text-red-400/70">{excessLiters.toLocaleString()} L × ₹{excess.toFixed(4)}</div>
                       </td>
-                      <td className="px-3 py-2.5 text-right font-semibold text-red-400">
+                      <td className="px-3 py-2.5 text-right font-semibold text-red-700 dark:text-red-400">
                         +₹{excessCharge.toFixed(2)}
                       </td>
                     </tr>
@@ -310,7 +310,7 @@ export default function TariffSettings() {
                     <tr>
                       <td className="px-3 py-2.5 text-text-muted">
                         <div>Excess Consumption</div>
-                        <div className="text-[10px] text-emerald-400">Within limit ✓</div>
+                        <div className="text-[10px] text-emerald-400 font-semibold">Within limit ✓</div>
                       </td>
                       <td className="px-3 py-2.5 text-right text-text-muted">₹0.00</td>
                     </tr>
@@ -324,8 +324,8 @@ export default function TariffSettings() {
             </div>
 
             {excessLiters > 0 && (
-              <div className="mt-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 flex items-start gap-2">
-                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              <div className="mt-3 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl text-xs text-red-800 dark:text-red-400 flex items-start gap-2 shadow-sm transition-colors animate-pulse">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
                 Usage exceeds monthly limit by {excessLiters.toLocaleString()} L. Excess charges apply.
               </div>
             )}

@@ -13,6 +13,8 @@ import com.aquatrack.aquatrack.model.WaterUsageAuditLog;
 import com.aquatrack.aquatrack.model.Notification;
 import com.aquatrack.aquatrack.repository.WaterUsageAuditLogRepository;
 import com.aquatrack.aquatrack.repository.NotificationRepository;
+import com.aquatrack.aquatrack.model.Bill;
+import com.aquatrack.aquatrack.repository.BillRepository;
 import java.time.LocalDateTime;
 
 
@@ -41,6 +43,9 @@ public class WaterUsageController {
     @Autowired
     private NotificationRepository notificationRepository;
 
+    @Autowired
+    private BillRepository billRepository;
+
     // 1. POST: Submit a single manual meter reading
     @PostMapping("/log")
     public ResponseEntity<?> logWaterUsage(
@@ -49,6 +54,20 @@ public class WaterUsageController {
         
         if (!"ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(callerRole)) {
             return ResponseEntity.status(403).body("Access denied. Only Community Admins can log water usage.");
+        }
+
+        // Check if billing is finalized for this household this month
+        if (log.getHouseNumber() != null && log.getReadingDate() != null) {
+            int targetYear = log.getReadingDate().getYear();
+            int targetMonth = log.getReadingDate().getMonthValue();
+            List<Bill> existingBills = billRepository.findByHouseNumber(log.getHouseNumber());
+            for (Bill b : existingBills) {
+                if (b.getGeneratedDate() != null 
+                        && b.getGeneratedDate().getYear() == targetYear 
+                        && b.getGeneratedDate().getMonthValue() == targetMonth) {
+                    return ResponseEntity.status(409).body("This billing month has already been finalized. No additional water logs can be added.");
+                }
+            }
         }
 
         if (log.getHouseNumber() != null) {
@@ -96,7 +115,9 @@ public class WaterUsageController {
     // GET: Download CSV prefilled template for logging water usage
     @GetMapping("/template")
     public ResponseEntity<String> downloadTemplate(
-            @RequestParam(required = false) String apartmentBlock) {
+            @RequestParam(required = false) String apartmentBlock,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year) {
         
         List<com.aquatrack.aquatrack.model.User> residents;
         if (apartmentBlock != null && !apartmentBlock.trim().isEmpty()) {
@@ -114,14 +135,23 @@ public class WaterUsageController {
         }
 
         StringBuilder csvContent = new StringBuilder();
-        csvContent.append("houseNumber,apartmentBlock,readingDate,readingLiters,logType\n");
+        csvContent.append("houseNumber,apartmentBlock,readingDate,readingLiters,logType,fullName\n");
 
-        LocalDate today = LocalDate.now();
+        LocalDate targetDate = LocalDate.now();
+        if (month != null && year != null) {
+            try {
+                targetDate = LocalDate.of(year, month, 1).with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());
+            } catch (Exception e) {
+                targetDate = LocalDate.now();
+            }
+        }
+
         for (com.aquatrack.aquatrack.model.User resident : residents) {
             String house = resident.getHouseNumber();
             String block = resident.getApartmentBlock();
             if (house != null && block != null) {
-                csvContent.append(String.format("%s,%s,%s,,MONTHLY\n", house, block, today.toString()));
+                String name = resident.getFullName() != null ? resident.getFullName() : resident.getUsername();
+                csvContent.append(String.format("%s,%s,%s,,MONTHLY,%s\n", house, block, targetDate.toString(), name));
             }
         }
 
@@ -191,10 +221,47 @@ public class WaterUsageController {
                         continue;
                     }
 
+                    if (!targetUser.isPresent()) {
+                        errors.add("Line " + lineNumber + ": House number " + houseNumber + " does not exist.");
+                        continue;
+                    }
+
+                    com.aquatrack.aquatrack.model.User resident = targetUser.get();
+                    if (!"APPROVED".equalsIgnoreCase(resident.getStatus())) {
+                        errors.add("Line " + lineNumber + ": Resident for house number " + houseNumber + " is not approved.");
+                        continue;
+                    }
+
+                    if (readingLiters < 0) {
+                        errors.add("Line " + lineNumber + ": Reading liters cannot be negative.");
+                        continue;
+                    }
+
+                    if (readingDate.isAfter(LocalDate.now())) {
+                        errors.add("Line " + lineNumber + ": Reading date cannot be in the future.");
+                        continue;
+                    }
+
                     // Duplicate detection
                     if (repository.existsByHouseNumberAndReadingDate(houseNumber, readingDate)) {
                         errors.add("Line " + lineNumber + ": duplicate reading for " + houseNumber +
                                 " on " + readingDate);
+                        continue;
+                    }
+
+                    // Check if billing is finalized for this household this month
+                    boolean isFinalized = false;
+                    List<Bill> existingBills = billRepository.findByHouseNumber(houseNumber);
+                    for (Bill b : existingBills) {
+                        if (b.getGeneratedDate() != null 
+                                && b.getGeneratedDate().getYear() == readingDate.getYear() 
+                                && b.getGeneratedDate().getMonthValue() == readingDate.getMonthValue()) {
+                            isFinalized = true;
+                            break;
+                        }
+                    }
+                    if (isFinalized) {
+                        errors.add("Line " + lineNumber + ": This billing month has already been finalized. No additional water logs can be added.");
                         continue;
                     }
 
@@ -300,11 +367,42 @@ public class WaterUsageController {
         WaterUsageLog existingLog = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Water usage log not found with ID: " + id));
 
+        // Check if billing is finalized for the original month
+        if (existingLog.getHouseNumber() != null && existingLog.getReadingDate() != null) {
+            int origYear = existingLog.getReadingDate().getYear();
+            int origMonth = existingLog.getReadingDate().getMonthValue();
+            List<Bill> existingBills = billRepository.findByHouseNumber(existingLog.getHouseNumber());
+            for (Bill b : existingBills) {
+                if (b.getGeneratedDate() != null 
+                        && b.getGeneratedDate().getYear() == origYear 
+                        && b.getGeneratedDate().getMonthValue() == origMonth) {
+                    return ResponseEntity.status(409).body("This billing month has already been finalized. Water logs for this cycle cannot be edited.");
+                }
+            }
+        }
+
+        // Check if billing is finalized for the new month (if date is changed)
+        if (existingLog.getHouseNumber() != null && updatedLog.getReadingDate() != null) {
+            int newYear = updatedLog.getReadingDate().getYear();
+            int newMonth = updatedLog.getReadingDate().getMonthValue();
+            List<Bill> existingBills = billRepository.findByHouseNumber(existingLog.getHouseNumber());
+            for (Bill b : existingBills) {
+                if (b.getGeneratedDate() != null 
+                        && b.getGeneratedDate().getYear() == newYear 
+                        && b.getGeneratedDate().getMonthValue() == newMonth) {
+                    return ResponseEntity.status(409).body("The target billing month has already been finalized. Water logs cannot be moved to a finalized month.");
+                }
+            }
+        }
+
         Double oldLiters = existingLog.getReadingLiters();
         Double newLiters = updatedLog.getReadingLiters();
 
         existingLog.setReadingLiters(newLiters);
         existingLog.setReadingDate(updatedLog.getReadingDate());
+        if (updatedLog.getLogType() != null) {
+            existingLog.setLogType(updatedLog.getLogType());
+        }
         if (updatedLog.getStatus() != null) {
             existingLog.setStatus(updatedLog.getStatus());
         }
@@ -321,41 +419,44 @@ public class WaterUsageController {
         alertService.analyzeUsage(existingLog, targetUsername);
         WaterUsageLog saved = repository.save(existingLog);
 
-        WaterUsageAuditLog audit = new WaterUsageAuditLog(
-                id,
-                existingLog.getHouseNumber(),
-                existingLog.getApartmentBlock(),
-                "EDITED",
-                oldLiters,
-                newLiters,
-                username
-        );
-        auditLogRepository.save(audit);
+        // Notify and log audit only if the reading liters actually changed
+        if (oldLiters == null || !oldLiters.equals(newLiters)) {
+            WaterUsageAuditLog audit = new WaterUsageAuditLog(
+                    id,
+                    existingLog.getHouseNumber(),
+                    existingLog.getApartmentBlock(),
+                    "EDITED",
+                    oldLiters,
+                    newLiters,
+                    username
+            );
+            auditLogRepository.save(audit);
 
-        String title = "Water Log Edited";
-        String message = "Community Admin '" + username + "' edited a water usage log for house number '" + existingLog.getHouseNumber() + "'. Old: " + oldLiters + "L, New: " + newLiters + "L.";
-        
-        // Notify Super Admins
-        List<com.aquatrack.aquatrack.model.User> superAdmins = userRepository.findByRole("ROLE_ADMIN");
-        for (com.aquatrack.aquatrack.model.User admin : superAdmins) {
-            if ("APPROVED".equalsIgnoreCase(admin.getStatus())) {
+            String title = "Water Log Edited";
+            String message = "Community Admin '" + username + "' edited a water usage log for house number '" + existingLog.getHouseNumber() + "'. Old: " + oldLiters + "L, New: " + newLiters + "L.";
+            
+            // Notify Super Admins
+            List<com.aquatrack.aquatrack.model.User> superAdmins = userRepository.findByRole("ROLE_ADMIN");
+            for (com.aquatrack.aquatrack.model.User admin : superAdmins) {
+                if ("APPROVED".equalsIgnoreCase(admin.getStatus())) {
+                    notificationRepository.save(new Notification(
+                            admin.getUsername(), "SYSTEM", title, message
+                    ));
+                }
+            }
+
+            // Notify Resident
+            if (targetUsername != null) {
                 notificationRepository.save(new Notification(
-                        admin.getUsername(), "SYSTEM", title, message
+                        targetUsername,
+                        "SYSTEM",
+                        "Water Meter Reading Updated",
+                        String.format(
+                            "Your water meter reading for %s has been updated by the Community Admin to %.0f Liters (was %.0f Liters).",
+                            existingLog.getReadingDate(), newLiters, oldLiters
+                        )
                 ));
             }
-        }
-
-        // Notify Resident
-        if (targetUsername != null) {
-            notificationRepository.save(new Notification(
-                    targetUsername,
-                    "SYSTEM",
-                    "Water Meter Reading Updated",
-                    String.format(
-                        "Your water meter reading for %s has been updated by the Community Admin to %.0f Liters (was %.0f Liters).",
-                        existingLog.getReadingDate(), newLiters, oldLiters
-                    )
-            ));
         }
 
         return ResponseEntity.ok(saved);
@@ -369,6 +470,20 @@ public class WaterUsageController {
             @RequestParam String callerRole) {
         WaterUsageLog existingLog = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Water usage log not found with ID: " + id));
+
+        // Check if billing is finalized for this household this month
+        if (existingLog.getHouseNumber() != null && existingLog.getReadingDate() != null) {
+            int origYear = existingLog.getReadingDate().getYear();
+            int origMonth = existingLog.getReadingDate().getMonthValue();
+            List<Bill> existingBills = billRepository.findByHouseNumber(existingLog.getHouseNumber());
+            for (Bill b : existingBills) {
+                if (b.getGeneratedDate() != null 
+                        && b.getGeneratedDate().getYear() == origYear 
+                        && b.getGeneratedDate().getMonthValue() == origMonth) {
+                    return ResponseEntity.status(409).body("This billing month has already been finalized. Water logs for this cycle cannot be deleted.");
+                }
+            }
+        }
 
         Double oldLiters = existingLog.getReadingLiters();
 

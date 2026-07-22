@@ -215,7 +215,7 @@ export function generateInvoiceHTML(bill) {
     /* ---- META GRID ---- */
     .meta-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 0;
       background: #f8fafc;
       border: 1px solid #e2e8f0;
@@ -545,6 +545,16 @@ export function generateInvoiceHTML(bill) {
 
   <!-- META GRID -->
   <div class="meta-grid">
+    <div class="meta-cell">
+      <div class="meta-cell-label">Billing Cycle</div>
+      <div class="meta-cell-value" style="color: #2563eb;">${
+        bill.billingPeriod
+          ? bill.billingPeriod
+          : bill.generatedDate
+            ? new Date(bill.generatedDate).toLocaleString('default', { month: 'long', year: 'numeric' })
+            : '—'
+      }</div>
+    </div>
     <div class="meta-cell">
       <div class="meta-cell-label">Invoice Date</div>
       <div class="meta-cell-value">${bill.generatedDate || '—'}</div>

@@ -248,7 +248,14 @@ public class BillingCycleController {
             bill.setDueDate(cycle.getEndDate().plusDays(15));
             bill.setStatus("UNPAID");
             bill.setBillingCycleId(cycle.getId());
-            bill.setGeneratedDate(LocalDate.now());
+            // Use the last day of the billing cycle (endDate) as the bill's generatedDate
+            // so that the billing month label is always derived from the actual period, not today.
+            bill.setGeneratedDate(cycle.getEndDate());
+            // Also store a human-readable billing period label for emails and UI
+            String billingPeriodLabel = cycle.getEndDate().getMonth().getDisplayName(
+                    java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH)
+                    + " " + cycle.getEndDate().getYear();
+            bill.setBillingPeriod(billingPeriodLabel);
             if (userOpt.isPresent()) {
                 bill.setMeterId(userOpt.get().getMeterId());
             }
@@ -287,7 +294,8 @@ public class BillingCycleController {
                             bill.getExcessLiters(),
                             bill.getBaseRatePerLiter(),
                             bill.getExcessRatePerLiter(),
-                            bill.getMonthlyLimitLiters()
+                            bill.getMonthlyLimitLiters(),
+                            bill.getBillingPeriod()
                         );
                     } catch (Exception e) {
                         System.err.println("SMTP dispatch failed for billing cycle email: " + e.getMessage());
