@@ -38,7 +38,8 @@ public class TariffController {
                 "baseRatePerLiter", 0.0,
                 "monthlyLimitLiters", 0.0,
                 "excessRatePerLiter", 0.0,
-                "lateFeePerMonth", 0.0
+                "lateFeePerMonth", 0.0,
+                "gracePeriodDays", 20
             ));
         }
 
@@ -47,7 +48,8 @@ public class TariffController {
             "baseRatePerLiter", admin.getWaterRatePerLiter() != null ? admin.getWaterRatePerLiter() : 0.0,
             "monthlyLimitLiters", admin.getMonthlyLimitLiters() != null ? admin.getMonthlyLimitLiters() : 0.0,
             "excessRatePerLiter", admin.getExcessRatePerLiter() != null ? admin.getExcessRatePerLiter() : 0.0,
-            "lateFeePerMonth", admin.getLateFeePerMonth() != null ? admin.getLateFeePerMonth() : 0.0
+            "lateFeePerMonth", admin.getLateFeePerMonth() != null ? admin.getLateFeePerMonth() : 0.0,
+            "gracePeriodDays", admin.getGracePeriodDays() != null ? admin.getGracePeriodDays() : 20
         ));
     }
 
@@ -81,6 +83,7 @@ public class TariffController {
         Double limit = body.get("monthlyLimitLiters") != null ? ((Number) body.get("monthlyLimitLiters")).doubleValue() : null;
         Double excessRate = body.get("excessRatePerLiter") != null ? ((Number) body.get("excessRatePerLiter")).doubleValue() : null;
         Double lateFee = body.get("lateFeePerMonth") != null ? ((Number) body.get("lateFeePerMonth")).doubleValue() : null;
+        Integer gracePeriod = body.get("gracePeriodDays") != null ? ((Number) body.get("gracePeriodDays")).intValue() : null;
 
         // Round to 4 decimal places to avoid IEEE 754 floating point corruption in MySQL
         if (baseRate != null) baseRate = Math.round(baseRate * 10000.0) / 10000.0;
@@ -97,6 +100,7 @@ public class TariffController {
         if (limit != null) admin.setMonthlyLimitLiters(limit);
         if (excessRate != null) admin.setExcessRatePerLiter(excessRate);
         if (lateFee != null) admin.setLateFeePerMonth(lateFee);
+        if (gracePeriod != null) admin.setGracePeriodDays(gracePeriod);
 
         userRepository.save(admin);
 
@@ -112,6 +116,7 @@ public class TariffController {
             if (limit != null) resident.setMonthlyLimitLiters(limit);
             if (excessRate != null) resident.setExcessRatePerLiter(excessRate);
             if (lateFee != null) resident.setLateFeePerMonth(lateFee);
+            if (gracePeriod != null) resident.setGracePeriodDays(gracePeriod);
             userRepository.save(resident);
         }
 
@@ -121,7 +126,8 @@ public class TariffController {
             "baseRatePerLiter", admin.getWaterRatePerLiter() != null ? admin.getWaterRatePerLiter() : 0.0,
             "monthlyLimitLiters", admin.getMonthlyLimitLiters() != null ? admin.getMonthlyLimitLiters() : 0.0,
             "excessRatePerLiter", admin.getExcessRatePerLiter() != null ? admin.getExcessRatePerLiter() : 0.0,
-            "lateFeePerMonth", admin.getLateFeePerMonth() != null ? admin.getLateFeePerMonth() : 0.0
+            "lateFeePerMonth", admin.getLateFeePerMonth() != null ? admin.getLateFeePerMonth() : 0.0,
+            "gracePeriodDays", admin.getGracePeriodDays() != null ? admin.getGracePeriodDays() : 20
         ));
     }
 }

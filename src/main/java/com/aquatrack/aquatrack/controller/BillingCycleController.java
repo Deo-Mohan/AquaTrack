@@ -245,7 +245,17 @@ public class BillingCycleController {
             bill.setBaseRatePerLiter(waterRate);
             bill.setExcessRatePerLiter(excessRate != null ? excessRate : 0.0);
             bill.setMonthlyLimitLiters(monthlyLimit != null ? monthlyLimit : 0.0);
-            bill.setDueDate(cycle.getEndDate().plusDays(15));
+            int graceDays = 20;
+            if (userOpt.isPresent() && userOpt.get().getGracePeriodDays() != null) {
+                graceDays = userOpt.get().getGracePeriodDays();
+            } else {
+                java.util.List<User> blockAdmins = userRepository.findByRoleAndApartmentBlock("ROLE_COMMUNITY_ADMIN", blockName);
+                if (!blockAdmins.isEmpty() && blockAdmins.get(0).getGracePeriodDays() != null) {
+                    graceDays = blockAdmins.get(0).getGracePeriodDays();
+                }
+            }
+
+            bill.setDueDate(cycle.getEndDate().plusDays(graceDays));
             bill.setStatus("UNPAID");
             bill.setBillingCycleId(cycle.getId());
             // Use the last day of the billing cycle (endDate) as the bill's generatedDate
@@ -271,7 +281,7 @@ public class BillingCycleController {
             notification.setType("BILL_GENERATED");
             notification.setTitle("New Bill Generated");
             notification.setMessage("Your bill for " + cycle.getCycleName() + " is ₹" +
-                    String.format("%.2f", totalAmount) + ". Due by " + cycle.getEndDate().plusDays(15) + ".");
+                    String.format("%.2f", totalAmount) + ". Due by " + cycle.getEndDate().plusDays(graceDays) + ".");
             notification.setReferenceType("BILLING_CYCLE");
             notification.setReferenceId(cycle.getId());
             notificationRepository.save(notification);

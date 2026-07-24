@@ -17,6 +17,7 @@ export default function TariffSettings() {
     monthlyLimitLiters: '',
     excessRatePerLiter: '',
     lateFeePerMonth: '',
+    gracePeriodDays: '',
   });
   const [saved, setSaved] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -42,6 +43,7 @@ export default function TariffSettings() {
         monthlyLimitLiters: res.data.monthlyLimitLiters || '',
         excessRatePerLiter: res.data.excessRatePerLiter || '',
         lateFeePerMonth: res.data.lateFeePerMonth || '',
+        gracePeriodDays: res.data.gracePeriodDays || 20,
       });
       setSaved(res.data);
     } catch (err) {
@@ -59,6 +61,7 @@ export default function TariffSettings() {
         monthlyLimitLiters: parseFloat(tariff.monthlyLimitLiters) || 0,
         excessRatePerLiter: parseFloat(tariff.excessRatePerLiter) || 0,
         lateFeePerMonth: parseFloat(tariff.lateFeePerMonth) || 0,
+        gracePeriodDays: parseInt(tariff.gracePeriodDays, 10) || 20,
       };
       // Only Super Admin can send baseRatePerLiter
       if (isSuperAdmin) {
@@ -231,12 +234,32 @@ export default function TariffSettings() {
               </div>
             </div>
 
+            {/* Grace Period (Days) */}
+            <div>
+              <label className="block text-sm font-semibold text-text-muted mb-1.5">
+                Grace Period Duration (Days)
+                <span className="ml-2 text-xs font-normal text-cyan-400">Days allowed after bill generation before due date & late fee accrual</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  max="90"
+                  value={tariff.gracePeriodDays}
+                  onChange={e => setTariff(p => ({ ...p, gracePeriodDays: e.target.value }))}
+                  className={inputCls}
+                  placeholder="Default: 20 days"
+                />
+              </div>
+            </div>
+
             {/* Info Banner */}
             <div className="flex items-start gap-3 p-4 bg-blue-50/60 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl text-xs text-blue-800 dark:text-blue-300 shadow-sm transition-colors">
               <Info className="w-4.5 h-4.5 mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
               <div>
                 <strong className="text-blue-900 dark:text-blue-200 font-bold">Auto-Propagation:</strong> Saving these settings will instantly update
-                rates and late fee policies for all residents in your block.
+                rates, grace period duration, and late fee policies for all residents in your block.
               </div>
             </div>
 
@@ -254,9 +277,9 @@ export default function TariffSettings() {
           {saved && (
             <div className="glass-card p-5 border border-emerald-500/20">
               <h4 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4" /> Currently Active Tariff
+                <CheckCircle2 className="w-4 h-4" /> Currently Active Tariff & Rules
               </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
                 <div className="bg-surface-lighter rounded-xl p-3">
                   <p className="text-xs text-text-muted">Base Rate</p>
                   <p className="text-base font-bold text-primary">₹{(saved.baseRatePerLiter || 0).toFixed(4)}</p>
@@ -276,6 +299,11 @@ export default function TariffSettings() {
                   <p className="text-xs text-text-muted">Late Fee</p>
                   <p className="text-base font-bold text-rose-400">₹{(saved.lateFeePerMonth || 0).toFixed(2)}</p>
                   <p className="text-[10px] text-text-muted">per month</p>
+                </div>
+                <div className="bg-surface-lighter rounded-xl p-3">
+                  <p className="text-xs text-text-muted">Grace Period</p>
+                  <p className="text-base font-bold text-cyan-400">{saved.gracePeriodDays || 20} Days</p>
+                  <p className="text-[10px] text-text-muted">due window</p>
                 </div>
               </div>
             </div>

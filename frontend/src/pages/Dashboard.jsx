@@ -199,6 +199,7 @@ export default function Dashboard() {
   const [safeWaterLimit, setSafeWaterLimit] = useState(0); // monthlyLimitLiters from CA tariff
   const [baseRatePerLiter, setBaseRatePerLiter] = useState(0);
   const [excessRatePerLiter, setExcessRatePerLiter] = useState(0);
+  const [gracePeriodDays, setGracePeriodDays] = useState(20);
   const [monthlyChartType, setMonthlyChartType] = useState('area'); // area, bar, line
   const [weeklyChartType, setWeeklyChartType] = useState('bar'); // bar, line, area
   const [currentAlertIndex, setCurrentAlertIndex] = useState(0);
@@ -309,19 +310,19 @@ export default function Dashboard() {
               let limit = profileRes.data.monthlyLimitLiters || 0;
               let baseRate = profileRes.data.waterRatePerLiter || 0;
               let excessRate = profileRes.data.excessRatePerLiter || 0;
+              let graceDays = profileRes.data.gracePeriodDays || 20;
 
               // Fallback to fetch from block tariff configured by Community Admin
-              if (limit === 0 || baseRate === 0 || excessRate === 0) {
-                try {
-                  const tariffRes = await api.get(`/tariff?callerUsername=${username}`);
-                  if (tariffRes.data) {
-                    if (limit === 0) limit = tariffRes.data.monthlyLimitLiters || 0;
-                    if (baseRate === 0) baseRate = tariffRes.data.baseRatePerLiter || 0;
-                    if (excessRate === 0) excessRate = tariffRes.data.excessRatePerLiter || 0;
-                  }
-                } catch (err) {
-                  console.error("Error fetching block tariff fallback:", err);
+              try {
+                const tariffRes = await api.get(`/tariff?callerUsername=${username}`);
+                if (tariffRes.data) {
+                  if (limit === 0) limit = tariffRes.data.monthlyLimitLiters || 0;
+                  if (baseRate === 0) baseRate = tariffRes.data.baseRatePerLiter || 0;
+                  if (excessRate === 0) excessRate = tariffRes.data.excessRatePerLiter || 0;
+                  if (tariffRes.data.gracePeriodDays) graceDays = tariffRes.data.gracePeriodDays;
                 }
+              } catch (err) {
+                console.error("Error fetching block tariff fallback:", err);
               }
 
               if (limit > 0) {
@@ -329,6 +330,7 @@ export default function Dashboard() {
               }
               setBaseRatePerLiter(baseRate);
               setExcessRatePerLiter(excessRate);
+              setGracePeriodDays(graceDays);
             }
           } catch (e) {
             console.error("Error fetching user profile:", e);
@@ -693,7 +695,7 @@ export default function Dashboard() {
           title="Current Bill (Est)"
           value={`₹${stats.unpaidBillAmount.toFixed(2)}`}
           subtitle={stats.unpaidBillAmount > 0 ? "Pending Payment" : "No Unpaid Bills"}
-          infoNote="Pay within 20 days of bill generation to avoid late fee penalties."
+          infoNote={`Pay within ${gracePeriodDays} days of bill generation to avoid late fee penalties.`}
           icon={Receipt}
           color="emerald"
           delay={0.2}

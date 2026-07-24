@@ -158,6 +158,16 @@ public class BillController {
         if (bill.getGeneratedDate() == null) {
             bill.setGeneratedDate(java.time.LocalDate.now());
         }
+        if (bill.getDueDate() == null) {
+            int graceDays = 20;
+            if (bill.getHouseNumber() != null) {
+                java.util.Optional<com.aquatrack.aquatrack.model.User> residentOpt = userRepository.findByHouseNumber(bill.getHouseNumber());
+                if (residentOpt.isPresent() && residentOpt.get().getGracePeriodDays() != null) {
+                    graceDays = residentOpt.get().getGracePeriodDays();
+                }
+            }
+            bill.setDueDate(bill.getGeneratedDate().plusDays(graceDays));
+        }
 
         if (bill.getHouseNumber() != null) {
             java.util.Optional<com.aquatrack.aquatrack.model.User> targetUser = userRepository.findByHouseNumber(bill.getHouseNumber());
@@ -559,8 +569,17 @@ public class BillController {
         bill.setBaseRatePerLiter(waterRate);
         bill.setExcessRatePerLiter(excessRate != null ? excessRate : 0.0);
         bill.setMonthlyLimitLiters(monthlyLimit != null ? monthlyLimit : 0.0);
+        int graceDays = 20;
+        if (user.getGracePeriodDays() != null) {
+            graceDays = user.getGracePeriodDays();
+        } else if (user.getApartmentBlock() != null) {
+            List<com.aquatrack.aquatrack.model.User> admins = userRepository.findByRoleAndApartmentBlock("ROLE_COMMUNITY_ADMIN", user.getApartmentBlock());
+            if (!admins.isEmpty() && admins.get(0).getGracePeriodDays() != null) {
+                graceDays = admins.get(0).getGracePeriodDays();
+            }
+        }
         bill.setGeneratedDate(java.time.LocalDate.now());
-        bill.setDueDate(java.time.LocalDate.now().plusDays(15));
+        bill.setDueDate(java.time.LocalDate.now().plusDays(graceDays));
         bill.setStatus("UNPAID");
         bill.setBillingCycleId(1L); // Default fallback cycle
         bill.setMeterId(user.getMeterId());

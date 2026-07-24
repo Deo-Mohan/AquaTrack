@@ -15,6 +15,7 @@ export default function Bills() {
   const [payQrModalBill, setPayQrModalBill] = useState(null);
   const [invoiceModalBill, setInvoiceModalBill] = useState(null);
   const [adminName, setAdminName] = useState('Community Admin');
+  const [gracePeriodDays, setGracePeriodDays] = useState(20);
 
   // Filter & Sort States
   const [sortBy, setSortBy] = useState('date-desc'); // date-desc, date-asc, amount-desc, amount-asc
@@ -132,7 +133,7 @@ export default function Bills() {
 
   useEffect(() => {
     fetchBills();
-    const fetchAdminName = async () => {
+    const fetchAdminNameAndGrace = async () => {
       try {
         const u = localStorage.getItem('username');
         const role = localStorage.getItem('role');
@@ -146,11 +147,17 @@ export default function Bills() {
             setAdminName(admin.fullName);
           }
         }
+        if (u) {
+          const tariffRes = await api.get('/tariff', { params: { callerUsername: u } });
+          if (tariffRes.data && tariffRes.data.gracePeriodDays) {
+            setGracePeriodDays(tariffRes.data.gracePeriodDays);
+          }
+        }
       } catch (err) {
-        console.error("Failed to fetch community admin name:", err);
+        console.error("Failed to fetch admin details or grace period:", err);
       }
     };
-    fetchAdminName();
+    fetchAdminNameAndGrace();
   }, []);
 
   return (
@@ -166,7 +173,7 @@ export default function Bills() {
       <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-3 text-xs text-amber-600 dark:text-amber-300 font-medium">
         <Clock className="w-5 h-5 shrink-0 text-amber-500 dark:text-amber-400" />
         <div>
-          <strong className="font-bold text-amber-700 dark:text-amber-200">Grace Period Reminder:</strong> Please settle invoices within <span className="font-extrabold text-amber-500 dark:text-amber-400">20 days of generation</span> to ensure zero late fee charges. Late fees accrue monthly after the due date.
+          <strong className="font-bold text-amber-700 dark:text-amber-200">Grace Period Reminder:</strong> Please settle invoices within <span className="font-extrabold text-amber-500 dark:text-amber-400">{gracePeriodDays} days of generation</span> to ensure zero late fee charges. Late fees accrue monthly after the due date.
         </div>
       </div>
 
