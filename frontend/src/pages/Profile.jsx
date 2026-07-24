@@ -178,7 +178,8 @@ export default function Profile() {
         localStorage.setItem('fullName', res.data.fullName || '');
         localStorage.setItem('mobileNumber', res.data.mobileNumber || '');
         localStorage.setItem('whatsAppNumber', res.data.whatsAppNumber || '');
-        
+        window.dispatchEvent(new Event('profileUpdated'));
+
         setSuccessMsg('Profile updated successfully in database!');
         setTimeout(() => setSuccessMsg(''), 3000);
       } catch (err) {

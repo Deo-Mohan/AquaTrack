@@ -32,10 +32,10 @@ const UserAvatar = ({ gender, role, size = 40 }) => {
     );
   }
 
-  // Male Household specific custom image
-  if ((!gender || gender.toLowerCase() === 'male') && role !== 'ROLE_ADMIN' && role !== 'ROLE_COMMUNITY_ADMIN') {
+  // Male Household / Community Admin custom image
+  if ((!gender || gender.toLowerCase() === 'male') && role !== 'ROLE_ADMIN') {
     return (
-      <img src="/male_household.png" alt="Household Avatar" className="rounded-full object-cover" style={{ width: size, height: size }} />
+      <img src="/male_household.png" alt="User Avatar" className="rounded-full object-cover" style={{ width: size, height: size }} />
     );
   }
 
@@ -75,7 +75,7 @@ export default function Header({ toggleSidebar }) {
 
   const username = localStorage.getItem('username') || 'Guest';
   const role = localStorage.getItem('role') || '';
-  const gender = localStorage.getItem('gender') || 'Male';
+  const [gender, setGender] = useState(() => localStorage.getItem('gender') || 'Male');
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -83,6 +83,32 @@ export default function Header({ toggleSidebar }) {
     document.documentElement.setAttribute('data-theme', nextTheme);
     localStorage.setItem('theme', nextTheme);
   };
+
+  // Sync profile gender from API & storage events
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token || username === 'Guest') return;
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+    const fetchGender = async () => {
+      try {
+        const res = await api.get(`/users/profile/${username}`);
+        if (res.data && res.data.gender) {
+          setGender(res.data.gender);
+          localStorage.setItem('gender', res.data.gender);
+        }
+      } catch (err) {
+        console.error("Error fetching profile gender for header:", err);
+      }
+    };
+    fetchGender();
+
+    const handleProfileUpdate = () => {
+      setGender(localStorage.getItem('gender') || 'Male');
+    };
+    window.addEventListener('profileUpdated', handleProfileUpdate);
+    return () => window.removeEventListener('profileUpdated', handleProfileUpdate);
+  }, [username]);
 
   // Fetch unread count on mount and on interval
   useEffect(() => {
