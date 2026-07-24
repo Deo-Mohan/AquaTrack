@@ -134,6 +134,30 @@ export default function AdminDashboard() {
       return next;
     });
   };
+
+  const handleClearAllAlerts = () => {
+    const currentAlerts = getCommunityAlerts();
+    const alertIds = currentAlerts.map(a => a.id).filter(id => id !== 'all-good');
+    if (alertIds.length > 0) {
+      setDismissedAlerts(prev => {
+        const next = Array.from(new Set([...prev, ...alertIds]));
+        localStorage.setItem('dismissedAlerts', JSON.stringify(next));
+        return next;
+      });
+    }
+  };
+
+  const handleClearAllSecurityLogs = () => {
+    const currentLogs = getSecurityLogs();
+    const logIds = currentLogs.map(l => l.id).filter(id => id !== 'system-ok');
+    if (logIds.length > 0) {
+      setDismissedSecurityLogs(prev => {
+        const next = Array.from(new Set([...prev, ...logIds]));
+        localStorage.setItem('dismissedSecurityLogs', JSON.stringify(next));
+        return next;
+      });
+    }
+  };
   
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -2069,9 +2093,34 @@ export default function AdminDashboard() {
               </div>
 
               <div className="glass-card p-6 flex flex-col">
-                <h3 className="font-semibold text-text mb-4">
-                  {isSuperAdmin ? 'Global Security Logs' : 'Community Alerts'}
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-text">
+                    {isSuperAdmin ? 'Global Security Logs' : 'Community Alerts'}
+                  </h3>
+                  {isSuperAdmin ? (
+                    getSecurityLogs().some(l => l.id !== 'system-ok') && (
+                      <button 
+                        onClick={handleClearAllSecurityLogs}
+                        className="p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+                        title="Clear all security logs"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Clear All</span>
+                      </button>
+                    )
+                  ) : (
+                    getCommunityAlerts().some(a => a.id !== 'all-good') && (
+                      <button 
+                        onClick={handleClearAllAlerts}
+                        className="p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+                        title="Clear all alerts"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Clear All</span>
+                      </button>
+                    )
+                  )}
+                </div>
                 <div className="space-y-3 flex-1 overflow-y-auto max-h-[260px]">
                   {isSuperAdmin ? (
                     getSecurityLogs().map(log => {

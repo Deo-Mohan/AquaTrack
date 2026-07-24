@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Droplets, Receipt, AlertTriangle, TrendingDown, Upload, FileText, CheckCircle2, ShieldAlert, ShieldCheck, X, AlertCircle, Loader2, ArrowRight, Clock, Info, Zap, BarChart3, Lightbulb, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Droplets, Receipt, AlertTriangle, TrendingDown, Upload, FileText, CheckCircle2, ShieldAlert, ShieldCheck, X, AlertCircle, Loader2, ArrowRight, Clock, Info, Zap, BarChart3, Lightbulb, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, LineChart, Line, Cell
@@ -215,6 +215,19 @@ export default function Dashboard() {
       });
     } catch (err) {
       console.error("Error deleting notification:", err);
+    }
+  };
+
+  const handleClearAllAlerts = async () => {
+    if (alerts.length === 0) return;
+    try {
+      await Promise.all(alerts.map(a => api.delete(`/notifications/${a.id}`).catch(() => {})));
+      setAlerts([]);
+      setCurrentAlertIndex(0);
+    } catch (err) {
+      console.error("Error clearing all notifications:", err);
+      setAlerts([]);
+      setCurrentAlertIndex(0);
     }
   };
 
@@ -694,9 +707,19 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-text">Recent Alerts</h3>
             {alerts.length > 0 && (
-              <span className="px-2 py-1 bg-amber-500/10 text-amber-400 text-xs rounded-full border border-amber-500/20">
-                {alerts.length} New
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleClearAllAlerts}
+                  className="p-1 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+                  title="Clear all alerts"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Clear All</span>
+                </button>
+                <span className="px-2 py-1 bg-amber-500/10 text-amber-400 text-xs rounded-full border border-amber-500/20">
+                  {alerts.length} New
+                </span>
+              </div>
             )}
           </div>
           <div className="space-y-3 min-h-[110px] flex flex-col justify-between">
