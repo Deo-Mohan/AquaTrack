@@ -21,6 +21,7 @@ const Invoices = lazy(() => import('./pages/Invoices'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const WaterTips = lazy(() => import('./pages/WaterTips'));
 const TariffSettings = lazy(() => import('./pages/TariffSettings'));
+const WaterPurchase = lazy(() => import('./pages/WaterPurchase'));
 const MeterWorkstation = lazy(() => import('./pages/MeterWorkstation'));
 const WaterBillingHistory = lazy(() => import('./pages/WaterBillingHistory'));
 
@@ -106,6 +107,7 @@ function App() {
           <Route path="/profile" element={<AuthLayout><Profile /></AuthLayout>} />
           <Route path="/support" element={<AuthLayout><Support /></AuthLayout>} />
           <Route path="/tariff" element={<AuthLayout><CommunityAdminRoute><TariffSettings /></CommunityAdminRoute></AuthLayout>} />
+          <Route path="/water-purchase" element={<AuthLayout><CommunityAdminRoute><WaterPurchase /></CommunityAdminRoute></AuthLayout>} />
           <Route path="/meter-workstation" element={<AuthLayout><MeterWorkstation /></AuthLayout>} />
           <Route path="/water-billing-history" element={<AuthLayout><WaterBillingHistory /></AuthLayout>} />
           

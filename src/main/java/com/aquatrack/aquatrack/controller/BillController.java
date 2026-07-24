@@ -46,6 +46,67 @@ public class BillController {
 
     @Autowired
     private com.aquatrack.aquatrack.service.EmailService emailService;
+    private void updateLateFeeAndStatus(Bill bill) {
+        if (bill == null) return;
+
+        // 1. Resolve lateFeePerMonth from household user or Community Admin if not populated
+        if (bill.getLateFeePerMonth() == null || bill.getLateFeePerMonth() <= 0) {
+            if (bill.getHouseNumber() != null) {
+                userRepository.findByHouseNumber(bill.getHouseNumber()).ifPresent(u -> {
+                    Double fee = u.getLateFeePerMonth();
+                    if (fee == null || fee <= 0) {
+                        String blk = u.getApartmentBlock();
+                        if (blk != null) {
+                            List<com.aquatrack.aquatrack.model.User> admins = userRepository.findByRoleAndApartmentBlock("ROLE_COMMUNITY_ADMIN", blk);
+                            if (!admins.isEmpty() && admins.get(0).getLateFeePerMonth() != null) {
+                                fee = admins.get(0).getLateFeePerMonth();
+                            }
+                        }
+                    }
+                    if (fee != null) bill.setLateFeePerMonth(fee);
+                });
+            }
+        }
+
+        // 2. Lock historical state if the bill is already PAID
+        if ("PAID".equalsIgnoreCase(bill.getStatus())) {
+            return;
+        }
+
+        // 3. Dynamic overdue & late fee accrual calculation
+        java.time.LocalDate dueDate = bill.getDueDate();
+        java.time.LocalDate today = java.time.LocalDate.now();
+
+        if (dueDate != null && today.isAfter(dueDate)) {
+            long daysPast = java.time.temporal.ChronoUnit.DAYS.between(dueDate, today);
+            int monthsLate = (int) Math.max(1, Math.ceil(daysPast / 30.0));
+            double feePerMonth = bill.getLateFeePerMonth() != null ? bill.getLateFeePerMonth() : 0.0;
+            double totalLateFee = Math.round(monthsLate * feePerMonth * 100.0) / 100.0;
+
+            boolean changed = false;
+            if (!Integer.valueOf(monthsLate).equals(bill.getMonthsOverdue())) {
+                bill.setMonthsOverdue(monthsLate);
+                changed = true;
+            }
+            if (!Double.valueOf(totalLateFee).equals(bill.getLateFeeAmount())) {
+                bill.setLateFeeAmount(totalLateFee);
+                changed = true;
+            }
+            if (!"OVERDUE".equalsIgnoreCase(bill.getStatus())) {
+                bill.setStatus("OVERDUE");
+                changed = true;
+            }
+            if (changed) {
+                repository.save(bill);
+            }
+        } else if ("OVERDUE".equalsIgnoreCase(bill.getStatus()) && (dueDate == null || !today.isAfter(dueDate))) {
+            bill.setMonthsOverdue(0);
+            bill.setLateFeeAmount(0.0);
+            bill.setStatus("UNPAID");
+            repository.save(bill);
+        }
+    }
+
     private void validateBillGeneration(String houseNumber, java.time.LocalDate generatedDate) {
         if (houseNumber == null || houseNumber.trim().isEmpty()) {
             return;
@@ -345,40 +406,56 @@ public class BillController {
     // GET: Retrieve all bills (Admin)
     @GetMapping("/all")
     public ResponseEntity<List<Bill>> getAllBills() {
-        return ResponseEntity.ok(repository.findAll());
+        List<Bill> list = repository.findAll();
+        list.forEach(this::updateLateFeeAndStatus);
+        return ResponseEntity.ok(list);
     }
 
     // GET: Fetch bills for a single household (Resident)
     @GetMapping("/household/{houseNumber}")
     public ResponseEntity<List<Bill>> getBillsByHousehold(@PathVariable String houseNumber) {
-        return ResponseEntity.ok(repository.findByHouseNumberOrderByDueDateDesc(houseNumber));
+        List<Bill> list = repository.findByHouseNumberOrderByDueDateDesc(houseNumber);
+        list.forEach(this::updateLateFeeAndStatus);
+        return ResponseEntity.ok(list);
     }
 
     // GET: Fetch bills by status (PAID, UNPAID, OVERDUE)
     @GetMapping("/status/{status}")
     public ResponseEntity<List<Bill>> getBillsByStatus(@PathVariable String status) {
+        // Run check on all bills first so status updates are current
+        List<Bill> all = repository.findAll();
+        all.forEach(this::updateLateFeeAndStatus);
         return ResponseEntity.ok(repository.findByStatus(status));
     }
 
     // GET: Fetch bills for a billing cycle
     @GetMapping("/cycle/{billingCycleId}")
     public ResponseEntity<List<Bill>> getBillsByCycle(@PathVariable Long billingCycleId) {
-        return ResponseEntity.ok(repository.findByBillingCycleId(billingCycleId));
+        List<Bill> list = repository.findByBillingCycleId(billingCycleId);
+        list.forEach(this::updateLateFeeAndStatus);
+        return ResponseEntity.ok(list);
     }
 
     // GET: Fetch bills for an apartment block
     @GetMapping("/block/{apartmentBlock}")
     public ResponseEntity<List<Bill>> getBillsByBlock(@PathVariable String apartmentBlock) {
-        return ResponseEntity.ok(repository.findByApartmentBlock(apartmentBlock));
+        List<Bill> list = repository.findByApartmentBlock(apartmentBlock);
+        list.forEach(this::updateLateFeeAndStatus);
+        return ResponseEntity.ok(list);
     }
 
     // GET: Get total unpaid amount for a household
     @GetMapping("/household/{houseNumber}/unpaid-total")
     public ResponseEntity<?> getUnpaidTotal(@PathVariable String houseNumber) {
-        Double total = repository.sumUnpaidByHousehold(houseNumber);
+        List<Bill> list = repository.findByHouseNumberOrderByDueDateDesc(houseNumber);
+        list.forEach(this::updateLateFeeAndStatus);
+        double total = list.stream()
+                .filter(b -> !"PAID".equalsIgnoreCase(b.getStatus()))
+                .mapToDouble(b -> (b.getAmount() != null ? b.getAmount() : 0.0) + (b.getLateFeeAmount() != null ? b.getLateFeeAmount() : 0.0))
+                .sum();
         return ResponseEntity.ok(java.util.Map.of(
                 "houseNumber", houseNumber,
-                "unpaidTotal", total != null ? total : 0.0
+                "unpaidTotal", Math.round(total * 100.0) / 100.0
         ));
     }
 
@@ -528,6 +605,8 @@ public class BillController {
             return ResponseEntity.ok(bill);
         }
 
+        // Lock current late fee state before setting to PAID
+        updateLateFeeAndStatus(bill);
         bill.setStatus("PAID");
         Bill saved = repository.save(bill);
 
@@ -535,10 +614,11 @@ public class BillController {
         java.util.Optional<com.aquatrack.aquatrack.model.User> userOpt = userRepository.findByHouseNumber(bill.getHouseNumber());
         if (userOpt.isPresent()) {
             com.aquatrack.aquatrack.model.User user = userOpt.get();
+            double totalPaid = (bill.getAmount() != null ? bill.getAmount() : 0.0) + (bill.getLateFeeAmount() != null ? bill.getLateFeeAmount() : 0.0);
             String title = "Payment Received — Invoice Ready";
             String message = String.format(
                 "Your water bill of ₹%.2f for %s (Due: %s) has been marked PAID. Thank you! Your invoice is available for download.",
-                bill.getAmount(), bill.getHouseNumber(), bill.getDueDate()
+                totalPaid, bill.getHouseNumber(), bill.getDueDate()
             );
             Notification notif = new Notification(user.getUsername(), "BILL_GENERATED", title, message);
             notif.setReferenceId(bill.getId());
@@ -554,6 +634,7 @@ public class BillController {
     public ResponseEntity<Bill> getBillById(@PathVariable Long id) {
         Bill bill = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Bill not found with ID: " + id));
+        updateLateFeeAndStatus(bill);
         return ResponseEntity.ok(bill);
     }
 
@@ -597,6 +678,7 @@ public class BillController {
             bill.setApartmentBlock(updatedBill.getApartmentBlock());
         }
         Bill saved = repository.save(bill);
+        updateLateFeeAndStatus(saved);
         return ResponseEntity.ok(saved);
     }
 
@@ -642,10 +724,13 @@ public class BillController {
         Bill bill = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Bill not found with ID: " + id));
 
+        updateLateFeeAndStatus(bill);
+        double totalPayable = (bill.getAmount() != null ? bill.getAmount() : 0.0) + (bill.getLateFeeAmount() != null ? bill.getLateFeeAmount() : 0.0);
+
         try {
             RazorpayClient client = new RazorpayClient(razorpayKeyId, razorpayKeySecret);
             JSONObject orderRequest = new JSONObject();
-            orderRequest.put("amount", Math.round(bill.getAmount() * 100)); // in paise
+            orderRequest.put("amount", Math.round(totalPayable * 100)); // in paise
             orderRequest.put("currency", "INR");
             orderRequest.put("receipt", "rcpt_" + bill.getId());
 
@@ -684,6 +769,7 @@ public class BillController {
             boolean isSignatureValid = Utils.verifyPaymentSignature(options, razorpayKeySecret);
 
             if (isSignatureValid) {
+                updateLateFeeAndStatus(bill);
                 bill.setStatus("PAID");
                 Bill saved = repository.save(bill);
 
@@ -691,10 +777,11 @@ public class BillController {
                 java.util.Optional<com.aquatrack.aquatrack.model.User> userOpt = userRepository.findByHouseNumber(bill.getHouseNumber());
                 if (userOpt.isPresent()) {
                     com.aquatrack.aquatrack.model.User user = userOpt.get();
+                    double totalPaid = (bill.getAmount() != null ? bill.getAmount() : 0.0) + (bill.getLateFeeAmount() != null ? bill.getLateFeeAmount() : 0.0);
                     String title = "Payment Received — Invoice Ready";
                     String message = String.format(
                         "Your water bill of ₹%.2f for %s (Due: %s) has been marked PAID. Thank you! Your invoice is available for download.",
-                        bill.getAmount(), bill.getHouseNumber(), bill.getDueDate()
+                        totalPaid, bill.getHouseNumber(), bill.getDueDate()
                     );
                     Notification notif = new Notification(user.getUsername(), "BILL_GENERATED", title, message);
                     notif.setReferenceId(bill.getId());

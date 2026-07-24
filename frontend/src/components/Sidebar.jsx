@@ -17,6 +17,7 @@ import {
   Gauge,
   Users,
   Wrench,
+  ShoppingCart,
   BookOpen
 } from 'lucide-react';
 
@@ -50,7 +51,10 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         { icon: Users,           label: 'User Directory',    path: '/admin?tab=users' },
         { icon: Wrench,          label: 'Meter Workstation', path: '/meter-workstation' },
         { icon: BookOpen,        label: 'Water & Billing History', path: '/water-billing-history' },
-        ...(isCommunityAdmin ? [{ icon: Gauge, label: 'Tariff Settings', path: '/tariff' }] : []),
+        ...(isCommunityAdmin ? [
+          { icon: Gauge, label: 'Tariff Settings', path: '/tariff' },
+          { icon: ShoppingCart, label: 'Water Purchase', path: '/water-purchase' }
+        ] : []),
         { icon: Bell,            label: 'Notifications',     path: '/notifications' },
         { icon: User,            label: 'Profile',           path: '/profile' },
         { icon: HelpCircle,      label: 'Support',           path: '/support' },

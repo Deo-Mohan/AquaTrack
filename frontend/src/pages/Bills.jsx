@@ -23,11 +23,13 @@ export default function Bills() {
   const [filterYear, setFilterYear] = useState('all'); // all, years...
 
   const getBillAmount = (bill) => {
+    let waterAmt = bill.amount || 0;
     if (bill.monthlyLimitLiters > 0) {
-      return ((bill.withinLimitLiters || 0) * (bill.baseRatePerLiter || 0)) + 
-             ((bill.excessLiters || 0) * (bill.excessRatePerLiter || 0));
+      waterAmt = ((bill.withinLimitLiters || 0) * (bill.baseRatePerLiter || 0)) + 
+                 ((bill.excessLiters || 0) * (bill.excessRatePerLiter || 0));
     }
-    return bill.amount || 0;
+    const lateFee = bill.lateFeeAmount || 0;
+    return waterAmt + lateFee;
   };
 
   const getBillMonth = (bill) => {
@@ -157,6 +159,14 @@ export default function Bills() {
         <div>
           <h1 className="text-2xl font-bold text-text">My Bills</h1>
           <p className="text-text-muted mt-1">View and manage your water utility bills.</p>
+        </div>
+      </div>
+
+      {/* Late Fee Grace Period Banner */}
+      <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-3 text-xs text-amber-600 dark:text-amber-300 font-medium">
+        <Clock className="w-5 h-5 shrink-0 text-amber-500 dark:text-amber-400" />
+        <div>
+          <strong className="font-bold text-amber-700 dark:text-amber-200">Grace Period Reminder:</strong> Please settle invoices within <span className="font-extrabold text-amber-500 dark:text-amber-400">20 days of generation</span> to ensure zero late fee charges. Late fees accrue monthly after the due date.
         </div>
       </div>
 
@@ -369,7 +379,7 @@ export default function Bills() {
                                 // (guards against stale bill.amount in DB)
                                 const baseCharge = (bill.withinLimitLiters || 0) * (bill.baseRatePerLiter || 0);
                                 const excessCharge = (bill.excessLiters || 0) * (bill.excessRatePerLiter || 0);
-                                const computedTotal = baseCharge + excessCharge;
+                                const lateFee = bill.lateFeeAmount || 0;
                                 return (
                                   <>
                                     <tr>
@@ -392,33 +402,55 @@ export default function Bills() {
                                         <td className="t-calc-right t-calc-red">+₹{excessCharge.toFixed(2)}</td>
                                       </tr>
                                     )}
+                                    {lateFee > 0 && (
+                                      <tr className="t-calc-excess-row">
+                                        <td>
+                                          <span className="t-calc-label t-calc-red">Late Fee ({bill.monthsOverdue || 1} mo)</span>
+                                          <span className="t-calc-sub t-calc-red">₹{(bill.lateFeePerMonth || 0).toFixed(2)}/mo penalty</span>
+                                        </td>
+                                        <td className="t-calc-right t-calc-red">—</td>
+                                        <td className="t-calc-right t-calc-red">₹{(bill.lateFeePerMonth || 0).toFixed(2)}</td>
+                                        <td className="t-calc-right t-calc-red">+₹{lateFee.toFixed(2)}</td>
+                                      </tr>
+                                    )}
                                   </>
                                 );
                               })() : (
-                                <tr>
-                                  <td>
-                                    <span className="t-calc-label">Water Consumption</span>
-                                    <span className="t-calc-sub">Standard rate</span>
-                                  </td>
-                                  <td className="t-calc-right">{(bill.consumptionLiters || 0).toLocaleString()}</td>
-                                  <td className="t-calc-right">
-                                    ₹{bill.baseRatePerLiter
-                                      ? Number(bill.baseRatePerLiter).toFixed(2)
-                                      : bill.consumptionLiters
-                                        ? (bill.amount / bill.consumptionLiters).toFixed(2)
-                                        : '0.00'}
-                                  </td>
-                                  <td className="t-calc-right">₹{(bill.amount || 0).toFixed(2)}</td>
-                                </tr>
+                                <>
+                                  <tr>
+                                    <td>
+                                      <span className="t-calc-label">Water Consumption</span>
+                                      <span className="t-calc-sub">Standard rate</span>
+                                    </td>
+                                    <td className="t-calc-right">{(bill.consumptionLiters || 0).toLocaleString()}</td>
+                                    <td className="t-calc-right">
+                                      ₹{bill.baseRatePerLiter
+                                        ? Number(bill.baseRatePerLiter).toFixed(2)
+                                        : bill.consumptionLiters
+                                          ? (bill.amount / bill.consumptionLiters).toFixed(2)
+                                          : '0.00'}
+                                    </td>
+                                    <td className="t-calc-right">₹{(bill.amount || 0).toFixed(2)}</td>
+                                  </tr>
+                                  {(bill.lateFeeAmount || 0) > 0 && (
+                                    <tr className="t-calc-excess-row">
+                                      <td>
+                                        <span className="t-calc-label t-calc-red">Late Fee ({bill.monthsOverdue || 1} mo)</span>
+                                        <span className="t-calc-sub t-calc-red">₹{(bill.lateFeePerMonth || 0).toFixed(2)}/mo penalty</span>
+                                      </td>
+                                      <td className="t-calc-right t-calc-red">—</td>
+                                      <td className="t-calc-right t-calc-red">₹{(bill.lateFeePerMonth || 0).toFixed(2)}</td>
+                                      <td className="t-calc-right t-calc-red">+₹{(bill.lateFeeAmount || 0).toFixed(2)}</td>
+                                    </tr>
+                                  )}
+                                </>
                               )}
                             </tbody>
                             <tfoot>
                               <tr className="t-calc-total-row">
                                 <td colSpan="3" className="t-calc-total-label">TOTAL AMOUNT</td>
                                 <td className="t-calc-right t-calc-total-value">
-                                  ₹{bill.monthlyLimitLiters > 0
-                                    ? (((bill.withinLimitLiters || 0) * (bill.baseRatePerLiter || 0)) + ((bill.excessLiters || 0) * (bill.excessRatePerLiter || 0))).toFixed(2)
-                                    : (bill.amount || 0).toFixed(2)}
+                                  ₹{getBillAmount(bill).toFixed(2)}
                                 </td>
                               </tr>
                             </tfoot>
@@ -441,9 +473,7 @@ export default function Bills() {
                       <div className="t-admit">
                         <div className="t-admit-text">Amount</div>
                         <div className={`t-admit-num ${bill.status.toLowerCase()}`}>
-                          ₹{bill.monthlyLimitLiters > 0
-                            ? (((bill.withinLimitLiters || 0) * (bill.baseRatePerLiter || 0)) + ((bill.excessLiters || 0) * (bill.excessRatePerLiter || 0))).toFixed(0)
-                            : (bill.amount || 0).toFixed(0)}
+                          ₹{getBillAmount(bill).toFixed(0)}
                         </div>
                       </div>
                     </div>
@@ -496,7 +526,7 @@ export default function Bills() {
                       const residentName = localStorage.getItem('fullName') || localStorage.getItem('username') || '';
                       setInvoiceModalBill({ ...bill, residentName, adminName });
                     }}
-                    className="pay-btn cursor-pointer !bg-blue-600 hover:!bg-blue-700"
+                    className="pay-btn cursor-pointer !bg-emerald-600 hover:!bg-emerald-700"
                     style={{ width: '100%', justifyContent: 'center' }}
                   >
                     <span className="btn-text">View Invoice</span>
@@ -552,19 +582,10 @@ export default function Bills() {
             </div>
 
             {/* On-screen Modal Content */}
-            <div className="p-8 space-y-6 bg-white dark:bg-slate-900 relative overflow-hidden">
+            <div className="p-8 space-y-6 bg-white dark:bg-slate-900">
               
-              {/* PAID Watermark */}
-              {invoiceModalBill.status === 'PAID' && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
-                  <div className="text-emerald-500/10 dark:text-emerald-400/8 text-[120px] font-black tracking-widest uppercase rotate-[-25deg]">
-                    PAID
-                  </div>
-                </div>
-              )}
-
               {/* Brand & Inv Meta */}
-              <div className="flex justify-between items-start relative z-10">
+              <div className="flex justify-between items-start">
                 <div>
                   <div className="font-black text-2xl text-blue-600">AquaTrack</div>
                   <p className="text-xs text-slate-500">High-Quality Water Utility Management</p>

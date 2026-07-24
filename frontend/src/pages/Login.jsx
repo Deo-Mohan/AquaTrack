@@ -58,26 +58,17 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 md:p-10 lg:p-12 bg-background relative overflow-hidden transition-colors duration-300">
+    <div className="min-h-screen w-full flex items-center justify-center p-3 sm:p-4 md:p-6 bg-background relative overflow-hidden transition-colors duration-300">
       
-      {/* Back to Home Button at the very left of the screen */}
-      <Link 
-        to="/" 
-        className="absolute top-6 left-6 sm:top-8 sm:left-8 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full bg-surface-lighter/10 border border-border/20 hover:bg-surface-lighter/20 hover:border-primary/40 text-text-muted hover:text-text transition-all duration-300 backdrop-blur-md shadow-lg active:scale-95 group font-medium text-xs sm:text-sm"
-      >
-        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-        <span>Back to Home</span>
-      </Link>
-
       {/* Background glow effects */}
       <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-primary/10 blur-[130px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-emerald-500/10 blur-[130px] pointer-events-none" />
       
-      {/* Floating unified card container */}
-      <div className="w-full max-w-5xl glass-card rounded-3xl border border-border/30 overflow-hidden shadow-2xl flex flex-col md:flex-row relative z-10 backdrop-blur-xl">
+      {/* Floating unified card container with minimal outer screen margin */}
+      <div className="w-full max-w-[96vw] xl:max-w-[1450px] min-h-[88vh] glass-card rounded-3xl border border-border/30 overflow-hidden shadow-2xl flex flex-col md:flex-row relative z-10 backdrop-blur-xl">
         
-        {/* LEFT SIDE: Brand Branding Panel */}
-        <div className="hidden md:flex md:w-5/12 left-brand-panel text-text p-10 flex-col justify-between relative overflow-hidden">
+        {/* LEFT SIDE: Brand Branding Panel (Expanded to 7/12 for generous branding space) */}
+        <div className="hidden md:flex md:w-6/12 lg:w-7/12 left-brand-panel text-text p-6 sm:p-8 lg:p-12 flex-col justify-between relative overflow-hidden">
           
           {/* Floating Bubble/Droplet Animations */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
@@ -109,27 +100,37 @@ export default function Login() {
             ))}
           </div>
 
-          {/* Brand Header */}
-          <div className="relative z-10 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl overflow-hidden border border-primary/30 flex items-center justify-center bg-surface-lighter/40 backdrop-blur-md shadow-lg shadow-primary/20">
-              <img src="/logo.png" alt="AquaTrack Logo" className="w-full h-full object-cover scale-110" />
+          {/* Brand Header with integrated Back to Home button */}
+          <div className="relative z-10 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-13 h-13 rounded-2xl overflow-hidden border border-primary/40 flex items-center justify-center bg-surface-lighter/50 backdrop-blur-md shadow-xl shadow-primary/25 shrink-0">
+                <img src="/logo.png" alt="AquaTrack Logo" className="w-full h-full object-cover scale-110" />
+              </div>
+              <div>
+                <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-text leading-none">
+                  Aqua<span className="text-primary font-black">Track</span>
+                </h1>
+                <p className="text-[11px] uppercase tracking-widest text-text-muted font-bold mt-1">Smart Water Management</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-text">
-                Aqua<span className="text-primary font-extrabold">Track</span>
-              </h1>
-              <p className="text-[9px] uppercase tracking-widest text-text-muted font-bold">Smart Water Management</p>
-            </div>
+
+            <Link 
+              to="/" 
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface-lighter/20 border border-border/30 hover:bg-surface-lighter/40 hover:border-primary/40 text-text-muted hover:text-text transition-all duration-300 backdrop-blur-md shadow-sm active:scale-95 group font-medium text-xs sm:text-sm"
+            >
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform text-primary" />
+              <span>Back to Home</span>
+            </Link>
           </div>
 
           {/* Brand Text / Slogan / Features */}
-          <div className="relative z-10 my-auto py-8 space-y-8">
+          <div className="relative z-10 my-auto py-8 space-y-8 max-w-xl">
             <div className="space-y-3">
               <motion.h2 
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
-                className="text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight"
+                className="text-3xl lg:text-5xl font-extrabold tracking-tight leading-tight"
               >
                 Every drop <br/>
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-400">has a story.</span>
@@ -185,11 +186,19 @@ export default function Login() {
         </div>
 
         {/* RIGHT SIDE: Login Form Panel */}
-        <div className="w-full md:w-7/12 flex flex-col justify-between p-8 md:p-12 relative overflow-hidden bg-transparent">
+        <div className="w-full md:w-6/12 lg:w-5/12 flex flex-col justify-between p-6 sm:p-8 lg:p-12 relative overflow-hidden auth-right-form-panel">
           
           {/* Top Header Bar */}
-          <div className="flex justify-end items-center w-full z-20 mb-6">
-            <label htmlFor="login-switch" className="toggle cursor-pointer">
+          <div className="flex justify-between items-center w-full z-20 mb-6">
+            <Link 
+              to="/" 
+              className="md:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-lighter/20 border border-border/30 hover:bg-surface-lighter/40 text-text-muted hover:text-text transition-all font-medium text-xs"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-primary" />
+              <span>Back to Home</span>
+            </Link>
+
+            <label htmlFor="login-switch" className="toggle cursor-pointer ml-auto">
               <input 
                 type="checkbox" 
                 className="input" 
@@ -228,14 +237,15 @@ export default function Login() {
           {/* Form Content directly inside the right panel */}
           <div className="my-auto w-full max-w-md mx-auto z-10 py-6">
             {/* Mobile-only logo */}
-            <div className="flex items-center gap-3 mb-6 md:hidden justify-center">
-              <div className="w-9 h-9 rounded-xl overflow-hidden border border-primary/30 flex items-center justify-center bg-surface-lighter/50">
+            <div className="flex items-center gap-3.5 mb-6 md:hidden justify-center">
+              <div className="w-12 h-12 rounded-2xl overflow-hidden border border-primary/30 flex items-center justify-center bg-surface-lighter/50 shadow-lg shadow-primary/20 shrink-0">
                 <img src="/logo.png" alt="AquaTrack Logo" className="w-full h-full object-cover scale-110" />
               </div>
               <div>
-                <h1 className="text-lg font-bold tracking-tight text-text">
-                  Aqua<span className="text-primary font-extrabold">Track</span>
+                <h1 className="text-2xl font-extrabold tracking-tight text-text">
+                  Aqua<span className="text-primary font-black">Track</span>
                 </h1>
+                <p className="text-[10px] uppercase tracking-widest text-text-muted font-bold">Smart Water Management</p>
               </div>
             </div>
 

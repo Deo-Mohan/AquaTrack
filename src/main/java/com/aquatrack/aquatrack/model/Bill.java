@@ -83,6 +83,16 @@ public class Bill {
     @Column(name = "billing_period")
     private String billingPeriod;
 
+    // Late Fee breakdown fields
+    @Column(name = "late_fee_per_month")
+    private Double lateFeePerMonth = 0.0;
+
+    @Column(name = "late_fee_amount")
+    private Double lateFeeAmount = 0.0;
+
+    @Column(name = "months_overdue")
+    private Integer monthsOverdue = 0;
+
     // Default Constructor
     public Bill() {}
 
@@ -158,4 +168,13 @@ public class Bill {
 
     public String getBillingPeriod() { return billingPeriod; }
     public void setBillingPeriod(String billingPeriod) { this.billingPeriod = billingPeriod; }
+
+    public Double getLateFeePerMonth() { return lateFeePerMonth; }
+    public void setLateFeePerMonth(Double lateFeePerMonth) { this.lateFeePerMonth = lateFeePerMonth; }
+
+    public Double getLateFeeAmount() { return lateFeeAmount; }
+    public void setLateFeeAmount(Double lateFeeAmount) { this.lateFeeAmount = lateFeeAmount; }
+
+    public Integer getMonthsOverdue() { return monthsOverdue; }
+    public void setMonthsOverdue(Integer monthsOverdue) { this.monthsOverdue = monthsOverdue; }
 }

@@ -12,4 +12,7 @@ public interface BulkWaterPurchaseRepository extends JpaRepository<BulkWaterPurc
     List<BulkWaterPurchase> findByApartmentId(Long apartmentId);
     List<BulkWaterPurchase> findByApartmentIdAndPurchaseDateBetween(Long apartmentId, LocalDate start, LocalDate end);
     List<BulkWaterPurchase> findByBillingCycleId(Long billingCycleId);
+    List<BulkWaterPurchase> findByApartmentBlock(String apartmentBlock);
+    List<BulkWaterPurchase> findByApartmentBlockAndBillingMonth(String apartmentBlock, String billingMonth);
+    List<BulkWaterPurchase> findByBillingMonth(String billingMonth);
 }

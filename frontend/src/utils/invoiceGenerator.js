@@ -11,10 +11,11 @@ export function generateInvoiceHTML(bill) {
       ? (bill.amount / bill.consumptionLiters).toFixed(4)
       : '0.0000';
   const invoiceNumber = `#AQ-${String(bill.id).padStart(5, '0')}`;
-  const generatedOn = new Date().toLocaleString('en-IN', {
-    day: '2-digit', month: 'long', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
+  const waterSubtotal = bill.monthlyLimitLiters > 0
+    ? ((Number(bill.withinLimitLiters || 0) * Number(bill.baseRatePerLiter || 0)) + (Number(bill.excessLiters || 0) * Number(bill.excessRatePerLiter || 0)))
+    : Number(bill.amount || 0);
+  const lateFeeAmt = Number(bill.lateFeeAmount || 0);
+  const grandTotal = waterSubtotal + lateFeeAmt;
 
   return `
 <!DOCTYPE html>
@@ -615,6 +616,16 @@ export function generateInvoiceHTML(bill) {
         <td><strong>₹${Number(bill.amount).toFixed(2)}</strong></td>
       </tr>
       `}
+      ${(bill.lateFeeAmount > 0 || bill.monthsOverdue > 0) ? `
+      <tr style="background:#fff1f2;">
+        <td>
+          <strong style="color:#e11d48;">⏰ Late Fee Accrual (${bill.monthsOverdue || 1} Month${(bill.monthsOverdue || 1) > 1 ? 's' : ''} Overdue)</strong><br/>
+          <span style="font-size:11px;color:#f43f5e;">₹${Number(bill.lateFeePerMonth || 0).toFixed(2)}/month late payment penalty</span>
+        </td>
+        <td style="color:#e11d48;">—</td>
+        <td style="color:#e11d48;">₹${Number(bill.lateFeePerMonth || 0).toFixed(2)}</td>
+        <td><strong style="color:#e11d48;">+₹${Number(bill.lateFeeAmount || 0).toFixed(2)}</strong></td>
+      </tr>` : ''}
       <tr>
         <td>Maintenance &amp; Infrastructure Cess</td>
         <td>—</td>
@@ -634,20 +645,22 @@ export function generateInvoiceHTML(bill) {
   <div class="totals-wrapper">
     <div class="totals-box">
       <div class="totals-row">
-        <span class="label">Subtotal</span>
-        <span class="value">₹${Number(bill.amount).toFixed(2)}</span>
+        <span class="label">Water Charges</span>
+        <span class="value">₹${waterSubtotal.toFixed(2)}</span>
       </div>
+      ${lateFeeAmt > 0 ? `
       <div class="totals-row">
-        <span class="label">Discount</span>
-        <span class="value" style="color:#10b981;">₹0.00</span>
+        <span class="label" style="color:#e11d48;">Late Fee Accrued</span>
+        <span class="value" style="color:#e11d48;">+₹${lateFeeAmt.toFixed(2)}</span>
       </div>
+      ` : ''}
       <div class="totals-row">
         <span class="label">Tax (GST @ 0%)</span>
         <span class="value">₹0.00</span>
       </div>
       <div class="totals-row grand">
         <span class="label">Total Payable</span>
-        <span class="value">₹${Number(bill.amount).toFixed(2)}</span>
+        <span class="value">₹${grandTotal.toFixed(2)}</span>
       </div>
     </div>
   </div>

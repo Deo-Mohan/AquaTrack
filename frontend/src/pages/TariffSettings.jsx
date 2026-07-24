@@ -16,6 +16,7 @@ export default function TariffSettings() {
     baseRatePerLiter: '',
     monthlyLimitLiters: '',
     excessRatePerLiter: '',
+    lateFeePerMonth: '',
   });
   const [saved, setSaved] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -24,6 +25,7 @@ export default function TariffSettings() {
 
   // Example preview values
   const [previewUsage, setPreviewUsage] = useState(8000);
+  const [previewMonthsLate, setPreviewMonthsLate] = useState(0);
 
   useEffect(() => {
     fetchTariff();
@@ -39,6 +41,7 @@ export default function TariffSettings() {
         baseRatePerLiter: res.data.baseRatePerLiter || '',
         monthlyLimitLiters: res.data.monthlyLimitLiters || '',
         excessRatePerLiter: res.data.excessRatePerLiter || '',
+        lateFeePerMonth: res.data.lateFeePerMonth || '',
       });
       setSaved(res.data);
     } catch (err) {
@@ -55,6 +58,7 @@ export default function TariffSettings() {
       const payload = {
         monthlyLimitLiters: parseFloat(tariff.monthlyLimitLiters) || 0,
         excessRatePerLiter: parseFloat(tariff.excessRatePerLiter) || 0,
+        lateFeePerMonth: parseFloat(tariff.lateFeePerMonth) || 0,
       };
       // Only Super Admin can send baseRatePerLiter
       if (isSuperAdmin) {
@@ -76,12 +80,15 @@ export default function TariffSettings() {
   const base = parseFloat(tariff.baseRatePerLiter) || 0;
   const limit = parseFloat(tariff.monthlyLimitLiters) || 0;
   const excess = parseFloat(tariff.excessRatePerLiter) || 0;
+  const lateFeeRate = parseFloat(tariff.lateFeePerMonth) || 0;
 
   const withinLimit = limit > 0 ? Math.min(previewUsage, limit) : previewUsage;
   const excessLiters = limit > 0 && previewUsage > limit ? previewUsage - limit : 0;
   const baseCharge = withinLimit * base;
   const excessCharge = excessLiters * excess;
-  const totalBill = baseCharge + excessCharge;
+  const waterSubtotal = baseCharge + excessCharge;
+  const simLateFee = previewMonthsLate * lateFeeRate;
+  const totalBill = waterSubtotal + simLateFee;
 
   const inputCls = "w-full bg-surface-lighter border border-border rounded-xl px-4 py-3 text-sm text-text focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all";
 
@@ -94,7 +101,7 @@ export default function TariffSettings() {
           Tariff Settings
         </h2>
         <p className="text-text-muted text-sm mt-1">
-          Set monthly water usage limits and pricing tiers for your block. Rates auto-propagate to all residents.
+          Set monthly water usage limits, pricing tiers, and late payment fees for your block. Rates auto-propagate to all residents.
         </p>
       </div>
 
@@ -204,12 +211,32 @@ export default function TariffSettings() {
               </div>
             </div>
 
+            {/* Late Fee per Overdue Month */}
+            <div>
+              <label className="block text-sm font-semibold text-text-muted mb-1.5">
+                Late Fee per Overdue Month (₹/Month)
+                <span className="ml-2 text-xs font-normal text-rose-400">Accrued monthly for bills past due date</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted font-semibold text-sm">₹</span>
+                <input
+                  type="number"
+                  step="5"
+                  min="0"
+                  value={tariff.lateFeePerMonth}
+                  onChange={e => setTariff(p => ({ ...p, lateFeePerMonth: e.target.value }))}
+                  className={inputCls + ' pl-8'}
+                  placeholder="e.g. 50"
+                />
+              </div>
+            </div>
+
             {/* Info Banner */}
             <div className="flex items-start gap-3 p-4 bg-blue-50/60 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl text-xs text-blue-800 dark:text-blue-300 shadow-sm transition-colors">
               <Info className="w-4.5 h-4.5 mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
               <div>
                 <strong className="text-blue-900 dark:text-blue-200 font-bold">Auto-Propagation:</strong> Saving these settings will instantly update
-                rates for all residents in your block. Existing bills are not affected — only future bills will use the new tariff.
+                rates and late fee policies for all residents in your block.
               </div>
             </div>
 
@@ -229,21 +256,26 @@ export default function TariffSettings() {
               <h4 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4" /> Currently Active Tariff
               </h4>
-              <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
                 <div className="bg-surface-lighter rounded-xl p-3">
                   <p className="text-xs text-text-muted">Base Rate</p>
-                  <p className="text-lg font-bold text-primary">₹{(saved.baseRatePerLiter || 0).toFixed(4)}</p>
+                  <p className="text-base font-bold text-primary">₹{(saved.baseRatePerLiter || 0).toFixed(4)}</p>
                   <p className="text-[10px] text-text-muted">per liter</p>
                 </div>
                 <div className="bg-surface-lighter rounded-xl p-3">
                   <p className="text-xs text-text-muted">Monthly Limit</p>
-                  <p className="text-lg font-bold text-amber-400">{(saved.monthlyLimitLiters || 0).toLocaleString()}</p>
+                  <p className="text-base font-bold text-amber-400">{(saved.monthlyLimitLiters || 0).toLocaleString()}</p>
                   <p className="text-[10px] text-text-muted">liters/flat</p>
                 </div>
                 <div className="bg-surface-lighter rounded-xl p-3">
                   <p className="text-xs text-text-muted">Excess Rate</p>
-                  <p className="text-lg font-bold text-red-400">₹{(saved.excessRatePerLiter || 0).toFixed(4)}</p>
+                  <p className="text-base font-bold text-red-400">₹{(saved.excessRatePerLiter || 0).toFixed(4)}</p>
                   <p className="text-[10px] text-text-muted">per liter</p>
+                </div>
+                <div className="bg-surface-lighter rounded-xl p-3">
+                  <p className="text-xs text-text-muted">Late Fee</p>
+                  <p className="text-base font-bold text-rose-400">₹{(saved.lateFeePerMonth || 0).toFixed(2)}</p>
+                  <p className="text-[10px] text-text-muted">per month</p>
                 </div>
               </div>
             </div>
@@ -257,23 +289,45 @@ export default function TariffSettings() {
               <TrendingUp className="w-5 h-5 text-purple-400" />
               <h3 className="font-semibold text-text">Live Bill Preview</h3>
             </div>
-            <p className="text-xs text-text-muted mb-3">Simulate how a bill is calculated with current settings.</p>
+            <p className="text-xs text-text-muted mb-3">Simulate how a bill & late fee accrue with current settings.</p>
 
-            <div className="mb-4">
-              <label className="block text-xs text-text-muted mb-1.5 font-medium">Simulate Usage (Liters)</label>
-              <input
-                type="range"
-                min="0"
-                max={Math.max(20000, (limit || 6000) * 2)}
-                step="100"
-                value={previewUsage}
-                onChange={e => setPreviewUsage(Number(e.target.value))}
-                className="w-full accent-primary"
-              />
-              <div className="flex justify-between text-xs text-text-muted mt-1">
-                <span>0 L</span>
-                <span className="font-bold text-primary">{previewUsage.toLocaleString()} L</span>
-                <span>{Math.max(20000, (limit || 6000) * 2).toLocaleString()} L</span>
+            <div className="mb-4 space-y-3">
+              <div>
+                <label className="block text-xs text-text-muted mb-1 font-medium">Simulate Usage (Liters)</label>
+                <input
+                  type="range"
+                  min="0"
+                  max={Math.max(20000, (limit || 6000) * 2)}
+                  step="100"
+                  value={previewUsage}
+                  onChange={e => setPreviewUsage(Number(e.target.value))}
+                  className="w-full accent-primary cursor-pointer"
+                />
+                <div className="flex justify-between text-xs text-text-muted mt-0.5">
+                  <span>0 L</span>
+                  <span className="font-bold text-primary">{previewUsage.toLocaleString()} L</span>
+                  <span>{Math.max(20000, (limit || 6000) * 2).toLocaleString()} L</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-text-muted mb-1 font-medium">Simulate Months Overdue</label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[0, 1, 2, 3].map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setPreviewMonthsLate(m)}
+                      className={`py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                        previewMonthsLate === m
+                          ? 'bg-rose-500 text-white border-rose-600 shadow-md shadow-rose-500/20'
+                          : 'bg-surface-lighter text-text-muted border-border hover:bg-surface'
+                      }`}
+                    >
+                      {m === 0 ? 'On Time' : `${m} Mo Late`}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -315,33 +369,31 @@ export default function TariffSettings() {
                       <td className="px-3 py-2.5 text-right text-text-muted">₹0.00</td>
                     </tr>
                   )}
+
+                  {previewMonthsLate > 0 && (
+                    <tr className="bg-rose-50/40 dark:bg-rose-500/10">
+                      <td className="px-3 py-2.5">
+                        <div className="font-bold text-rose-600 dark:text-rose-400">Late Fee Accrual ⏰</div>
+                        <div className="text-[10px] text-rose-500/80">{previewMonthsLate} Month(s) Overdue × ₹{lateFeeRate.toFixed(2)}/mo</div>
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-bold text-rose-600 dark:text-rose-400">
+                        +₹{simLateFee.toFixed(2)}
+                      </td>
+                    </tr>
+                  )}
+
                   <tr className="bg-primary/5 border-t-2 border-primary/20">
-                    <td className="px-3 py-3 font-bold text-text">Total Bill</td>
+                    <td className="px-3 py-3 font-bold text-text">Total Bill Payable</td>
                     <td className="px-3 py-3 text-right font-bold text-primary text-base">₹{totalBill.toFixed(2)}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
-            {excessLiters > 0 && (
-              <div className="mt-3 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl text-xs text-red-800 dark:text-red-400 flex items-start gap-2 shadow-sm transition-colors animate-pulse">
-                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
-                Usage exceeds monthly limit by {excessLiters.toLocaleString()} L. Excess charges apply.
-              </div>
-            )}
-
-            {limit > 0 && (
-              <div className="mt-3">
-                <div className="flex justify-between text-xs text-text-muted mb-1">
-                  <span>Usage vs Limit</span>
-                  <span>{Math.min(100, Math.round((previewUsage / limit) * 100))}%</span>
-                </div>
-                <div className="h-2 bg-surface rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-300 ${excessLiters > 0 ? 'bg-red-500' : 'bg-emerald-500'}`}
-                    style={{ width: `${Math.min(100, (previewUsage / limit) * 100)}%` }}
-                  />
-                </div>
+            {previewMonthsLate > 0 && (
+              <div className="mt-3 p-3 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 rounded-xl text-xs text-rose-800 dark:text-rose-400 flex items-start gap-2 shadow-sm">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-rose-600 dark:text-rose-400" />
+                Overdue by {previewMonthsLate} month(s). Accrued late fee penalty of ₹{simLateFee.toFixed(2)} added.
               </div>
             )}
           </div>

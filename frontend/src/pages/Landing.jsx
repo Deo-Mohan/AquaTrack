@@ -147,21 +147,40 @@ export default function Landing() {
       <div className={`absolute inset-0 pointer-events-none overflow-hidden transition-opacity duration-700 z-0 ${
         bgType === 'modern' ? 'opacity-100' : 'opacity-0'
       }`}>
-        {/* Subtle Grid Overlay */}
-        <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" 
-             style={{ 
-               backgroundImage: 'radial-gradient(var(--color-primary) 1px, transparent 1px), radial-gradient(var(--color-primary) 1px, transparent 1px)',
-               backgroundSize: '40px 40px',
-               backgroundPosition: '0 0, 20px 20px'
-             }} 
-        />
-        {/* Futuristic mesh gradient lines */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(59,130,246,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(59,130,246,0.03)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
+        {/* Soft Radial Ambient Lighting */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-400/30 via-transparent to-transparent dark:from-primary/10 pointer-events-none" />
 
-        {/* Large Premium Glow Orbs */}
-        <div className="absolute top-[-10%] left-[5%] w-[60vw] h-[60vw] rounded-full bg-gradient-to-tr from-primary/10 to-blue-500/10 blur-[130px] animate-pulse pointer-events-none" />
-        <div className="absolute bottom-[-10%] right-[5%] w-[50vw] h-[50vw] rounded-full bg-gradient-to-br from-emerald-500/5 to-cyan-500/5 blur-[130px] animate-pulse pointer-events-none" style={{ animationDelay: '2s' }} />
-        <div className="absolute top-[30%] right-[10%] w-[35vw] h-[35vw] rounded-full bg-gradient-to-l from-indigo-500/5 to-blue-500/5 blur-[120px] pointer-events-none" style={{ animationDelay: '1s' }} />
+        {/* Large Premium Floating Liquid Glow Orbs */}
+        <div className="absolute top-[-10%] left-[5%] w-[65vw] h-[65vw] rounded-full bg-gradient-to-tr from-sky-400/35 via-blue-500/25 to-indigo-400/25 dark:from-primary/10 dark:to-blue-500/10 blur-[130px] animate-pulse pointer-events-none" />
+        <div className="absolute bottom-[-10%] right-[5%] w-[55vw] h-[55vw] rounded-full bg-gradient-to-br from-emerald-400/30 via-teal-300/25 to-cyan-400/30 dark:from-emerald-500/5 dark:to-cyan-500/5 blur-[130px] animate-pulse pointer-events-none" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-[35%] right-[10%] w-[40vw] h-[40vw] rounded-full bg-gradient-to-l from-cyan-400/30 via-sky-400/25 to-blue-400/30 dark:from-indigo-500/5 dark:to-blue-500/5 blur-[120px] pointer-events-none" style={{ animationDelay: '1s' }} />
+
+        {/* Ambient Rising Water Droplets/Bubbles */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-40 dark:opacity-20">
+          {[...Array(8)].map((_, i) => (
+            <motion.div
+              key={`bg-bubble-${i}`}
+              className="absolute bg-primary/20 rounded-full border border-white/40 backdrop-blur-[1px]"
+              style={{
+                width: `${Math.random() * 20 + 8}px`,
+                height: `${Math.random() * 20 + 8}px`,
+                left: `${Math.random() * 90 + 5}%`,
+                bottom: `-40px`,
+              }}
+              animate={{
+                y: [0, -900],
+                x: [0, Math.random() * 50 - 25],
+                opacity: [0, 0.6, 0.6, 0],
+              }}
+              transition={{
+                duration: Math.random() * 10 + 12,
+                repeat: Infinity,
+                delay: Math.random() * 10,
+                ease: "easeInOut",
+              }}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Brand Navbar */}
@@ -256,11 +275,58 @@ export default function Landing() {
         className="z-10 w-full px-6 max-w-7xl mx-auto pt-16 pb-28 md:pt-24 md:pb-36 flex flex-col lg:flex-row items-center justify-between gap-12 min-h-[85vh]"
       >
         <div className="flex-1 text-center lg:text-left">
-
-          <motion.h1 variants={itemVariants} className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-text tracking-tighter mb-8 lg:leading-[1.1]">
+          <motion.h1 variants={itemVariants} className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-text tracking-tight mb-8 lg:leading-[1.1]">
             Smart Water Management <br className="hidden lg:block" />
-            <span className="bg-gradient-to-r from-primary via-blue-400 to-cyan-300 bg-clip-text text-transparent">
-              For Communities
+            <span className="inline-flex flex-wrap items-baseline">
+              <span className="bg-gradient-to-r from-blue-700 via-primary to-cyan-600 dark:from-primary dark:via-blue-400 dark:to-cyan-300 bg-clip-text text-transparent drop-shadow-sm mr-3 sm:mr-4">
+                For
+              </span>
+              <span className="inline-flex items-baseline bg-gradient-to-r from-blue-700 via-primary to-cyan-600 dark:from-primary dark:via-blue-400 dark:to-cyan-300 bg-clip-text text-transparent drop-shadow-sm">
+                <span>C</span>
+                <motion.span 
+                  animate={{ y: [0, -2, 0], scale: [1, 1.04, 1] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                  className="inline-flex items-baseline relative mx-[0.02em] self-baseline"
+                >
+                  <svg 
+                    viewBox="0 0 100 100" 
+                    className="w-[0.58em] h-[0.64em] inline-block overflow-visible drop-shadow-[0_4px_10px_rgba(37,99,235,0.45)]"
+                    style={{ verticalAlign: "baseline", transform: "translateY(0.04em)" }}
+                  >
+                    <defs>
+                      <linearGradient id="oDropletGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#38bdf8" />
+                        <stop offset="40%" stopColor="#2563eb" />
+                        <stop offset="85%" stopColor="#1d4ed8" />
+                        <stop offset="100%" stopColor="#1e3a8a" />
+                      </linearGradient>
+                      <linearGradient id="oDropletRim" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+                        <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.4" />
+                      </linearGradient>
+                    </defs>
+                    {/* O-Shaped Liquid Water Drop Path (Soft top droplet apex with rounded O-oval body) */}
+                    <path 
+                      d="M 50,4 C 54,4 94,28 94,54 C 94,79 74,96 50,96 C 26,96 6,79 6,54 C 6,28 46,4 50,4 Z" 
+                      fill="url(#oDropletGrad)" 
+                      stroke="url(#oDropletRim)" 
+                      strokeWidth="3.5"
+                    />
+                    {/* Inner Water Drop Reflection & Specular Arc */}
+                    <path 
+                      d="M 28,40 C 22,50 22,66 28,75" 
+                      fill="none" 
+                      stroke="#ffffff" 
+                      strokeWidth="5.5" 
+                      strokeLinecap="round" 
+                      opacity="0.85"
+                    />
+                    {/* Top Gloss Highlight Spot */}
+                    <ellipse cx="48" cy="22" rx="4" ry="5" fill="#ffffff" opacity="0.9" transform="rotate(-15 48 22)" />
+                  </svg>
+                </motion.span>
+                <span>mmunities</span>
+              </span>
             </span>
           </motion.h1>
 
@@ -269,8 +335,8 @@ export default function Landing() {
           </motion.p>
 
           <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 w-full sm:w-auto px-4 lg:px-0">
-            <Link to="/register" className="w-full max-w-[280px] sm:w-auto">
-              <button className="btn-liquid-bubble-blue">
+            <Link to="/register" className="w-full sm:w-52">
+              <button className="btn-liquid-bubble-blue w-full">
                 <span className="btn-liquid-bubble-text">Get Started</span>
                 <div className="btn-liquid-bubble-liquid">
                   <div className="btn-liquid-bubble-bubble"></div>
@@ -282,8 +348,8 @@ export default function Landing() {
                 </div>
               </button>
             </Link>
-            <Link to="/login" className="w-full max-w-[280px] sm:w-auto">
-              <button className="btn-liquid-bubble">
+            <Link to="/login" className="w-full sm:w-52">
+              <button className="btn-liquid-bubble w-full">
                 <span className="btn-liquid-bubble-text">Sign In</span>
                 <div className="btn-liquid-bubble-liquid">
                   <div className="btn-liquid-bubble-bubble"></div>
@@ -395,9 +461,9 @@ export default function Landing() {
         initial="hidden"
         animate="visible"
         variants={containerVariants}
-        className="z-10 w-full px-6 max-w-6xl mx-auto py-20 md:py-32 relative"
+        className="z-10 w-full px-6 max-w-6xl mx-auto pt-10 pb-6 md:pt-14 md:pb-8 relative"
       >
-        <div className="text-center mb-8 md:mb-16">
+        <div className="text-center mb-8 md:mb-12">
           <motion.h2 
             variants={fadeUpVariants} 
             className="text-3xl md:text-5xl font-bold text-text mb-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-2"
@@ -461,7 +527,7 @@ export default function Landing() {
         whileInView="visible"
         viewport={{ once: true }}
         variants={fadeUpVariants}
-        className="w-full py-10 md:py-20 px-6 mt-4 md:mt-10 relative z-10"
+        className="w-full py-4 md:py-6 px-6 mt-0 md:mt-2 relative z-10"
       >
         <div style={{ perspective: '1000px' }} className="max-w-4xl mx-auto w-full">
           <motion.div 
@@ -471,11 +537,11 @@ export default function Landing() {
           >
             {/* Animated Blobs */}
             <div className="blobs">
-              <span className="blob" style={{ backgroundColor: "rgba(59, 130, 246, 0.4)" }}></span>
-              <span className="blob" style={{ backgroundColor: "rgba(16, 185, 129, 0.3)" }}></span>
-              <span className="blob" style={{ backgroundColor: "rgba(139, 92, 246, 0.4)" }}></span>
+              <span className="blob" style={{ backgroundColor: "rgba(59, 130, 246, 0.25)" }}></span>
               <span className="blob" style={{ backgroundColor: "rgba(6, 182, 212, 0.2)" }}></span>
-              <span className="blob" style={{ backgroundColor: "rgba(37, 99, 235, 0.3)" }}></span>
+              <span className="blob" style={{ backgroundColor: "rgba(99, 102, 241, 0.2)" }}></span>
+              <span className="blob" style={{ backgroundColor: "rgba(14, 165, 233, 0.2)" }}></span>
+              <span className="blob" style={{ backgroundColor: "rgba(37, 99, 235, 0.2)" }}></span>
             </div>
             {/* Noise filter */}
             <svg className="noise" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
@@ -560,7 +626,7 @@ export default function Landing() {
               </div>
 
               <h2 className="text-3xl md:text-5xl font-bold text-text mb-2 relative z-10">Ready to stop wasting water?</h2>
-              <p className="text-xl font-medium text-emerald-400 mb-6 relative z-10 tracking-wide">"Water is the driving force of all nature."</p>
+              <p className="text-xl font-bold bg-gradient-to-r from-primary to-cyan-500 bg-clip-text text-transparent mb-6 relative z-10 tracking-wide">"Water is the driving force of all nature."</p>
               <p className="text-lg text-text/80 mb-8 max-w-2xl mx-auto relative z-10 font-medium">
                 Join modern communities that use AquaTrack to reduce their water footprint and automate complex billing cycles.
               </p>
@@ -588,28 +654,27 @@ export default function Landing() {
       </motion.section>
 
       {/* Footer */}
-      <footer className="w-full bg-background/50 border-t border-border/50 z-10 mt-8 md:mt-20 relative pt-8 md:pt-16 pb-8 px-6">
-        <div className="max-w-6xl mx-auto hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+      <footer className="w-full bg-white/70 dark:bg-[#071324] text-text border-t border-primary/25 backdrop-blur-xl z-10 mt-6 md:mt-10 relative pt-8 md:pt-12 pb-8 px-2 sm:px-6 shadow-lg shadow-primary/5">
+        <div className="w-full px-4 sm:px-8 lg:px-12 hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
           {/* Logo & Description */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3.5">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full overflow-hidden border border-primary/20 bg-surface">
+              <div className="w-9 h-9 rounded-xl overflow-hidden border border-primary/40 bg-surface shadow-md shadow-primary/20 flex items-center justify-center">
                 <img src="/logo.png" alt="AquaTrack Logo" className="w-full h-full object-cover scale-110" />
               </div>
-              <span className="loader-text-inherit text-xl font-bold">
-                <span className="outline-layer">AquaTrack</span>
-                <span className="fill-layer">AquaTrack</span>
+              <span className="text-xl font-black tracking-tight text-text">
+                Aqua<span className="text-primary font-black">Track</span>
               </span>
             </div>
-            <p className="text-sm text-text/80 leading-relaxed">
+            <p className="text-xs text-text-muted leading-relaxed font-medium">
               Smart water tracking and automated billing infrastructure for modern communities. Saving water, simplifying payments.
             </p>
           </div>
 
           {/* Product Links */}
-          <div className="flex flex-col gap-3">
-            <h4 className="text-sm font-bold text-text tracking-wider uppercase">Product</h4>
-            <ul className="flex flex-col gap-2 text-sm text-text/80">
+          <div className="flex flex-col gap-2.5">
+            <h4 className="text-xs font-black text-text tracking-widest uppercase">Product</h4>
+            <ul className="flex flex-col gap-2 text-xs text-text-muted font-medium">
               <li><Link to="/features" className="hover:text-primary transition-colors">Features</Link></li>
               <li><Link to="/pricing" className="hover:text-primary transition-colors">Pricing</Link></li>
               <li><Link to="/security" className="hover:text-primary transition-colors">Security</Link></li>
@@ -618,9 +683,9 @@ export default function Landing() {
           </div>
 
           {/* Resources Links */}
-          <div className="flex flex-col gap-3">
-            <h4 className="text-sm font-bold text-text tracking-wider uppercase">Resources</h4>
-            <ul className="flex flex-col gap-2 text-sm text-text/80">
+          <div className="flex flex-col gap-2.5">
+            <h4 className="text-xs font-black text-text tracking-widest uppercase">Resources</h4>
+            <ul className="flex flex-col gap-2 text-xs text-text-muted font-medium">
               <li><Link to="/docs" className="hover:text-primary transition-colors">Documentation</Link></li>
               <li><Link to="/guides" className="hover:text-primary transition-colors">Guides</Link></li>
               <li><Link to="/status" className="hover:text-primary transition-colors">System Status</Link></li>
@@ -629,9 +694,9 @@ export default function Landing() {
           </div>
 
           {/* Legal Links */}
-          <div className="flex flex-col gap-3">
-            <h4 className="text-sm font-bold text-text tracking-wider uppercase">Legal</h4>
-            <ul className="flex flex-col gap-2 text-sm text-text/80">
+          <div className="flex flex-col gap-2.5">
+            <h4 className="text-xs font-black text-text tracking-widest uppercase">Legal</h4>
+            <ul className="flex flex-col gap-2 text-xs text-text-muted font-medium">
               <li><Link to="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
               <li><Link to="/terms" className="hover:text-primary transition-colors">Terms of Service</Link></li>
               <li><Link to="/license" className="hover:text-primary transition-colors">Licensing</Link></li>
@@ -640,8 +705,8 @@ export default function Landing() {
         </div>
 
         {/* Separator and Bottom area */}
-        <div className="max-w-6xl mx-auto pt-8 border-t border-border/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-text/80">
+        <div className="w-full px-4 sm:px-8 lg:px-12 pt-6 border-t border-border/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-xs text-text-muted font-medium">
             © {new Date().getFullYear()} AquaTrack Systems. All rights reserved.
           </p>
 

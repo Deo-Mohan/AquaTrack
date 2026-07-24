@@ -14,7 +14,6 @@ public class BulkWaterPurchase {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotNull(message = "Apartment ID is required")
     @Column(name = "apartment_id")
     private Long apartmentId;
 
@@ -46,6 +45,12 @@ public class BulkWaterPurchase {
 
     @Column(name = "notes")
     private String notes;
+
+    @Column(name = "apartment_block")
+    private String apartmentBlock;
+
+    @Column(name = "billing_month")
+    private String billingMonth;
 
     // Link to billing cycle (optional)
     @Column(name = "billing_cycle_id")
@@ -83,6 +88,10 @@ public class BulkWaterPurchase {
     public void setVendorName(String vendorName) { this.vendorName = vendorName; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+    public String getApartmentBlock() { return apartmentBlock; }
+    public void setApartmentBlock(String apartmentBlock) { this.apartmentBlock = apartmentBlock; }
+    public String getBillingMonth() { return billingMonth; }
+    public void setBillingMonth(String billingMonth) { this.billingMonth = billingMonth; }
     public Long getBillingCycleId() { return billingCycleId; }
     public void setBillingCycleId(Long billingCycleId) { this.billingCycleId = billingCycleId; }
 }

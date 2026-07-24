@@ -37,7 +37,8 @@ public class TariffController {
                 "block", block,
                 "baseRatePerLiter", 0.0,
                 "monthlyLimitLiters", 0.0,
-                "excessRatePerLiter", 0.0
+                "excessRatePerLiter", 0.0,
+                "lateFeePerMonth", 0.0
             ));
         }
 
@@ -45,7 +46,8 @@ public class TariffController {
             "block", block,
             "baseRatePerLiter", admin.getWaterRatePerLiter() != null ? admin.getWaterRatePerLiter() : 0.0,
             "monthlyLimitLiters", admin.getMonthlyLimitLiters() != null ? admin.getMonthlyLimitLiters() : 0.0,
-            "excessRatePerLiter", admin.getExcessRatePerLiter() != null ? admin.getExcessRatePerLiter() : 0.0
+            "excessRatePerLiter", admin.getExcessRatePerLiter() != null ? admin.getExcessRatePerLiter() : 0.0,
+            "lateFeePerMonth", admin.getLateFeePerMonth() != null ? admin.getLateFeePerMonth() : 0.0
         ));
     }
 
@@ -78,11 +80,13 @@ public class TariffController {
         Double baseRate = body.get("baseRatePerLiter") != null ? ((Number) body.get("baseRatePerLiter")).doubleValue() : null;
         Double limit = body.get("monthlyLimitLiters") != null ? ((Number) body.get("monthlyLimitLiters")).doubleValue() : null;
         Double excessRate = body.get("excessRatePerLiter") != null ? ((Number) body.get("excessRatePerLiter")).doubleValue() : null;
+        Double lateFee = body.get("lateFeePerMonth") != null ? ((Number) body.get("lateFeePerMonth")).doubleValue() : null;
 
         // Round to 4 decimal places to avoid IEEE 754 floating point corruption in MySQL
         if (baseRate != null) baseRate = Math.round(baseRate * 10000.0) / 10000.0;
         if (limit != null) limit = Math.round(limit * 10000.0) / 10000.0;
         if (excessRate != null) excessRate = Math.round(excessRate * 10000.0) / 10000.0;
+        if (lateFee != null) lateFee = Math.round(lateFee * 100.0) / 100.0;
 
         // Base rate is a Super Admin-only setting — Community Admins cannot change it
         if ("ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(callerRole)) {
@@ -92,6 +96,7 @@ public class TariffController {
         if (baseRate != null) admin.setWaterRatePerLiter(baseRate);
         if (limit != null) admin.setMonthlyLimitLiters(limit);
         if (excessRate != null) admin.setExcessRatePerLiter(excessRate);
+        if (lateFee != null) admin.setLateFeePerMonth(lateFee);
 
         userRepository.save(admin);
 
@@ -106,6 +111,7 @@ public class TariffController {
             if (baseRate != null) resident.setWaterRatePerLiter(baseRate);
             if (limit != null) resident.setMonthlyLimitLiters(limit);
             if (excessRate != null) resident.setExcessRatePerLiter(excessRate);
+            if (lateFee != null) resident.setLateFeePerMonth(lateFee);
             userRepository.save(resident);
         }
 
@@ -114,7 +120,8 @@ public class TariffController {
             "block", block,
             "baseRatePerLiter", admin.getWaterRatePerLiter() != null ? admin.getWaterRatePerLiter() : 0.0,
             "monthlyLimitLiters", admin.getMonthlyLimitLiters() != null ? admin.getMonthlyLimitLiters() : 0.0,
-            "excessRatePerLiter", admin.getExcessRatePerLiter() != null ? admin.getExcessRatePerLiter() : 0.0
+            "excessRatePerLiter", admin.getExcessRatePerLiter() != null ? admin.getExcessRatePerLiter() : 0.0,
+            "lateFeePerMonth", admin.getLateFeePerMonth() != null ? admin.getLateFeePerMonth() : 0.0
         ));
     }
 }

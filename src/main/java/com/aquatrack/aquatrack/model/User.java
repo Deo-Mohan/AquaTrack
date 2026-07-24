@@ -61,6 +61,8 @@ public class User {
 
     private Double excessRatePerLiter;   // Rate charged per liter above the monthly limit
 
+    private Double lateFeePerMonth;      // Fee charged per month late past due date
+
     public User() {}
 
     public User(String username, String email, String password, String role, String houseNumber, String colonyName, String apartmentBlock, String gender) {
@@ -113,4 +115,6 @@ public class User {
     public void setMonthlyLimitLiters(Double monthlyLimitLiters) { this.monthlyLimitLiters = monthlyLimitLiters; }
     public Double getExcessRatePerLiter() { return excessRatePerLiter; }
     public void setExcessRatePerLiter(Double excessRatePerLiter) { this.excessRatePerLiter = excessRatePerLiter; }
+    public Double getLateFeePerMonth() { return lateFeePerMonth; }
+    public void setLateFeePerMonth(Double lateFeePerMonth) { this.lateFeePerMonth = lateFeePerMonth; }
 }

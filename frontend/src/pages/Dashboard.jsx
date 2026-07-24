@@ -61,27 +61,34 @@ const getGreeting = () => {
   return 'Good evening';
 };
 
-const StatCard = ({ title, value, subtitle, icon: Icon, color, delay }) => (
+const StatCard = ({ title, value, subtitle, infoNote, icon: Icon, color, delay }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay, duration: 0.4 }}
-    className="glass-card p-6 relative overflow-hidden group"
+    className="glass-card p-6 relative overflow-hidden group flex flex-col justify-between"
   >
-    <div className="flex justify-between items-start mb-4">
-      <div>
-        <p className="text-text-muted text-sm font-medium mb-1">{title}</p>
-        <h3 className="text-3xl font-bold text-text tracking-tight">{value}</h3>
+    <div>
+      <div className="flex justify-between items-start mb-3">
+        <div>
+          <p className="text-text-muted text-sm font-medium mb-1">{title}</p>
+          <h3 className="text-3xl font-bold text-text tracking-tight">{value}</h3>
+        </div>
+        <div className={`p-3 rounded-xl bg-${color}-500/10 text-${color}-400 group-hover:scale-110 transition-transform duration-300`}>
+          <Icon className="w-6 h-6" />
+        </div>
       </div>
-      <div className={`p-3 rounded-xl bg-${color}-500/10 text-${color}-400 group-hover:scale-110 transition-transform duration-300`}>
-        <Icon className="w-6 h-6" />
-      </div>
+      {subtitle && (
+        <div className="flex items-center text-xs font-semibold text-emerald-400 mb-1">
+          <span>{subtitle}</span>
+        </div>
+      )}
     </div>
-    {subtitle && (
-      <div className="flex items-center text-sm">
-        <TrendingDown className="w-4 h-4 text-emerald-400 mr-1" />
-        <span className="text-emerald-400 font-medium">{subtitle}</span>
-        <span className="text-text-muted ml-2">vs last week</span>
+
+    {infoNote && (
+      <div className="mt-3 pt-2.5 border-t border-border/40 flex items-start gap-2 text-[11px] text-amber-600 dark:text-amber-300/90 font-medium">
+        <Clock className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500 dark:text-amber-400" />
+        <span>{infoNote}</span>
       </div>
     )}
     <div className={`absolute -right-10 -bottom-10 w-32 h-32 bg-${color}-500/5 rounded-full blur-2xl group-hover:bg-${color}-500/10 transition-colors`} />
@@ -673,6 +680,7 @@ export default function Dashboard() {
           title="Current Bill (Est)"
           value={`₹${stats.unpaidBillAmount.toFixed(2)}`}
           subtitle={stats.unpaidBillAmount > 0 ? "Pending Payment" : "No Unpaid Bills"}
+          infoNote="Pay within 20 days of bill generation to avoid late fee penalties."
           icon={Receipt}
           color="emerald"
           delay={0.2}
