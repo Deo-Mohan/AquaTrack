@@ -102,32 +102,32 @@ export default function Notifications() {
   };
 
   const getBgColor = (type, title, isRead) => {
-    if (isRead) return 'bg-surface-light/40 dark:bg-surface-light/10 border-border/50 opacity-70';
+    if (isRead) return 'bg-surface-light/40 dark:bg-surface-light/10 border-2 border-slate-300/80 dark:border-slate-700/80 opacity-80 hover:border-primary/60';
     const sev = getSeverity(type, title);
     switch (sev) {
       case 'danger':
-        return 'bg-red-500/10 dark:bg-red-500/10 border-red-500/30 dark:border-red-500/25';
+        return 'bg-red-500/10 dark:bg-red-500/15 border-2 border-red-500/50 dark:border-red-500/40 shadow-sm shadow-red-500/10 hover:border-red-500';
       case 'success':
-        return 'bg-emerald-500/10 dark:bg-emerald-500/10 border-emerald-500/30 dark:border-emerald-500/25';
+        return 'bg-emerald-500/10 dark:bg-emerald-500/15 border-2 border-emerald-500/50 dark:border-emerald-500/40 shadow-sm shadow-emerald-500/10 hover:border-emerald-500';
       case 'billing':
-        return 'bg-indigo-500/10 dark:bg-indigo-500/10 border-indigo-500/30 dark:border-indigo-500/25';
+        return 'bg-indigo-500/10 dark:bg-indigo-500/15 border-2 border-indigo-500/50 dark:border-indigo-500/40 shadow-sm shadow-indigo-500/10 hover:border-indigo-500';
       default:
-        return 'bg-blue-500/10 dark:bg-blue-500/10 border-blue-500/30 dark:border-blue-500/25';
+        return 'bg-blue-500/10 dark:bg-blue-500/15 border-2 border-blue-500/50 dark:border-blue-500/40 shadow-sm shadow-blue-500/10 hover:border-blue-500';
     }
   };
 
   const getIconContainerClass = (type, title, isRead) => {
-    if (isRead) return 'p-2.5 rounded-lg bg-surface flex-shrink-0 mt-0.5 border border-border/40';
+    if (isRead) return 'p-2.5 rounded-xl bg-surface flex-shrink-0 mt-0.5 border border-border/70';
     const sev = getSeverity(type, title);
     switch (sev) {
       case 'danger':
-        return 'p-2.5 rounded-lg bg-red-500/15 border border-red-500/20 flex-shrink-0 mt-0.5';
+        return 'p-2.5 rounded-xl bg-red-500/20 border border-red-500/40 flex-shrink-0 mt-0.5';
       case 'success':
-        return 'p-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/20 flex-shrink-0 mt-0.5';
+        return 'p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex-shrink-0 mt-0.5';
       case 'billing':
-        return 'p-2.5 rounded-lg bg-indigo-500/15 border border-indigo-500/20 flex-shrink-0 mt-0.5';
+        return 'p-2.5 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex-shrink-0 mt-0.5';
       default:
-        return 'p-2.5 rounded-lg bg-blue-500/15 border border-blue-500/20 flex-shrink-0 mt-0.5';
+        return 'p-2.5 rounded-xl bg-blue-500/20 border border-blue-500/40 flex-shrink-0 mt-0.5';
     }
   };
 

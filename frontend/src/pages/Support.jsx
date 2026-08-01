@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   MessageSquare, Plus, AlertTriangle, CheckCircle2, Clock, 
   Send, ShieldAlert, ArrowUpRight, Filter, User, HelpCircle, 
-  Loader2, Mail, Shield, Check, X, RefreshCw, Sparkles
+  Loader2, Mail, Shield, Check, X, RefreshCw, Sparkles, LifeBuoy, Image, Paperclip
 } from 'lucide-react';
 import api from '../api';
 
@@ -17,6 +17,7 @@ export default function Support() {
   // Modals & Form states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEscalateModal, setShowEscalateModal] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
   const [escalationReason, setEscalationReason] = useState('');
   const [replyText, setReplyText] = useState('');
   const [submittingReply, setSubmittingReply] = useState(false);
@@ -28,8 +29,24 @@ export default function Support() {
     title: '',
     category: 'BILLING',
     priority: 'MEDIUM',
-    description: ''
+    description: '',
+    screenshotUrl: ''
   });
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size exceeds 5MB limit. Please upload a smaller image.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setTicketForm(prev => ({ ...prev, screenshotUrl: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Filter state
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -41,6 +58,26 @@ export default function Support() {
   const username = localStorage.getItem('username');
   const role = localStorage.getItem('role') || 'ROLE_RESIDENT';
 
+  // Read status state for unread replies count
+  const [readTicketCounts, setReadTicketCounts] = useState(() => {
+    try {
+      const saved = localStorage.getItem('aquatrack_read_reply_counts');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const markTicketAsRead = (ticket) => {
+    if (!ticket) return;
+    const replyCount = ticket.replies ? ticket.replies.length : 0;
+    setReadTicketCounts(prev => {
+      const updated = { ...prev, [ticket.id]: replyCount };
+      localStorage.setItem('aquatrack_read_reply_counts', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   const isResident = role === 'ROLE_RESIDENT';
   const isCommunityAdmin = role === 'ROLE_COMMUNITY_ADMIN';
   const isSuperAdmin = role === 'ROLE_SUPER_ADMIN' || role === 'ROLE_ADMIN';
@@ -48,7 +85,6 @@ export default function Support() {
   // Fetch Tickets
   const fetchTickets = async () => {
     try {
-      setLoading(true);
       setError('');
       const res = await api.get(`/tickets?callerUsername=${username}`);
       const data = res.data || [];
@@ -60,7 +96,6 @@ export default function Support() {
       }
     } catch (err) {
       console.error('Error fetching support tickets', err);
-      setError(err.response?.data?.message || 'Failed to load support tickets.');
     } finally {
       setLoading(false);
     }
@@ -90,10 +125,17 @@ export default function Support() {
     }
   };
 
+  // Real-Time Polling for live updates (4 seconds interval)
   useEffect(() => {
     if (username) {
       fetchTickets();
       fetchContacts();
+
+      const interval = setInterval(() => {
+        fetchTickets();
+      }, 4000);
+
+      return () => clearInterval(interval);
     }
   }, [username]);
 
@@ -114,7 +156,7 @@ export default function Support() {
       };
       await api.post(`/tickets/create?callerUsername=${username}`, payload);
       setShowCreateModal(false);
-      setTicketForm({ title: '', category: 'BILLING', priority: 'MEDIUM', description: '' });
+      setTicketForm({ title: '', category: 'BILLING', priority: 'MEDIUM', description: '', screenshotUrl: '' });
       await fetchTickets();
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to create support ticket');
@@ -134,6 +176,7 @@ export default function Support() {
         message: replyText
       });
       setSelectedTicket(res.data);
+      markTicketAsRead(res.data);
       setReplyText('');
       await fetchTickets();
     } catch (err) {
@@ -192,7 +235,7 @@ export default function Support() {
       return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"><CheckCircle2 className="w-3.5 h-3.5" /> Resolved</span>;
     }
     if (ticket.escalatedToSuperAdmin || ticket.status === 'ESCALATED_TO_SUPER_ADMIN') {
-      return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30 animate-pulse"><ShieldAlert className="w-3.5 h-3.5" /> Escalated to Super Admin</span>;
+      return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30 animate-pulse"><ShieldAlert className="w-3.5 h-3.5" /> Sent to Super Admin</span>;
     }
     if (ticket.status === 'IN_PROGRESS') {
       return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30"><Clock className="w-3.5 h-3.5" /> In Progress</span>;
@@ -221,28 +264,43 @@ export default function Support() {
           <div className="flex flex-wrap items-center gap-3 mb-2">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-blue-600 dark:text-cyan-400" />
-              Support & Help Desk
+              Support & Resolution Center
             </h1>
             <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-blue-600/10 text-blue-700 dark:bg-cyan-500/20 dark:text-cyan-300 border border-blue-600/20 dark:border-cyan-400/30">
-              {isSuperAdmin ? 'Platform Super Admin' : isCommunityAdmin ? 'Community Manager' : 'Household Resident'}
+              {isSuperAdmin ? 'Platform Super Admin' : isCommunityAdmin ? 'Community Admin' : 'Resident'}
             </span>
           </div>
-          <p className="text-slate-600 dark:text-slate-300 text-xs sm:text-sm leading-relaxed font-medium">
-            {isResident && "Raise concerns regarding billing, meter readings, or leaks. Your Community Manager will respond promptly."}
-            {isCommunityAdmin && "Manage resident tickets in your community or escalate complex issues to the Platform Super Admin."}
-            {isSuperAdmin && "Review escalated community issues and direct tickets from Community Managers."}
+          <p className="text-slate-600 dark:text-slate-300 text-xs sm:text-sm leading-relaxed font-medium mb-4">
+            {isResident && "Raise water, billing, or meter issues. Track live updates and get notified when your Community Admin responds."}
+            {isCommunityAdmin && "Review resident issues, respond directly, resolve tickets, or forward complex cases to the Platform Super Admin."}
+            {isSuperAdmin && "Manage system-wide escalated tickets and assist community administrators."}
           </p>
+
+          {/* Raise Concern / Create Ticket Button (Hidden for Super Admin) */}
+          {activeTab === 'tickets' && !isSuperAdmin && (
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={() => setShowCreateModal(true)}
+              className="bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white py-2.5 px-5 rounded-2xl font-extrabold text-xs inline-flex items-center gap-2.5 shadow-xl shadow-blue-500/30 border border-white/20 transition-all cursor-pointer"
+            >
+              <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
+                <Plus className="w-3.5 h-3.5 text-white stroke-[3]" />
+              </div>
+              <span className="tracking-wide">{isResident ? 'Raise Concern' : 'Create Internal Ticket'}</span>
+            </motion.button>
+          )}
         </div>
 
-        {/* Action Controls Group */}
-        <div className="flex flex-wrap items-center gap-3 z-10 w-full xl:w-auto shrink-0">
-          <div className="flex bg-white/80 dark:bg-slate-900/90 p-1.5 rounded-2xl border border-slate-300/70 dark:border-slate-700/60 shadow-inner w-full sm:w-auto">
+        {/* Action Controls Group (Tabs only on Right Side) */}
+        <div className="flex items-center gap-3 z-10 shrink-0">
+          <div className="flex bg-surface-lighter/80 dark:bg-surface-lighter/40 p-1.5 rounded-2xl border border-primary/20 shadow-inner backdrop-blur-md">
             <button
               onClick={() => setActiveTab('tickets')}
-              className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 ${
                 activeTab === 'tickets' 
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30' 
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md shadow-blue-500/30 scale-105' 
+                  : 'text-text-muted hover:text-text hover:bg-surface-lighter/50'
               }`}
             >
               <MessageSquare className="w-4 h-4" />
@@ -250,26 +308,16 @@ export default function Support() {
             </button>
             <button
               onClick={() => setActiveTab('contacts')}
-              className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 ${
                 activeTab === 'contacts' 
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30' 
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md shadow-blue-500/30 scale-105' 
+                  : 'text-text-muted hover:text-text hover:bg-surface-lighter/50'
               }`}
             >
               <Mail className="w-4 h-4" />
               <span>Contacts</span>
             </button>
           </div>
-
-          {activeTab === 'tickets' && (
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-5 rounded-2xl font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 transition-all shrink-0 active:scale-95"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{isResident ? 'Raise Concern' : 'Create Ticket'}</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -277,82 +325,107 @@ export default function Support() {
         /* Equal Height Grid Panels (min-h-[520px]) */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
           
-          {/* LEFT: Ticket List Panel (5 Cols) */}
-          <div className="lg:col-span-5 flex flex-col justify-between bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-xl min-h-[520px]">
-            <div className="flex flex-col gap-4">
+          {/* LEFT: Ticket Search & Filter List (5 Cols) */}
+          <div className="lg:col-span-5 flex flex-col justify-between bg-surface/80 dark:bg-surface/40 backdrop-blur-xl border border-primary/20 rounded-3xl p-5 sm:p-6 shadow-xl min-h-[520px]">
+            <div className="space-y-4">
               
               {/* Filter Bar */}
-              <div className="flex items-center justify-between gap-1.5 bg-slate-100/90 dark:bg-slate-800/90 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700">
-                {['ALL', 'OPEN', 'ESCALATED', 'RESOLVED'].map((f) => (
+              <div className="flex items-center justify-between gap-1.5 bg-surface-lighter/60 dark:bg-surface-lighter/30 p-1.5 rounded-2xl border border-primary/10">
+                {[
+                  { id: 'ALL', label: 'ALL' },
+                  { id: 'OPEN', label: 'OPEN' },
+                  { id: 'ESCALATED', label: 'SENT TO ADMIN' },
+                  { id: 'RESOLVED', label: 'RESOLVED' }
+                ].map((f) => (
                   <button
-                    key={f}
-                    onClick={() => setStatusFilter(f)}
-                    className={`flex-1 py-1.5 rounded-xl text-[11px] font-extrabold transition-all uppercase tracking-wider ${
-                      statusFilter === f 
-                        ? 'bg-blue-600 text-white shadow-sm' 
-                        : 'text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-white'
+                    key={f.id}
+                    onClick={() => setStatusFilter(f.id)}
+                    className={`flex-1 py-1.5 rounded-xl text-[10px] sm:text-[11px] font-extrabold transition-all uppercase tracking-wider ${
+                      statusFilter === f.id 
+                        ? 'bg-primary text-white shadow-md shadow-primary/20' 
+                        : 'text-text-muted hover:text-primary dark:hover:text-white'
                     }`}
                   >
-                    {f}
+                    {f.label}
                   </button>
                 ))}
                 <button 
                   onClick={fetchTickets}
-                  className="p-1.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors" 
+                  className="p-1.5 rounded-xl hover:bg-surface-lighter text-text-muted hover:text-text transition-colors" 
                   title="Refresh"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-primary' : ''}`} />
                 </button>
               </div>
 
               {/* Ticket List Cards */}
               {loading && tickets.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20">
-                  <Loader2 className="w-8 h-8 text-blue-600 animate-spin mb-2" />
-                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Loading support tickets...</span>
+                  <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
+                  <span className="text-xs font-bold text-text-muted">Loading support tickets...</span>
                 </div>
               ) : filteredTickets.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-center px-4">
-                  <HelpCircle className="w-12 h-12 text-blue-500/40 mb-3" />
-                  <p className="text-base font-extrabold text-slate-800 dark:text-slate-100 mb-1">No Tickets Found</p>
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 max-w-xs">
+                  <HelpCircle className="w-12 h-12 text-primary/40 mb-3" />
+                  <p className="text-base font-extrabold text-text mb-1">No Tickets Found</p>
+                  <p className="text-xs font-medium text-text-muted max-w-xs">
                     {statusFilter === 'ALL' 
                       ? 'No support tickets have been raised yet.' 
                       : `No tickets matching filter "${statusFilter}".`}
                   </p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-3 max-h-[420px] overflow-y-auto pr-1">
+                <div className="flex flex-col gap-3 max-h-[420px] overflow-y-auto pr-1 custom-scrollbar">
                   {filteredTickets.map((ticket) => {
                     const isSelected = selectedTicket && selectedTicket.id === ticket.id;
+                    const totalReplies = ticket.replies ? ticket.replies.length : 0;
+                    const lastReadCount = readTicketCounts[ticket.id] || 0;
+                    const unreadReplies = Math.max(0, totalReplies - lastReadCount);
+
                     return (
                       <motion.div
                         key={ticket.id}
-                        onClick={() => setSelectedTicket(ticket)}
+                        onClick={() => {
+                          setSelectedTicket(ticket);
+                          markTicketAsRead(ticket);
+                        }}
                         whileHover={{ scale: 1.01 }}
-                        className={`p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden shadow-sm ${
+                        className={`p-4 rounded-2xl border transition-all cursor-pointer relative shadow-sm ${
                           isSelected 
-                            ? 'bg-blue-50/90 dark:bg-slate-800/90 border-blue-600 shadow-md shadow-blue-500/10' 
-                            : 'bg-slate-50/60 dark:bg-slate-800/50 border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-slate-700'
+                            ? 'bg-primary/10 border-primary shadow-md shadow-primary/10 ring-1 ring-primary' 
+                            : 'bg-surface/60 border-border hover:border-primary/50'
                         }`}
                       >
                         {ticket.escalatedToSuperAdmin && (
-                          <div className="absolute top-0 right-0 w-2 h-full bg-purple-600" />
+                          <div className="absolute top-0 right-0 w-2 h-full bg-purple-600 rounded-r-2xl" />
                         )}
                         
                         <div className="flex items-center justify-between gap-2 mb-2">
-                          <span className="text-[11px] font-mono font-extrabold text-blue-600 dark:text-blue-400">#{ticket.ticketNumber}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-mono font-extrabold text-primary">#{ticket.ticketNumber}</span>
+                            {ticket.screenshotUrl && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center gap-0.5" title="Has Screenshot Attachment">
+                                <Image className="w-2.5 h-2.5" />
+                                Image
+                              </span>
+                            )}
+                            {unreadReplies > 0 && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white animate-bounce shadow-md shadow-rose-500/30 flex items-center gap-0.5" title={`${unreadReplies} new reply`}>
+                                {unreadReplies} new
+                              </span>
+                            )}
+                          </div>
                           {getStatusBadge(ticket)}
                         </div>
 
-                        <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm line-clamp-1 mb-1">{ticket.title}</h3>
-                        <p className="text-slate-600 dark:text-slate-300 text-xs line-clamp-2 mb-3">{ticket.description}</p>
+                        <h3 className="font-extrabold text-text text-sm line-clamp-1 mb-1">{ticket.title}</h3>
+                        <p className="text-text-muted text-xs line-clamp-2 mb-3">{ticket.description}</p>
 
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-200/60 dark:border-slate-700/60 pt-2.5">
+                        <div className="flex items-center justify-between text-[11px] text-text-muted border-t border-border/50 pt-2.5">
                           <div className="flex items-center gap-1.5">
-                            <User className="w-3.5 h-3.5 text-blue-600" />
-                            <span className="font-bold text-slate-800 dark:text-slate-200">{ticket.createdByName}</span>
-                            {ticket.houseNumber && <span className="text-slate-500 dark:text-slate-400">({ticket.houseNumber})</span>}
+                            <User className="w-3.5 h-3.5 text-primary" />
+                            <span className="font-bold text-text">{ticket.createdByName}</span>
+                            {ticket.houseNumber && <span className="text-text-muted">({ticket.houseNumber})</span>}
                           </div>
                           {getPriorityBadge(ticket.priority)}
                         </div>
@@ -363,13 +436,14 @@ export default function Support() {
               )}
             </div>
 
-            <div className="text-[11px] font-medium text-slate-400 dark:text-slate-500 text-center border-t border-slate-100 dark:border-slate-800/60 pt-3">
-              Total Support Records: {tickets.length}
+            <div className="text-[11px] font-medium text-text-muted text-center border-t border-border/40 pt-3 flex items-center justify-center gap-1.5">
+              <Clock className="w-3 h-3 text-primary" />
+              <span>Total Active Records ({tickets.length}) • Support data automatically cleared after 15 days</span>
             </div>
           </div>
 
           {/* RIGHT: Selected Ticket Conversation Thread (7 Cols) */}
-          <div className="lg:col-span-7 flex flex-col justify-between bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl min-h-[520px]">
+          <div className="lg:col-span-7 flex flex-col justify-between bg-surface/80 dark:bg-surface/40 backdrop-blur-xl border border-primary/20 rounded-3xl p-6 sm:p-7 shadow-xl min-h-[520px]">
             {selectedTicket ? (
               <div className="flex flex-col justify-between h-full">
                 
@@ -379,8 +453,6 @@ export default function Support() {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs font-mono font-extrabold text-blue-600 dark:text-blue-400">#{selectedTicket.ticketNumber}</span>
-                        {getStatusBadge(selectedTicket)}
-                        {getPriorityBadge(selectedTicket.priority)}
                       </div>
                       <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">{selectedTicket.title}</h2>
                     </div>
@@ -394,7 +466,7 @@ export default function Support() {
                           className="px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 hover:bg-purple-500/25 transition-all flex items-center gap-1.5 shadow-sm"
                         >
                           <ShieldAlert className="w-3.5 h-3.5" />
-                          <span>Escalate to Super Admin</span>
+                          <span>Send Issue to Super Admin</span>
                         </button>
                       )}
 
@@ -412,35 +484,58 @@ export default function Support() {
                   </div>
 
                   {/* Metadata Row */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700/60 text-xs mb-5">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-surface-lighter/60 dark:bg-surface-lighter/30 p-3.5 rounded-2xl border border-primary/10 text-xs mb-5">
                     <div>
-                      <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-extrabold">Category</span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-200">{selectedTicket.category}</span>
+                      <span className="text-text-muted block text-[10px] uppercase font-extrabold">Category</span>
+                      <span className="font-extrabold text-text">{selectedTicket.category}</span>
                     </div>
                     <div>
-                      <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-extrabold">Raised By</span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-200">{selectedTicket.createdByName}</span>
+                      <span className="text-text-muted block text-[10px] uppercase font-extrabold">Raised By</span>
+                      <span className="font-extrabold text-text">{selectedTicket.createdByName}</span>
                     </div>
                     <div>
-                      <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-extrabold">House / Block</span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-200">{selectedTicket.houseNumber || 'N/A'}</span>
+                      <span className="text-text-muted block text-[10px] uppercase font-extrabold">House / Block</span>
+                      <span className="font-extrabold text-text">{selectedTicket.houseNumber || 'N/A'}</span>
                     </div>
                     <div>
-                      <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-extrabold">Community</span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-200">{selectedTicket.colonyName || 'System'}</span>
+                      <span className="text-text-muted block text-[10px] uppercase font-extrabold">Community</span>
+                      <span className="font-extrabold text-text">{selectedTicket.colonyName || 'System'}</span>
                     </div>
                   </div>
 
                   {/* Initial Ticket Description */}
-                  <div className="bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 p-4 rounded-2xl mb-5 shadow-sm">
-                    <span className="text-xs font-extrabold text-blue-700 dark:text-blue-300 block mb-1">Issue Overview:</span>
-                    <p className="text-sm text-slate-800 dark:text-slate-200 whitespace-pre-line leading-relaxed font-medium">{selectedTicket.description}</p>
+                  <div className="bg-primary/5 border border-primary/20 p-4 rounded-2xl mb-5 shadow-sm space-y-3">
+                    <div>
+                      <span className="text-xs font-extrabold text-primary block mb-1">Issue Overview:</span>
+                      <p className="text-sm text-text whitespace-pre-line leading-relaxed font-medium">{selectedTicket.description}</p>
+                    </div>
+
+                    {/* Screenshot attachment preview if available */}
+                    {selectedTicket.screenshotUrl && (
+                      <div className="border-t border-primary/15 pt-3">
+                        <span className="text-xs font-extrabold text-text flex items-center gap-1.5 mb-2">
+                          <Image className="w-3.5 h-3.5 text-primary" />
+                          Attached Issue Screenshot:
+                        </span>
+                        <div className="relative group max-w-sm rounded-xl overflow-hidden border border-border bg-surface-lighter/80 shadow-md">
+                          <img 
+                            src={selectedTicket.screenshotUrl} 
+                            alt="Issue Screenshot" 
+                            className="w-full max-h-48 object-contain cursor-pointer transition-transform duration-300 group-hover:scale-105"
+                            onClick={() => setPreviewImage(selectedTicket.screenshotUrl)}
+                          />
+                          <div className="absolute inset-0 bg-surface/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                            <span className="text-xs font-bold text-text bg-surface px-2.5 py-1 rounded-lg border border-border">Click to Enlarge</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Reply Conversation Feed */}
-                  <div className="space-y-4 max-h-[220px] overflow-y-auto pr-2 mb-4">
+                  <div className="space-y-4 max-h-[220px] overflow-y-auto pr-2 mb-4 custom-scrollbar">
                     <div className="text-center my-2">
-                      <span className="text-[10px] uppercase tracking-widest font-extrabold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1 rounded-full">
+                      <span className="text-[10px] uppercase tracking-widest font-extrabold text-text-muted bg-surface-lighter/80 border border-border px-3 py-1 rounded-full">
                         Discussion Thread ({selectedTicket.replies?.length || 0})
                       </span>
                     </div>
@@ -448,7 +543,13 @@ export default function Support() {
                     {selectedTicket.replies && selectedTicket.replies.length > 0 ? (
                       selectedTicket.replies.map((reply, idx) => {
                         const isSystem = reply.message.startsWith('⚠️ TICKET ESCALATED');
-                        const isMe = reply.senderEmail === username || reply.senderName === username;
+                        // Robust "isMe" check: match username, email, or role origin
+                        const cleanUsername = (username || '').toLowerCase();
+                        const isMe = Boolean(
+                          (reply.senderEmail && reply.senderEmail.toLowerCase() === cleanUsername) ||
+                          (reply.senderName && reply.senderName.toLowerCase() === cleanUsername) ||
+                          (reply.senderRole === role)
+                        );
                         
                         if (isSystem) {
                           return (
@@ -467,20 +568,20 @@ export default function Support() {
                             key={idx}
                             className={`flex flex-col max-w-[85%] ${isMe ? 'ml-auto items-end' : 'mr-auto items-start'}`}
                           >
-                            <div className="flex items-center gap-2 mb-1 text-[11px] text-slate-500 dark:text-slate-400">
-                              <span className="font-extrabold text-slate-800 dark:text-slate-200">{reply.senderName}</span>
+                            <div className={`flex items-center gap-2 mb-1 text-[11px] ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                              <span className="font-extrabold text-slate-800 dark:text-slate-200">{isMe ? 'You' : reply.senderName}</span>
                               <span className="px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-blue-500/15 text-blue-700 dark:text-blue-300">
                                 {reply.senderRole === 'ROLE_SUPER_ADMIN' || reply.senderRole === 'ROLE_ADMIN' ? 'Platform Admin' : reply.senderRole === 'ROLE_COMMUNITY_ADMIN' ? 'Community Admin' : 'Resident'}
                               </span>
                             </div>
                             <div className={`p-3.5 rounded-2xl text-xs leading-relaxed font-medium shadow-sm ${
                               isMe 
-                                ? 'bg-blue-600 text-white rounded-tr-none' 
-                                : 'bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-tl-none'
+                                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-tr-none shadow-blue-500/20' 
+                                : 'bg-surface-lighter/90 dark:bg-surface-lighter/60 border border-primary/20 text-text rounded-tl-none'
                             }`}>
                               {reply.message}
                             </div>
-                            <span className="text-[10px] font-bold text-slate-400 mt-1">
+                            <span className="text-[10px] font-bold text-text-muted mt-1">
                               {reply.createdAt ? new Date(reply.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                             </span>
                           </div>
@@ -513,10 +614,12 @@ export default function Support() {
               </div>
             ) : (
               <div className="text-center flex flex-col items-center justify-center h-full my-auto py-16">
-                <MessageSquare className="w-14 h-14 text-blue-500/40 mb-4" />
-                <h3 className="text-lg font-extrabold text-slate-900 dark:text-slate-100 mb-1">Select a Ticket</h3>
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 max-w-sm">
-                  Click on any support ticket from the list to view issue details, track updates, or reply to the discussion thread.
+                <div className="w-16 h-16 rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
+                  <MessageSquare className="w-8 h-8 text-primary" />
+                </div>
+                <h3 className="text-lg font-extrabold text-text mb-1">Select a Ticket to View</h3>
+                <p className="text-xs font-medium text-text-muted max-w-sm">
+                  Click any ticket from the list on the left to read issue details, view attached screenshots, or send replies.
                 </p>
               </div>
             )}
@@ -781,12 +884,40 @@ export default function Support() {
                   <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">Detailed Description *</label>
                   <textarea
                     required
-                    rows={4}
+                    rows={3}
                     value={ticketForm.description}
                     onChange={(e) => setTicketForm({ ...ticketForm, description: e.target.value })}
                     placeholder="Provide exact details, dates, or meter values regarding your issue..."
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-3 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600 font-medium"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">Attach Screenshot (Optional)</label>
+                  <div className="flex items-center gap-3">
+                    <label className="flex-1 cursor-pointer flex items-center justify-center gap-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-3 text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors">
+                      <Image className="w-4 h-4 text-blue-600 dark:text-cyan-400" />
+                      <span>{ticketForm.screenshotUrl ? 'Change Screenshot' : 'Upload Image / Screenshot'}</span>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleImageChange} 
+                        className="hidden" 
+                      />
+                    </label>
+                    {ticketForm.screenshotUrl && (
+                      <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-blue-500 shrink-0">
+                        <img src={ticketForm.screenshotUrl} alt="Preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setTicketForm(prev => ({ ...prev, screenshotUrl: '' }))}
+                          className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full p-0.5"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-3 pt-3">
@@ -802,7 +933,7 @@ export default function Support() {
                     disabled={creatingTicket}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-blue-500/25"
                   >
-                    {creatingTicket ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    {creatingTicket ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     <span>Submit Ticket</span>
                   </button>
                 </div>
@@ -820,46 +951,46 @@ export default function Support() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 border border-purple-500/40 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl relative"
+              className="bg-white dark:bg-slate-900 border border-purple-500/40 rounded-3xl p-7 sm:p-9 max-w-2xl w-full shadow-2xl relative"
             >
               <button
                 onClick={() => setShowEscalateModal(false)}
-                className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="absolute top-6 right-6 text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
               </button>
 
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-600">
-                  <ShieldAlert className="w-5 h-5" />
+              <div className="flex items-center gap-3.5 mb-3">
+                <div className="w-12 h-12 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-600 shrink-0">
+                  <ShieldAlert className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-extrabold text-slate-900 dark:text-slate-100">Escalate to Super Admin</h2>
-                  <span className="text-xs text-blue-600 dark:text-blue-400 font-mono font-bold">#{selectedTicket.ticketNumber}</span>
+                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">Send Issue to Super Admin</h2>
+                  <span className="text-xs text-blue-600 dark:text-blue-400 font-mono font-bold">Ticket #{selectedTicket.ticketNumber}</span>
                 </div>
               </div>
 
-              <p className="text-xs text-slate-600 dark:text-slate-400 mb-4 leading-relaxed font-medium">
-                If you are unable to solve this resident concern at the community level, escalating it will forward this ticket directly to the <strong className="text-slate-900 dark:text-slate-100">Platform Super Admin</strong> queue for system intervention.
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mb-5 leading-relaxed font-medium">
+                If this resident issue requires system-level authority or platform technical support, submitting it here will forward the entire ticket history directly to the <strong className="text-slate-900 dark:text-slate-100">Platform Super Admin</strong> team for action.
               </p>
 
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div>
-                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">Escalation Reason / Admin Note *</label>
+                  <label className="block text-xs font-extrabold text-slate-800 dark:text-slate-200 mb-1.5">Note for Super Admin *</label>
                   <textarea
-                    rows={3}
+                    rows={5}
                     value={escalationReason}
                     onChange={(e) => setEscalationReason(e.target.value)}
-                    placeholder="e.g. Requires backend database recount / Platform tariff policy override required..."
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-3 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-600 font-medium"
+                    placeholder="Provide details for the Super Admin (e.g., database recount required, platform policy exception needed...)"
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl p-4 text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-600 font-medium leading-relaxed"
                   />
                 </div>
 
-                <div className="flex justify-end gap-3 pt-2">
+                <div className="flex justify-end gap-3 pt-3">
                   <button
                     type="button"
                     onClick={() => setShowEscalateModal(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white"
                   >
                     Cancel
                   </button>
@@ -867,13 +998,45 @@ export default function Support() {
                     type="button"
                     onClick={handleEscalateTicket}
                     disabled={escalating}
-                    className="px-6 py-2.5 rounded-xl font-extrabold text-xs bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-500/25 flex items-center gap-2 disabled:opacity-50"
+                    className="px-6 py-3 rounded-2xl font-extrabold text-xs bg-purple-600 hover:bg-purple-700 text-white shadow-xl shadow-purple-500/25 flex items-center gap-2 disabled:opacity-50 transition-all active:scale-95"
                   >
                     {escalating ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
-                    <span>Confirm Escalation</span>
+                    <span>Send Issue to Super Admin</span>
                   </button>
                 </div>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* IMAGE ENLARGE LIGHTBOX MODAL */}
+      <AnimatePresence>
+        {previewImage && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-xl cursor-pointer"
+            onClick={() => setPreviewImage(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="relative max-w-5xl max-h-[90vh] p-2 bg-surface/90 border border-primary/30 rounded-3xl shadow-2xl overflow-hidden cursor-default"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setPreviewImage(null)}
+                className="absolute top-4 right-4 z-10 p-2 rounded-full bg-slate-900/80 text-white hover:bg-red-600 transition-colors shadow-lg"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <img 
+                src={previewImage} 
+                alt="Enlarged Attachment" 
+                className="w-full h-full max-h-[85vh] object-contain rounded-2xl"
+              />
             </motion.div>
           </div>
         )}

@@ -278,7 +278,7 @@ export default function MyUsage() {
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(parseInt(e.target.value, 10))}
-              className="bg-surface-lighter border border-border/80 rounded-lg px-2.5 py-1.5 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer font-bold"
+              className="notranslate bg-surface-lighter border border-border/80 rounded-lg px-2.5 py-1.5 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer font-bold"
             >
               {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((mName, idx) => (
                 <option key={mName} value={idx + 1}>{mName}</option>
@@ -564,7 +564,7 @@ export default function MyUsage() {
                     }
                     if (chartType === 'line') {
                       return (
-                        <LineChart data={weeklyUsage || usageData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                        <LineChart data={usageData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                           <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                           <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />

@@ -43,6 +43,9 @@ public class SupportTicket {
     @JsonIgnoreProperties({"password", "otp", "otpExpiry"})
     private User createdBy;
 
+    @Column(columnDefinition = "LONGTEXT")
+    private String screenshotUrl;
+
     private boolean escalatedToSuperAdmin = false;
     private String escalatedByName;
     
@@ -52,6 +55,9 @@ public class SupportTicket {
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime updatedAt = LocalDateTime.now();
     private LocalDateTime resolvedAt;
+
+    public String getScreenshotUrl() { return screenshotUrl; }
+    public void setScreenshotUrl(String screenshotUrl) { this.screenshotUrl = screenshotUrl; }
 
     @OneToMany(mappedBy = "ticket", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<TicketReply> replies = new ArrayList<>();

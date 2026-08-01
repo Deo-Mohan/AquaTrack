@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Droplet, ArrowRight, Shield, BarChart3, Users, Zap, CheckCircle2, Sun, Moon, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Droplet, ArrowRight, Shield, BarChart3, Users, Zap, CheckCircle2, Sun, Moon, Sparkles, Globe, ChevronDown, CheckCheck, Search } from 'lucide-react';
+import SharedHeader from '../components/SharedHeader';
 
 function FeaturePanelCard({ icon: Icon, title, subtitle, blobsColor, cardType }) {
   return (
@@ -45,11 +46,52 @@ function FeaturePanelCard({ icon: Icon, title, subtitle, blobsColor, cardType })
 export default function Landing() {
   const [valveClosed, setValveClosed] = React.useState(false);
   const [theme, setTheme] = React.useState(() => {
-    return document.documentElement.getAttribute('data-theme') || 'dark';
+    return localStorage.getItem('theme') || document.documentElement.getAttribute('data-theme') || 'dark';
   });
+
+  // Sync data-theme attribute on mount
+  React.useEffect(() => {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    setTheme(currentTheme);
+  }, []);
+
   const [bgType, setBgType] = React.useState(() => {
     return localStorage.getItem('landing-bg-type') || 'modern';
   });
+
+  // Language state & dropRef
+  const [currentLang, setCurrentLang] = useState(() => localStorage.getItem('selectedLang') || 'en');
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const [langSearchQuery, setLangSearchQuery] = useState('');
+  const langRef = useRef(null);
+
+  const languages = [
+    { code: 'en', name: 'English (Default)', flag: '🇬🇧' },
+    { code: 'hi', name: 'हिंदी (Hindi)', flag: '🇮🇳' },
+    { code: 'bn', name: 'বাংলা (Bengali)', flag: '🇮🇳' },
+    { code: 'te', name: 'తెలుగు (Telugu)', flag: '🇮🇳' },
+    { code: 'mr', name: 'मराठी (Marathi)', flag: '🇮🇳' },
+    { code: 'ta', name: 'தமிழ் (Tamil)', flag: '🇮🇳' },
+    { code: 'ur', name: 'اردو (Urdu)', flag: '🇮🇳' },
+    { code: 'gu', name: 'ગુજરાતી (Gujarati)', flag: '🇮🇳' },
+    { code: 'kn', name: 'ಕನ್ನಡ (Kannada)', flag: '🇮🇳' },
+    { code: 'ml', name: 'മലയാളം (Malayalam)', flag: '🇮🇳' },
+    { code: 'pa', name: 'ਪੰਜਾਬੀ (Punjabi)', flag: '🇮🇳' },
+    { code: 'or', name: 'ଓଡ଼ିଆ (Odia)', flag: '🇮🇳' },
+    { code: 'as', name: 'অসমীয়া (Assamese)', flag: '🇮🇳' },
+  ];
+
+  // Language display: listen to SharedHeader's localStorage changes
+  useEffect(() => {
+    const syncLang = () => {
+      setCurrentLang(localStorage.getItem('selectedLang') || 'en');
+    };
+    window.addEventListener('storage', syncLang);
+    // Also poll briefly for same-tab changes
+    const interval = setInterval(syncLang, 500);
+    return () => { window.removeEventListener('storage', syncLang); clearInterval(interval); };
+  }, []);
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -134,6 +176,8 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden flex flex-col items-center selection:bg-primary/30 scroll-smooth">
+      {/* Hidden Google Translate container for Landing Page */}
+      <div id="google_translate_element_landing" className="hidden" />
 
       {/* Liquid Background Canvas */}
       <canvas 
@@ -149,185 +193,96 @@ export default function Landing() {
       }`}>
         {/* Soft Radial Ambient Lighting */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-400/30 via-transparent to-transparent dark:from-primary/10 pointer-events-none" />
-
-        {/* Large Premium Floating Liquid Glow Orbs */}
-        <div className="absolute top-[-10%] left-[5%] w-[65vw] h-[65vw] rounded-full bg-gradient-to-tr from-sky-400/35 via-blue-500/25 to-indigo-400/25 dark:from-primary/10 dark:to-blue-500/10 blur-[130px] animate-pulse pointer-events-none" />
-        <div className="absolute bottom-[-10%] right-[5%] w-[55vw] h-[55vw] rounded-full bg-gradient-to-br from-emerald-400/30 via-teal-300/25 to-cyan-400/30 dark:from-emerald-500/5 dark:to-cyan-500/5 blur-[130px] animate-pulse pointer-events-none" style={{ animationDelay: '2s' }} />
-        <div className="absolute top-[35%] right-[10%] w-[40vw] h-[40vw] rounded-full bg-gradient-to-l from-cyan-400/30 via-sky-400/25 to-blue-400/30 dark:from-indigo-500/5 dark:to-blue-500/5 blur-[120px] pointer-events-none" style={{ animationDelay: '1s' }} />
-
-        {/* Ambient Rising Water Droplets/Bubbles */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-40 dark:opacity-20">
-          {[...Array(8)].map((_, i) => (
-            <motion.div
-              key={`bg-bubble-${i}`}
-              className="absolute bg-primary/20 rounded-full border border-white/40 backdrop-blur-[1px]"
-              style={{
-                width: `${Math.random() * 20 + 8}px`,
-                height: `${Math.random() * 20 + 8}px`,
-                left: `${Math.random() * 90 + 5}%`,
-                bottom: `-40px`,
-              }}
-              animate={{
-                y: [0, -900],
-                x: [0, Math.random() * 50 - 25],
-                opacity: [0, 0.6, 0.6, 0],
-              }}
-              transition={{
-                duration: Math.random() * 10 + 12,
-                repeat: Infinity,
-                delay: Math.random() * 10,
-                ease: "easeInOut",
-              }}
-            />
-          ))}
-        </div>
       </div>
 
-      {/* Brand Navbar */}
-      <nav className="w-full px-6 py-6 z-20 flex justify-center lg:justify-start">
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex items-center justify-between max-w-7xl mx-auto w-full"
-        >
-          <div className="flex items-center gap-3 md:gap-5">
-            <div className="w-12 h-12 md:w-24 md:h-24 flex-shrink-0 rounded-full overflow-hidden shadow-xl shadow-primary/30 border border-primary/20 bg-surface">
-              <img src="/logo.png" alt="AquaTrack Logo" className="w-full h-full object-cover scale-110" />
-            </div>
-            <div className="flex flex-col items-start gap-1 justify-center">
-              <div className="loader loader-md md:loader-lg">
-                <span className="outline-layer">AquaTrack</span>
-                <span className="fill-layer">AquaTrack</span>
-              </div>
-              <div className="btn-nextgen-gooey hidden md:block">
-                <p>
-                  <Zap className="w-3.5 h-3.5 text-emerald-400 animate-pulse mr-1.5 inline-block relative z-10" />
-                  <span>The Next Generation of Water Billing</span>
-                </p>
-                <div className="liquid">
-                  <span style={{ "--i": 0 }}><span></span></span>
-                  <span style={{ "--i": 1 }}><span></span></span>
-                  <span style={{ "--i": 2 }}><span></span></span>
-                  <span style={{ "--i": 3 }}><span></span></span>
-                  <span style={{ "--i": 4 }}><span></span></span>
-                  <span style={{ "--i": 5 }}><span></span></span>
-                  <span style={{ "--i": 6 }}><span></span></span>
-                  <span className="bg"><span></span></span>
-                </div>
-                <svg xmlns="http://www.w3.org/2000/svg" version="1.1" style={{ width: 0, height: 0, position: 'absolute', pointerEvents: 'none', opacity: 0 }}>
-                  <defs>
-                    <filter id="gooey-badge-filter">
-                      <feGaussianBlur in="SourceGraphic" stdDeviation="10" />
-                      <feColorMatrix values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 20 -10" />
-                    </filter>
-                  </defs>
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
-
-            <label htmlFor="switch" className="toggle">
-              <input 
-                type="checkbox" 
-                className="input" 
-                id="switch" 
-                checked={theme === 'light'} 
-                onChange={toggleTheme}
-              />
-              <div className="icon icon--moon">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M9.528 1.718a.75.75 0 01.162.819A8.97 8.97 0 009 6a9 9 0 009 9 8.97 8.97 0 003.463-.69.75.75 0 01.981.98 10.503 10.503 0 01-9.694 6.46c-5.799 0-10.5-4.701-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 01.818.162z"
-                    clipRule="evenodd"
-                  ></path>
-                </svg>
-              </div>
-
-              <div className="icon icon--sun">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path
-                    d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.894 6.166a.75.75 0 00-1.06-1.06l-1.591 1.59a.75.75 0 101.06 1.061l1.591-1.59zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H21a.75.75 0 01.75.75zM17.834 18.894a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 10-1.061 1.06l1.59 1.591zM12 18a.75.75 0 01.75.75V21a.75.75 0 01-1.5 0v-2.25A.75.75 0 0112 18zM7.758 17.303a.75.75 0 00-1.06-1.06l-1.591 1.59a.75.75 0 001.06 1.061l1.591-1.59zM6 12a.75.75 0 01-.75.75H3a.75.75 0 010-1.5h2.25A.75.75 0 016 12zM6.697 7.757a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 00-1.061 1.06l1.59 1.591z"
-                  ></path>
-                </svg>
-              </div>
-            </label>
-          </div>
-        </motion.div>
-      </nav>
+      {/* Shared Glassmorphic Header */}
+      <SharedHeader activeTab="home" />
 
       {/* Hero Section */}
       <motion.section 
+        id="hero"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="z-10 w-full px-6 max-w-7xl mx-auto pt-16 pb-28 md:pt-24 md:pb-36 flex flex-col lg:flex-row items-center justify-between gap-12 min-h-[85vh]"
+        className="z-10 w-full px-6 max-w-7xl mx-auto pt-16 pb-28 md:pt-24 md:pb-36 flex flex-col lg:flex-row items-center justify-between gap-12 min-h-[85vh] scroll-mt-24"
       >
         <div className="flex-1 text-center lg:text-left">
-          <motion.h1 variants={itemVariants} className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-text tracking-tight mb-8 lg:leading-[1.1]">
-            Smart Water Management <br className="hidden lg:block" />
-            <span className="inline-flex flex-wrap items-baseline">
-              <span className="bg-gradient-to-r from-blue-700 via-primary to-cyan-600 dark:from-primary dark:via-blue-400 dark:to-cyan-300 bg-clip-text text-transparent drop-shadow-sm mr-3 sm:mr-4">
-                For
-              </span>
-              <span className="inline-flex items-baseline bg-gradient-to-r from-blue-700 via-primary to-cyan-600 dark:from-primary dark:via-blue-400 dark:to-cyan-300 bg-clip-text text-transparent drop-shadow-sm">
-                <span>C</span>
-                <motion.span 
-                  animate={{ y: [0, -2, 0], scale: [1, 1.04, 1] }}
-                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                  className="inline-flex items-baseline relative mx-[0.02em] self-baseline"
-                >
-                  <svg 
-                    viewBox="0 0 100 100" 
-                    className="w-[0.58em] h-[0.64em] inline-block overflow-visible drop-shadow-[0_4px_10px_rgba(37,99,235,0.45)]"
-                    style={{ verticalAlign: "baseline", transform: "translateY(0.04em)" }}
-                  >
-                    <defs>
-                      <linearGradient id="oDropletGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#38bdf8" />
-                        <stop offset="40%" stopColor="#2563eb" />
-                        <stop offset="85%" stopColor="#1d4ed8" />
-                        <stop offset="100%" stopColor="#1e3a8a" />
-                      </linearGradient>
-                      <linearGradient id="oDropletRim" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
-                        <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.4" />
-                      </linearGradient>
-                    </defs>
-                    {/* O-Shaped Liquid Water Drop Path (Soft top droplet apex with rounded O-oval body) */}
-                    <path 
-                      d="M 50,4 C 54,4 94,28 94,54 C 94,79 74,96 50,96 C 26,96 6,79 6,54 C 6,28 46,4 50,4 Z" 
-                      fill="url(#oDropletGrad)" 
-                      stroke="url(#oDropletRim)" 
-                      strokeWidth="3.5"
-                    />
-                    {/* Inner Water Drop Reflection & Specular Arc */}
-                    <path 
-                      d="M 28,40 C 22,50 22,66 28,75" 
-                      fill="none" 
-                      stroke="#ffffff" 
-                      strokeWidth="5.5" 
-                      strokeLinecap="round" 
-                      opacity="0.85"
-                    />
-                    {/* Top Gloss Highlight Spot */}
-                    <ellipse cx="48" cy="22" rx="4" ry="5" fill="#ffffff" opacity="0.9" transform="rotate(-15 48 22)" />
-                  </svg>
-                </motion.span>
-                <span>mmunities</span>
-              </span>
-            </span>
+          <motion.h1
+            variants={itemVariants}
+            className={`font-display font-black text-text tracking-tight mb-8 ${
+              currentLang === 'en'
+                ? 'lg:leading-[1.1] text-4xl sm:text-5xl md:text-6xl lg:text-7xl'
+                : 'leading-[1.6] text-3xl sm:text-4xl md:text-5xl lg:text-6xl'
+            }`}
+          >
+            {currentLang === 'en' ? (
+              <>
+                Smart Water Management <br className="hidden lg:block" />
+                <span className="notranslate inline-flex flex-wrap items-baseline">
+                  <span className="bg-gradient-to-r from-blue-700 via-primary to-cyan-600 dark:from-primary dark:via-blue-400 dark:to-cyan-300 bg-clip-text text-transparent drop-shadow-sm mr-3 sm:mr-4">
+                    For
+                  </span>
+                  <span className="inline-flex items-baseline bg-gradient-to-r from-blue-700 via-primary to-cyan-600 dark:from-primary dark:via-blue-400 dark:to-cyan-300 bg-clip-text text-transparent drop-shadow-sm">
+                    <span>C</span>
+                    <motion.span
+                      animate={{ y: [0, -2, 0], scale: [1, 1.04, 1] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                      className="inline-flex items-baseline relative mx-[0.02em] self-baseline"
+                    >
+                      <svg
+                        viewBox="0 0 100 100"
+                        className="w-[0.58em] h-[0.64em] inline-block overflow-visible drop-shadow-[0_4px_10px_rgba(37,99,235,0.45)]"
+                        style={{ verticalAlign: 'baseline', transform: 'translateY(0.04em)' }}
+                      >
+                        <defs>
+                          <linearGradient id="oDropletGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="#38bdf8" />
+                            <stop offset="40%" stopColor="#2563eb" />
+                            <stop offset="85%" stopColor="#1d4ed8" />
+                            <stop offset="100%" stopColor="#1e3a8a" />
+                          </linearGradient>
+                          <linearGradient id="oDropletRim" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+                            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.4" />
+                          </linearGradient>
+                        </defs>
+                        <path d="M 50,4 C 54,4 94,28 94,54 C 94,79 74,96 50,96 C 26,96 6,79 6,54 C 6,28 46,4 50,4 Z" fill="url(#oDropletGrad)" stroke="url(#oDropletRim)" strokeWidth="3.5" />
+                        <path d="M 28,40 C 22,50 22,66 28,75" fill="none" stroke="#ffffff" strokeWidth="5.5" strokeLinecap="round" opacity="0.85" />
+                        <ellipse cx="48" cy="22" rx="4" ry="5" fill="#ffffff" opacity="0.9" transform="rotate(-15 48 22)" />
+                      </svg>
+                    </motion.span>
+                    <span>mmunities</span>
+                  </span>
+                </span>
+              </>
+            ) : (
+              // Non-English: show full heading from local dictionary (correct word order, no overflow SVG)
+              (() => {
+                const headings = {
+                  hi: ['स्मार्ट जल प्रबंधन', 'समुदायों के लिए'],
+                  bn: ['স্মার্ট জল ব্যবস্থাপনা', 'সম্প্রদায়গুলির জন্য'],
+                  te: ['స్మార్ట్ వాటర్ మేనేజ్‌మెంట్', 'కమ్యూనిటీల కోసం'],
+                  mr: ['स्मार्ट जल व्यवस्थापन', 'समुदायांसाठी'],
+                  ta: ['ஸ்மார்ட் நீர் மேலாண்மை', 'சமூகங்களுக்காக'],
+                  ur: ['سمارٹ واٹر مینجمنٹ', 'برادریوں کے لیے'],
+                  gu: ['સ્માર્ટ વોટર મેનેજમેન્ટ', 'સમુદાયો માટે'],
+                  kn: ['ಸ್ಮಾರ್ಟ್ ವಾಟರ್ ಮ್ಯಾನೇಜ್‌ಮೆಂಟ್', 'ಸಮುದಾಯಗಳಿಗಾಗಿ'],
+                  ml: ['സ്മാർട്ട് ജല മാനേജ്മെന്റ്', 'സമൂഹങ്ങൾക്കായി'],
+                  pa: ['ਸਮਾਰਟ ਵਾਟਰ ਮੈਨੇਜਮੈਂਟ', 'ਭਾਈਚਾਰਿਆਂ ਲਈ'],
+                  or: ['ସ୍ମାର୍ଟ ଜଳ ପରିଚାଳନା', 'ସମ୍ପ୍ରଦାୟ ପାଇଁ'],
+                  as: ['স্মাৰ্ট পানী ব্যৱস্থাপনা', 'সম্প্ৰদায়ৰ বাবে'],
+                };
+                const [line1, line2] = headings[currentLang] || ['Smart Water Management', 'For Communities'];
+                return (
+                  <>
+                    <span className="notranslate block leading-[1.5] py-1">{line1}</span>
+                    <span className="notranslate block leading-[1.5] py-1 bg-gradient-to-r from-blue-700 via-primary to-cyan-600 dark:from-primary dark:via-blue-400 dark:to-cyan-300 bg-clip-text text-transparent">
+                      {line2}
+                    </span>
+                  </>
+                );
+              })()
+            )}
           </motion.h1>
 
           <motion.p variants={itemVariants} className="text-base sm:text-lg md:text-xl text-text/90 mb-12 max-w-2xl mx-auto lg:mx-0 leading-relaxed px-4 lg:px-0">
@@ -458,10 +413,11 @@ export default function Landing() {
 
       {/* Features Section */}
       <motion.section 
+        id="features"
         initial="hidden"
         animate="visible"
         variants={containerVariants}
-        className="z-10 w-full px-6 max-w-6xl mx-auto pt-10 pb-6 md:pt-14 md:pb-8 relative"
+        className="z-10 w-full px-6 max-w-6xl mx-auto pt-10 pb-6 md:pt-14 md:pb-8 relative scroll-mt-24"
       >
         <div className="text-center mb-8 md:mb-12">
           <motion.h2 
@@ -521,13 +477,16 @@ export default function Landing() {
         </div>
       </motion.section>
 
-      {/* Footer CTA */}
+
+
+      {/* Footer CTA & Contact Section */}
       <motion.section 
+        id="contact"
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true }}
         variants={fadeUpVariants}
-        className="w-full py-4 md:py-6 px-6 mt-0 md:mt-2 relative z-10"
+        className="w-full py-4 md:py-6 px-6 mt-0 md:mt-2 relative z-10 scroll-mt-24"
       >
         <div style={{ perspective: '1000px' }} className="max-w-4xl mx-auto w-full">
           <motion.div 

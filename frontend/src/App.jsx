@@ -2,7 +2,9 @@ import React, { useState, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
-import PrivacyDialog from './components/PrivacyDialog';
+// Lazy load secondary global components for initial bundle optimization
+const HouseholdChatbot = lazy(() => import('./components/HouseholdChatbot'));
+const PrivacyDialog = lazy(() => import('./components/PrivacyDialog'));
 
 // Lazy load page components for code-splitting and optimized initial load times
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -24,6 +26,9 @@ const TariffSettings = lazy(() => import('./pages/TariffSettings'));
 const WaterPurchase = lazy(() => import('./pages/WaterPurchase'));
 const MeterWorkstation = lazy(() => import('./pages/MeterWorkstation'));
 const WaterBillingHistory = lazy(() => import('./pages/WaterBillingHistory'));
+const FeaturesPage = lazy(() => import('./pages/FeaturesPage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
 
 // Beautiful premium Glassmorphism page loader during lazy chunks fetching
 const PageLoader = () => (
@@ -55,7 +60,7 @@ const AuthLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex flex-col h-screen bg-background overflow-hidden selection:bg-primary/30">
+    <div className="flex flex-col h-screen bg-background overflow-hidden selection:bg-primary/30 relative">
       {/* Header takes full width at the top */}
       <Header toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
       
@@ -70,6 +75,9 @@ const AuthLayout = ({ children }) => {
           {children}
         </main>
       </div>
+
+      {/* Floating AI Household Assistant Chatbot */}
+      <HouseholdChatbot />
     </div>
   );
 };
@@ -90,6 +98,9 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Landing />} />
+          <Route path="/features" element={<FeaturesPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/contact" element={<ContactPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/register/invite/:token" element={<InviteRegister />} />

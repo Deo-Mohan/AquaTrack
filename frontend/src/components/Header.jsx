@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Menu, Sun, Moon, Bell, CheckCheck, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Menu, Sun, Moon, Bell, CheckCheck, Trash2, Globe, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api';
 
@@ -62,6 +63,7 @@ const UserAvatar = ({ gender, role, size = 40 }) => {
 };
 
 export default function Header({ toggleSidebar }) {
+  const navigate = useNavigate();
   const [theme, setTheme] = useState(() => {
     return document.documentElement.getAttribute('data-theme') || 'dark';
   });
@@ -229,12 +231,103 @@ export default function Header({ toggleSidebar }) {
     }
   };
 
+  // Google Translate Integration for Universal & Indian Languages
+  const [currentLang, setCurrentLang] = useState(() => localStorage.getItem('selectedLang') || 'en');
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const [langSearchQuery, setLangSearchQuery] = useState('');
+  const langRef = useRef(null);
+
+  const languages = [
+    { code: 'en', name: 'English (Default)', flag: '🇬🇧' },
+    { code: 'hi', name: 'हिन्दी (Hindi)', flag: '🇮🇳' },
+    { code: 'bn', name: 'বাংলা (Bengali)', flag: '🇮🇳' },
+    { code: 'te', name: 'తెలుగు (Telugu)', flag: '🇮🇳' },
+    { code: 'mr', name: 'मराठी (Marathi)', flag: '🇮🇳' },
+    { code: 'ta', name: 'தமிழ் (Tamil)', flag: '🇮🇳' },
+    { code: 'ur', name: 'اردو (Urdu)', flag: '🇮🇳' },
+    { code: 'gu', name: 'ગુજરાતી (Gujarati)', flag: '🇮🇳' },
+    { code: 'kn', name: 'ಕನ್ನಡ (Kannada)', flag: '🇮🇳' },
+    { code: 'ml', name: 'മലയാളം (Malayalam)', flag: '🇮🇳' },
+    { code: 'pa', name: 'ਪੰਜਾਬੀ (Punjabi)', flag: '🇮🇳' },
+    { code: 'or', name: 'ଓଡ଼ିଆ (Odia)', flag: '🇮🇳' },
+    { code: 'as', name: 'অসমীয়া (Assamese)', flag: '🇮🇳' },
+  ];
+
+  useEffect(() => {
+    if (!window.googleTranslateElementInit) {
+      window.googleTranslateElementInit = () => {
+        if (window.google && window.google.translate) {
+          new window.google.translate.TranslateElement(
+            {
+              pageLanguage: 'en',
+              includedLanguages: 'en,hi,bn,te,mr,ta,ur,gu,kn,ml,pa,or,as',
+              autoDisplay: false,
+              layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE
+            },
+            'google_translate_element'
+          );
+        }
+      };
+
+      const script = document.createElement('script');
+      script.src = '//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+
+    // Mutation Observer to permanently kill & hide the Google Translate top banner iframe
+    const observer = new MutationObserver(() => {
+      const bannerFrame = document.querySelector('.goog-te-banner-frame, iframe[id=":1.container"]');
+      if (bannerFrame && bannerFrame.style.display !== 'none') {
+        bannerFrame.style.display = 'none';
+        bannerFrame.style.visibility = 'hidden';
+      }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
+  }, []);
+
+  const changeLanguage = (langCode) => {
+    setCurrentLang(langCode);
+    localStorage.setItem('selectedLang', langCode);
+    window.dispatchEvent(new CustomEvent('languageChange', { detail: { lang: langCode } }));
+    setLangDropdownOpen(false);
+
+    // Trigger Google Translate frame combo switch if ready
+    const selectEl = document.querySelector('.goog-te-combo');
+    if (selectEl) {
+      selectEl.value = langCode;
+      selectEl.dispatchEvent(new Event('change'));
+    } else {
+      // Fallback setting cookie directly
+      document.cookie = `googtrans=/en/${langCode}; path=/; domain=${window.location.hostname}`;
+      document.cookie = `googtrans=/en/${langCode}; path=/;`;
+      window.location.reload();
+    }
+  };
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleLangClickOutside = (e) => {
+      if (langRef.current && !langRef.current.contains(e.target)) {
+        setLangDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleLangClickOutside);
+    return () => document.removeEventListener('mousedown', handleLangClickOutside);
+  }, []);
+
   return (
     <motion.header 
       initial={{ y: -50, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       className="h-16 lg:h-24 flex items-center justify-between px-4 lg:px-8 border-b border-border/50 bg-surface/50 backdrop-blur-xl relative z-30"
     >
+      {/* Hidden Google Translate container */}
+      <div id="google_translate_element" className="hidden" />
+
       <div className="flex items-center gap-2 lg:gap-4">
         <button 
           onClick={toggleSidebar} 
@@ -254,6 +347,116 @@ export default function Header({ toggleSidebar }) {
       </div>
 
       <div className="flex items-center gap-4 lg:gap-6">
+
+        {/* Universal & Indian Language Selector with Globe Icon */}
+        <div className="relative" ref={langRef}>
+          <button
+            onClick={() => setLangDropdownOpen(!langDropdownOpen)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface/80 hover:bg-surface-lighter border border-border/70 text-xs font-bold text-text transition-all hover:scale-105 shadow-sm"
+            title="Change Website Language"
+          >
+            <Globe className="w-4 h-4 text-primary animate-spin-slow" />
+            <span className="hidden sm:inline uppercase tracking-wider">{currentLang}</span>
+            <ChevronDown className="w-3.5 h-3.5 text-text-muted" />
+          </button>
+
+          <AnimatePresence>
+            {langDropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                className="absolute right-0 top-full mt-2 w-64 max-h-80 overflow-hidden flex flex-col bg-surface border border-primary/40 rounded-2xl shadow-2xl z-[9999] p-2 backdrop-blur-3xl"
+              >
+                {/* Header & Search Bar */}
+                <div className="p-2 border-b border-border bg-surface">
+                  <div className="text-[10px] uppercase tracking-wider font-extrabold text-primary mb-2 flex items-center justify-between">
+                    <span>🌐 Select Indian Language</span>
+                    <span className="text-[9px] font-bold text-primary/90 px-1.5 py-0.5 rounded-full bg-primary/10">{languages.length} Available</span>
+                  </div>
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+                    <input
+                      type="text"
+                      placeholder="Search language (e.g. Hindi, English)..."
+                      value={langSearchQuery}
+                      onChange={(e) => setLangSearchQuery(e.target.value)}
+                      className="w-full bg-surface-lighter text-text text-xs rounded-xl pl-8 pr-3 py-1.5 border border-border/80 focus:outline-none focus:border-primary/80 transition-all placeholder:text-text-muted/60"
+                      autoFocus
+                    />
+                    {langSearchQuery && (
+                      <button
+                        onClick={() => setLangSearchQuery('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text text-xs"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Language Items List */}
+                <div className="flex-1 overflow-y-auto space-y-1 p-1 bg-surface custom-scrollbar">
+                  {/* Pinned English (Default) Option on Top when not searching */}
+                  {!langSearchQuery && (
+                    <div className="mb-2 pb-1.5 border-b border-border/50">
+                      <div className="px-2 py-1 text-[9px] font-bold text-text-muted uppercase tracking-wider">Pinned Top</div>
+                      {languages.filter(l => l.code === 'en').map((l) => (
+                        <button
+                          key={l.code}
+                          onClick={() => changeLanguage(l.code)}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                            currentLang === l.code
+                              ? 'bg-primary/20 text-primary font-bold shadow-xs border border-primary/30'
+                              : 'text-text hover:bg-surface-lighter'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2">
+                            <span className="text-base">{l.flag}</span>
+                            <span className="font-bold">{l.name}</span>
+                          </span>
+                          {currentLang === l.code && <CheckCheck className="w-4 h-4 text-primary" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Filtered Languages List */}
+                  {languages
+                    .filter((l) => {
+                      if (!langSearchQuery) return l.code !== 'en'; // English already shown above
+                      const q = langSearchQuery.toLowerCase();
+                      return l.name.toLowerCase().includes(q) || l.code.toLowerCase().includes(q);
+                    })
+                    .map((l) => (
+                      <button
+                        key={l.code}
+                        onClick={() => changeLanguage(l.code)}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                          currentLang === l.code
+                            ? 'bg-primary/20 text-primary font-bold shadow-xs border border-primary/30'
+                            : 'text-text hover:bg-surface-lighter'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="text-base">{l.flag}</span>
+                          <span>{l.name}</span>
+                        </span>
+                        {currentLang === l.code && <CheckCheck className="w-3.5 h-3.5 text-primary" />}
+                      </button>
+                    ))}
+
+                  {/* Empty Search Result */}
+                  {languages.filter(l => l.name.toLowerCase().includes(langSearchQuery.toLowerCase()) || l.code.toLowerCase().includes(langSearchQuery.toLowerCase())).length === 0 && (
+                    <div className="py-6 text-center text-xs text-text-muted font-medium">
+                      No matching language found for "{langSearchQuery}"
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
 
         <label htmlFor="header-switch" className="toggle">
@@ -312,7 +515,7 @@ export default function Header({ toggleSidebar }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
-                className="fixed sm:absolute right-4 sm:right-0 left-4 sm:left-auto top-16 sm:top-full mt-3 w-auto sm:w-96 max-h-[480px] bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden z-50 notification-dropdown"
+                className="fixed sm:absolute right-4 sm:right-0 left-4 sm:left-auto top-16 sm:top-full mt-3 w-auto sm:w-96 max-h-[480px] bg-surface/95 dark:bg-surface/90 backdrop-blur-2xl border border-border/80 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-hidden z-50 notification-dropdown"
               >
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-border">
@@ -403,7 +606,11 @@ export default function Header({ toggleSidebar }) {
         <div className="h-8 w-px bg-border mx-1"></div>
 
         {/* User Profile - Gender-based Avatar */}
-        <div className="flex items-center gap-3 cursor-pointer group">
+        <div 
+          onClick={() => navigate('/profile')}
+          title="Click to view & edit your profile"
+          className="flex items-center gap-3 cursor-pointer group hover:scale-105 transition-all"
+        >
           <div className="text-right hidden sm:block">
             <p className="text-sm font-medium text-text group-hover:text-primary transition-colors">
               {username}
@@ -413,7 +620,7 @@ export default function Header({ toggleSidebar }) {
                role === 'ROLE_COMMUNITY_ADMIN' ? 'Community Admin' : 'Household User'}
             </p>
           </div>
-          <div className="w-10 h-10 rounded-full border-2 border-border group-hover:border-primary/50 transition-colors overflow-hidden flex-shrink-0">
+          <div className="w-10 h-10 rounded-full border-2 border-border group-hover:border-primary transition-colors overflow-hidden flex-shrink-0 shadow-sm">
             <UserAvatar gender={gender} role={role} size={40} />
           </div>
         </div>

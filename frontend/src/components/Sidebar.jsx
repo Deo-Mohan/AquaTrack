@@ -45,6 +45,32 @@ export default function Sidebar({ isOpen, setIsOpen }) {
     }
   };
 
+  // Fetch pending support tickets count for admins/community admins
+  const [openTicketsCount, setOpenTicketsCount] = useState(0);
+
+  React.useEffect(() => {
+    if (isAdmin) {
+      const fetchSupportCount = async () => {
+        try {
+          const username = localStorage.getItem('username');
+          if (username) {
+            const res = await api.get(`/tickets?callerUsername=${username}`);
+            if (res.data && Array.isArray(res.data)) {
+              // Count tickets that are OPEN or IN_PROGRESS or ESCALATED
+              const openCount = res.data.filter(t => t.status === 'OPEN' || t.status === 'IN_PROGRESS' || t.status === 'ESCALATED').length;
+              setOpenTicketsCount(openCount);
+            }
+          }
+        } catch (err) {
+          // ignore background count fetch error
+        }
+      };
+      fetchSupportCount();
+      const interval = setInterval(fetchSupportCount, 15000); // refresh count every 15 seconds
+      return () => clearInterval(interval);
+    }
+  }, [isAdmin]);
+
   const navItems = isAdmin 
     ? [
         { icon: LayoutDashboard, label: 'Dashboard',         path: '/admin' },
@@ -57,7 +83,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         ] : []),
         { icon: Bell,            label: 'Notifications',     path: '/notifications' },
         { icon: User,            label: 'Profile',           path: '/profile' },
-        { icon: HelpCircle,      label: 'Support',           path: '/support' },
+        { icon: HelpCircle,      label: 'Support',           path: '/support', badge: openTicketsCount },
       ]
     : [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
@@ -72,8 +98,12 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       ];
 
   const handleLogout = () => {
+    const savedTheme = localStorage.getItem('theme');
     localStorage.clear();
-    navigate('/login');
+    if (savedTheme) {
+      localStorage.setItem('theme', savedTheme);
+    }
+    navigate('/');
   };
 
   const isLinkActive = (path) => {
@@ -140,12 +170,23 @@ export default function Sidebar({ isOpen, setIsOpen }) {
               }
               title={isCollapsed ? item.label : ''}
             >
-              <item.icon className={`w-5 h-5 flex-shrink-0 transition-all duration-300 ${
-                isCollapsed ? 'lg:mr-0' : 'mr-3'
-              }`} />
-              <span className={`font-medium text-sm transition-all duration-300 truncate text-ellipsis overflow-hidden ${
-                isCollapsed ? 'lg:hidden lg:w-0' : 'block opacity-100'
-              }`}>{item.label}</span>
+              <div className="relative flex items-center w-full justify-between">
+                <div className="flex items-center">
+                  <item.icon className={`w-5 h-5 flex-shrink-0 transition-all duration-300 ${
+                    isCollapsed ? 'lg:mr-0' : 'mr-3'
+                  }`} />
+                  <span className={`font-medium text-sm transition-all duration-300 truncate text-ellipsis overflow-hidden ${
+                    isCollapsed ? 'lg:hidden lg:w-0' : 'block opacity-100'
+                  }`}>{item.label}</span>
+                </div>
+                {item.badge > 0 && (
+                  <span className={`min-w-[18px] h-[18px] px-1.5 flex items-center justify-center bg-red-500 text-white font-extrabold text-[10px] rounded-full shadow-md shadow-red-500/30 border border-white/20 animate-pulse ${
+                    isCollapsed ? 'lg:absolute lg:-top-1 lg:-right-1' : 'ml-2'
+                  }`}>
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </span>
+                )}
+              </div>
             </NavLink>
           ))}
         </div>

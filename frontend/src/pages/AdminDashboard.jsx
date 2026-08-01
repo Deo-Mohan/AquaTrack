@@ -1288,9 +1288,21 @@ export default function AdminDashboard() {
     );
     if (matchedColony) return matchedColony.name;
     
-    // Fallback: look up in users state
-    const matchedUser = users.find(u => u.apartmentBlock?.toLowerCase() === blockName.toLowerCase());
-    if (matchedUser && matchedUser.colonyName) return matchedUser.colonyName;
+    // Fallback: look up Community Admin for that block specifically
+    const communityAdminUser = users.find(u => 
+      (u.role === 'ROLE_COMMUNITY_ADMIN' || u.role === 'COMMUNITY_ADMIN') && 
+      u.apartmentBlock?.toLowerCase() === blockName.toLowerCase() &&
+      u.colonyName
+    );
+    if (communityAdminUser) return communityAdminUser.colonyName;
+
+    // Second fallback: any user in that block with a valid colonyName (excluding fallback usernames)
+    const matchedUser = users.find(u => 
+      u.apartmentBlock?.toLowerCase() === blockName.toLowerCase() && 
+      u.colonyName && 
+      u.colonyName.toLowerCase() !== u.username?.toLowerCase()
+    );
+    if (matchedUser) return matchedUser.colonyName;
 
     return 'Unassigned';
   };
@@ -1326,24 +1338,27 @@ export default function AdminDashboard() {
 
     // Super Admin:
     if (chartScope === 'colony') {
-      // Colony-wise View: group consumption by Colony Name
+      // Colony-wise View: group consumption by Colony Name from registered apartments list
       const colonyNamesSet = new Set(apartments.map(apt => apt.name));
       users.forEach(u => {
-        if (u.colonyName) colonyNamesSet.add(u.colonyName);
+        if (u.colonyName && u.role === 'ROLE_COMMUNITY_ADMIN') {
+          colonyNamesSet.add(u.colonyName);
+        }
       });
       
       const chartDataList = Array.from(colonyNamesSet).map(cName => ({ name: cName, usage: 0 }));
       
       usageLogs.forEach(log => {
         const logColony = getColonyNameForBlock(log.apartmentBlock);
+        if (!logColony || logColony === 'Unassigned') return;
         const matched = chartDataList.find(c => c.name.toLowerCase() === logColony.toLowerCase());
         if (matched) {
           matched.usage += log.readingLiters || 0;
-        } else if (logColony !== 'Unassigned') {
+        } else {
           chartDataList.push({ name: logColony, usage: log.readingLiters || 0 });
         }
       });
-      return chartDataList;
+      return chartDataList.filter(item => item.usage > 0 || apartments.some(a => a.name === item.name));
     } else {
       // Building-wise View: group consumption by building/block
       const blocksSet = new Set();
@@ -2128,36 +2143,36 @@ export default function AdminDashboard() {
                       const isInfo = log.type === 'info';
                       const isOk = log.type === 'ok';
                       
-                      let bgColor = 'bg-blue-500/5 border-blue-500/10';
-                      let textColor = 'text-blue-200';
-                      let subColor = 'text-blue-400/70';
+                      let bgColor = 'bg-blue-500/10 dark:bg-blue-500/15 border border-blue-500/20';
+                      let textColor = 'text-blue-900 dark:text-blue-200 font-bold';
+                      let subColor = 'text-blue-700 dark:text-blue-300 font-semibold';
                       let Icon = Server;
 
                       if (isWarning) {
-                        bgColor = 'bg-amber-500/5 border-amber-500/10';
-                        textColor = 'text-amber-200';
-                        subColor = 'text-amber-400/70';
+                        bgColor = 'bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/20';
+                        textColor = 'text-amber-900 dark:text-amber-200 font-bold';
+                        subColor = 'text-amber-800 dark:text-amber-300 font-semibold';
                         Icon = AlertCircle;
                       } else if (isOk) {
-                        bgColor = 'bg-emerald-500/5 border-emerald-500/10';
-                        textColor = 'text-emerald-200';
-                        subColor = 'text-emerald-400/70';
+                        bgColor = 'bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/20';
+                        textColor = 'text-emerald-900 dark:text-emerald-200 font-bold';
+                        subColor = 'text-emerald-800 dark:text-emerald-300 font-semibold';
                         Icon = Activity;
                       }
 
                       return (
-                        <div key={log.id} className={`flex items-start justify-between gap-3 p-3 rounded-lg border ${bgColor} group/log relative`}>
+                        <div key={log.id} className={`flex items-start justify-between gap-3 p-3.5 rounded-xl ${bgColor} group/log relative transition-all shadow-sm`}>
                           <div className="flex items-start gap-3">
-                            <Icon className="w-5 h-5 mt-0.5" style={{ color: isWarning ? '#fbbf24' : isOk ? '#34d399' : '#60a5fa' }} />
+                            <Icon className="w-5 h-5 mt-0.5 shrink-0" style={{ color: isWarning ? '#d97706' : isOk ? '#059669' : '#2563eb' }} />
                             <div>
-                              <p className={`text-sm font-medium ${textColor}`}>{log.title}</p>
+                              <p className={`text-sm ${textColor}`}>{log.title}</p>
                               <p className={`text-xs ${subColor} mt-1`}>{log.message}</p>
                             </div>
                           </div>
                           {log.id !== 'system-ok' && (
                             <button 
                               onClick={() => handleDismissSecurityLog(log.id)}
-                              className="p-1 rounded-full text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer focus:outline-none shrink-0"
+                              className="p-1 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-500/15 transition-all cursor-pointer focus:outline-none shrink-0"
                               title="Dismiss log"
                             >
                               <X className="w-3.5 h-3.5" />

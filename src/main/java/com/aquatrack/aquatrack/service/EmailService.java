@@ -264,6 +264,89 @@ public class EmailService {
         sendEmail(toEmail, subject, htmlContent);
     }
 
+    // 6. Support Ticket Emails
+    public void sendTicketCreatedEmail(String toEmail, String adminName, String residentName, String houseNumber, String ticketNum, String title, String category, String priority, String description) {
+        String subject = "🔔 New Support Concern Raised — " + ticketNum + " (" + houseNumber + ")";
+        String htmlContent = "<div style=\"font-family: 'Segoe UI', Arial, sans-serif; background-color: #0d1117; color: #c9d1d9; padding: 40px 20px; text-align: center;\">" +
+                "  <div style=\"max-width: 600px; margin: 0 auto; background: #161b22; border: 1px solid #30363d; border-radius: 16px; padding: 40px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); text-align: left;\">" +
+                "    <div style=\"text-align: center; margin-bottom: 30px;\">" +
+                "      <span style=\"font-size: 32px; font-weight: 800; color: #00f2fe; text-shadow: 0 0 10px rgba(0, 242, 254, 0.3);\">AquaTrack Support</span>" +
+                "      <div style=\"height: 2px; width: 60px; background: linear-gradient(90deg, #00c6ff, #0072ff); margin: 15px auto 0;\"></div>" +
+                "    </div>" +
+                "    <p style=\"font-size: 16px; line-height: 1.6;\">Dear <strong>" + adminName + "</strong>,</p>" +
+                "    <p style=\"font-size: 16px; line-height: 1.6;\">A new support ticket has been raised by resident <strong>" + residentName + "</strong> (House <strong>" + houseNumber + "</strong>).</p>" +
+                "    <div style=\"background: rgba(0, 242, 254, 0.05); border: 1px solid #30363d; padding: 20px; margin: 25px 0; border-radius: 8px;\">" +
+                "      <h3 style=\"margin-top: 0; color: #00f2fe; border-bottom: 1px solid #30363d; padding-bottom: 10px;\">Ticket Details — " + ticketNum + "</h3>" +
+                "      <table style=\"width: 100%; border-collapse: collapse; font-size: 15px; color: #c9d1d9;\">" +
+                "        <tr><td style=\"padding: 8px 0; color: #8b949e;\">Issue Title:</td><td style=\"padding: 8px 0; font-weight: bold; text-align: right; color: #f0f6fc;\">" + title + "</td></tr>" +
+                "        <tr><td style=\"padding: 8px 0; color: #8b949e;\">Category:</td><td style=\"padding: 8px 0; font-weight: bold; text-align: right; color: #58a6ff;\">" + category + "</td></tr>" +
+                "        <tr><td style=\"padding: 8px 0; color: #8b949e;\">Priority:</td><td style=\"padding: 8px 0; font-weight: bold; text-align: right; color: #ff7e5f;\">" + priority + "</td></tr>" +
+                "      </table>" +
+                "      <div style=\"margin-top: 15px; background: #0d1117; padding: 12px; border-radius: 6px; border: 1px solid #30363d;\">" +
+                "        <strong style=\"color: #58a6ff; display: block; margin-bottom: 5px;\">Description:</strong>" +
+                "        <span style=\"color: #c9d1d9; font-size: 14px;\">" + description + "</span>" +
+                "      </div>" +
+                "    </div>" +
+                "    <div style=\"text-align: center; margin: 35px 0;\">" +
+                "      <a href=\"http://localhost:5173/support\" style=\"display: inline-block; background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%); color: #ffffff; text-decoration: none; padding: 14px 35px; font-weight: bold; border-radius: 8px; font-size: 15px;\">" +
+                "        Open Support Desk" +
+                "      </a>" +
+                "    </div>" +
+                "  </div>" +
+                "</div>";
+        sendEmail(toEmail, subject, htmlContent);
+    }
+
+    public void sendTicketEscalatedEmail(String toEmail, String superAdminName, String communityAdminName, String ticketNum, String title, String reason) {
+        String subject = "⚠️ TICKET ESCALATED to Super Admin — " + ticketNum;
+        String htmlContent = "<div style=\"font-family: 'Segoe UI', Arial, sans-serif; background-color: #0d1117; color: #c9d1d9; padding: 40px 20px; text-align: center;\">" +
+                "  <div style=\"max-width: 600px; margin: 0 auto; background: #161b22; border: 1px solid #30363d; border-radius: 16px; padding: 40px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); text-align: left;\">" +
+                "    <div style=\"text-align: center; margin-bottom: 30px;\">" +
+                "      <span style=\"font-size: 32px; font-weight: 800; color: #a855f7; text-shadow: 0 0 10px rgba(168, 85, 247, 0.3);\">AquaTrack Escalation</span>" +
+                "      <div style=\"height: 2px; width: 60px; background: linear-gradient(90deg, #a855f7, #ec4899); margin: 15px auto 0;\"></div>" +
+                "    </div>" +
+                "    <p style=\"font-size: 16px; line-height: 1.6;\">Dear <strong>" + superAdminName + "</strong>,</p>" +
+                "    <p style=\"font-size: 16px; line-height: 1.6;\">Community Admin <strong>" + communityAdminName + "</strong> has escalated support ticket <strong>" + ticketNum + "</strong> to the Super Admin desk.</p>" +
+                "    <div style=\"background: rgba(168, 85, 247, 0.08); border-left: 4px solid #a855f7; padding: 15px; margin: 25px 0; border-radius: 0 8px 8px 0;\">" +
+                "      <p style=\"margin: 0; font-size: 15px; color: #e9d5ff;\">" +
+                "        <strong>Escalation Reason:</strong> " + reason + "" +
+                "      </p>" +
+                "    </div>" +
+                "    <div style=\"text-align: center; margin: 35px 0;\">" +
+                "      <a href=\"http://localhost:5173/support\" style=\"display: inline-block; background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%); color: #ffffff; text-decoration: none; padding: 14px 35px; font-weight: bold; border-radius: 8px; font-size: 15px;\">" +
+                "        Review Escalated Ticket" +
+                "      </a>" +
+                "    </div>" +
+                "  </div>" +
+                "</div>";
+        sendEmail(toEmail, subject, htmlContent);
+    }
+
+    public void sendTicketResolvedEmail(String toEmail, String residentName, String ticketNum, String title) {
+        String subject = "✅ Support Issue Resolved — " + ticketNum;
+        String htmlContent = "<div style=\"font-family: 'Segoe UI', Arial, sans-serif; background-color: #0d1117; color: #c9d1d9; padding: 40px 20px; text-align: center;\">" +
+                "  <div style=\"max-width: 600px; margin: 0 auto; background: #161b22; border: 1px solid #30363d; border-radius: 16px; padding: 40px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); text-align: left;\">" +
+                "    <div style=\"text-align: center; margin-bottom: 30px;\">" +
+                "      <span style=\"font-size: 32px; font-weight: 800; color: #10b981; text-shadow: 0 0 10px rgba(16, 185, 129, 0.3);\">AquaTrack Resolution</span>" +
+                "      <div style=\"height: 2px; width: 60px; background: linear-gradient(90deg, #10b981, #059669); margin: 15px auto 0;\"></div>" +
+                "    </div>" +
+                "    <p style=\"font-size: 16px; line-height: 1.6;\">Dear <strong>" + residentName + "</strong>,</p>" +
+                "    <p style=\"font-size: 16px; line-height: 1.6;\">Great news! Your support ticket <strong>" + ticketNum + "</strong> (<em>" + title + "</em>) has been marked as <strong>RESOLVED</strong>.</p>" +
+                "    <div style=\"background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 15px; margin: 25px 0; border-radius: 0 8px 8px 0;\">" +
+                "      <p style=\"margin: 0; font-size: 15px; color: #6ee7b7;\">" +
+                "        Thank you for contacting AquaTrack Support. If you have any further questions, you can view the ticket details or reply directly on your Support Desk." +
+                "      </p>" +
+                "    </div>" +
+                "    <div style=\"text-align: center; margin: 35px 0;\">" +
+                "      <a href=\"http://localhost:5173/support\" style=\"display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; padding: 14px 35px; font-weight: bold; border-radius: 8px; font-size: 15px;\">" +
+                "        View Ticket Thread" +
+                "      </a>" +
+                "    </div>" +
+                "  </div>" +
+                "</div>";
+        sendEmail(toEmail, subject, htmlContent);
+    }
+
     // Core private helper to dispatch or write logs
     private void sendEmail(String toEmail, String subject, String htmlContent) {
         System.out.println("==========================================================================");

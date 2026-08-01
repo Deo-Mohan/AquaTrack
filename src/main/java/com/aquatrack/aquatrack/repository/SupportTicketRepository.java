@@ -23,4 +23,6 @@ public interface SupportTicketRepository extends JpaRepository<SupportTicket, Lo
     List<SupportTicket> findAllByOrderByCreatedAtDesc();
 
     Optional<SupportTicket> findByTicketNumber(String ticketNumber);
+
+    void deleteByCreatedAtBefore(java.time.LocalDateTime cutoffDate);
 }
