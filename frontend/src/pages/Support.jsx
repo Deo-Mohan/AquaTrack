@@ -334,9 +334,9 @@ export default function Support() {
                 {[
                   { id: 'ALL', label: 'ALL' },
                   { id: 'OPEN', label: 'OPEN' },
-                  { id: 'ESCALATED', label: 'SENT TO ADMIN' },
+                  !isSuperAdmin && { id: 'ESCALATED', label: 'SENT TO ADMIN' },
                   { id: 'RESOLVED', label: 'RESOLVED' }
-                ].map((f) => (
+                ].filter(Boolean).map((f) => (
                   <button
                     key={f.id}
                     onClick={() => setStatusFilter(f.id)}
