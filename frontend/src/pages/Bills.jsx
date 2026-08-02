@@ -286,9 +286,9 @@ export default function Bills() {
             <div className="h-72 rounded-2xl skeleton-pulse" />
           </div>
         ) : filteredAndSortedBills.length === 0 ? (
-          <div className="p-12 text-center text-text-muted flex flex-col items-center">
-            <Receipt className="w-12 h-12 mb-3 opacity-20" />
-            <p className="font-bold text-sm">No bills match the selected filters.</p>
+          <div className="py-20 px-12 text-center text-text-muted flex flex-col items-center justify-center min-h-[360px]">
+            <img src="/empty_state_billing_cycles.svg" alt="No Bills" className="w-48 h-48 mb-4 object-contain opacity-90" />
+            <p className="font-bold text-base text-text">No bills match the selected filters.</p>
             <p className="text-xs text-text-muted mt-1">Try resetting the dropdown filters to see all invoices.</p>
           </div>
         ) : (

@@ -31,10 +31,15 @@ AquaTrack is a premium, full-stack smart water management, analytics, and automa
 * **Automated Escalations**: Community Admins can escalate complex infrastructure tickets directly to Super Admins.
 * **Automatic Ticket Cleanup**: Automated daily cleanup of tickets resolved over 15 days.
 
-### 👑 Super Admin Panel
-* **Global System Control**: Manage multiple colonies, buildings, and community block networks.
-* **Verification Pipelines**: Final approval of onboarding community administrators and blocks.
-* **High-Contrast Security Audit Logs**: Real-time monitoring of system events with light & dark theme accessibility.
+### 🎙️ Speech-to-Text (STT) Voice-Enabled Search & Keyboard Navigation
+* **Voice Search Integration**: Native Web Speech API integration (`useSpeechToText` hook & `MicSearchBox` component) across Meter Workstation, Water Billing History, and Invoices modules.
+* **Keyboard-Driven Dropdown**: Complete keyboard navigation (↑/↓ arrow keys, Tab/Enter selection, Esc to dismiss) for instant resident & meter search.
+* **Matched Search Highlighting**: Dynamic blue-highlighted matching text in search results for resident names, house numbers, meter IDs, and apartment blocks.
+
+### 🎨 Accessible UI & High-Contrast Liquid Glass Aesthetic
+* **High-Contrast Typography**: Cohesive rich-brown and high-contrast earth-tone styling for status indicators, unbilled water logs, and warnings.
+* **Glassmorphic Notification Cards**: Multi-layered backdrop blur (`backdrop-blur-[40px]`) and saturation for clean, readable notifications.
+* **Multi-Language Protection**: Enforced `notranslate` tags across language selector controls ensuring proper native display of languages.
 
 ---
 

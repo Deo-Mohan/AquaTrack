@@ -16,6 +16,9 @@ public class TariffController {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private com.aquatrack.aquatrack.repository.NotificationRepository notificationRepository;
+
     // GET: Fetch tariff settings for a community admin's block
     @GetMapping
     public ResponseEntity<?> getTariffSettings(
@@ -104,7 +107,7 @@ public class TariffController {
 
         userRepository.save(admin);
 
-        // Propagate to all residents
+        // Propagate to all residents and send notification alerts
         List<User> residents1 = userRepository.findByRoleAndApartmentBlock("ROLE_RESIDENT", block);
         List<User> residents2 = userRepository.findByRoleAndApartmentBlock("ROLE_HOUSEHOLD_USER", block);
         java.util.List<User> allResidents = new java.util.ArrayList<>();
@@ -118,6 +121,20 @@ public class TariffController {
             if (lateFee != null) resident.setLateFeePerMonth(lateFee);
             if (gracePeriod != null) resident.setGracePeriodDays(gracePeriod);
             userRepository.save(resident);
+
+            // Dispatch notification alert to resident
+            try {
+                com.aquatrack.aquatrack.model.Notification note = new com.aquatrack.aquatrack.model.Notification();
+                note.setUsername(resident.getUsername());
+                note.setTitle("📢 Tariff & Pricing Updated");
+                note.setMessage("The water usage rates and limits for block " + block + " have been updated by your Community Admin. Check your Tariff Settings for details.");
+                note.setType("TARIFF_UPDATE");
+                note.setCreatedAt(java.time.LocalDateTime.now());
+                note.setIsRead(false);
+                notificationRepository.save(note);
+            } catch (Exception e) {
+                // Ignore notification failure to ensure tariff saving succeeds
+            }
         }
 
         return ResponseEntity.ok(Map.of(

@@ -169,7 +169,7 @@ export default function AboutPage() {
                   {/* Avatar Container */}
                   <div className="w-full h-full bg-surface-lighter rounded-[21px] overflow-hidden relative z-10 border border-white/20">
                     <img 
-                      src="/male_admin.png" 
+                      src="/male_03.svg" 
                       alt="Krishna Mohan Kumar - Lead Developer" 
                       className="w-full h-full object-cover object-top scale-105 group-hover/avatar:scale-110 transition-transform duration-500"
                     />

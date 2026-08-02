@@ -61,7 +61,7 @@ const getGreeting = () => {
   return 'Good evening';
 };
 
-const StatCard = ({ title, value, subtitle, infoNote, icon: Icon, color, delay }) => (
+const StatCard = ({ title, value, subtitle, infoNote, icon: Icon, svgSrc, color, delay }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -74,9 +74,19 @@ const StatCard = ({ title, value, subtitle, infoNote, icon: Icon, color, delay }
           <p className="text-text-muted text-sm font-medium mb-1">{title}</p>
           <h3 className="text-3xl font-bold text-text tracking-tight">{value}</h3>
         </div>
-        <div className={`p-3 rounded-xl bg-${color}-500/10 text-${color}-400 group-hover:scale-110 transition-transform duration-300`}>
-          <Icon className="w-6 h-6" />
-        </div>
+        {svgSrc ? (
+          <motion.img 
+            src={svgSrc} 
+            alt={title} 
+            className="w-20 h-20 sm:w-24 sm:h-24 object-contain group-hover:scale-110 transition-transform duration-300 -mt-2 -mr-2"
+            animate={{ y: [0, -5, 0] }}
+            transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
+          />
+        ) : (
+          <div className={`p-3 rounded-xl bg-${color}-500/10 text-${color}-400 group-hover:scale-110 transition-transform duration-300`}>
+            <Icon className="w-6 h-6" />
+          </div>
+        )}
       </div>
       {subtitle && (
         <div className="flex items-center text-xs font-semibold text-emerald-400 mb-1">
@@ -200,6 +210,7 @@ export default function Dashboard() {
   const [baseRatePerLiter, setBaseRatePerLiter] = useState(0);
   const [excessRatePerLiter, setExcessRatePerLiter] = useState(0);
   const [gracePeriodDays, setGracePeriodDays] = useState(20);
+  const [lateFeePerMonth, setLateFeePerMonth] = useState(0);
   const [monthlyChartType, setMonthlyChartType] = useState('area'); // area, bar, line
   const [weeklyChartType, setWeeklyChartType] = useState('bar'); // bar, line, area
   const [currentAlertIndex, setCurrentAlertIndex] = useState(0);
@@ -311,6 +322,7 @@ export default function Dashboard() {
               let baseRate = profileRes.data.waterRatePerLiter || 0;
               let excessRate = profileRes.data.excessRatePerLiter || 0;
               let graceDays = profileRes.data.gracePeriodDays || 20;
+              let lateFee = profileRes.data.lateFeePerMonth || 0;
 
               // Fallback to fetch from block tariff configured by Community Admin
               try {
@@ -320,6 +332,7 @@ export default function Dashboard() {
                   if (baseRate === 0) baseRate = tariffRes.data.baseRatePerLiter || 0;
                   if (excessRate === 0) excessRate = tariffRes.data.excessRatePerLiter || 0;
                   if (tariffRes.data.gracePeriodDays) graceDays = tariffRes.data.gracePeriodDays;
+                  if (tariffRes.data.lateFeePerMonth) lateFee = tariffRes.data.lateFeePerMonth;
                 }
               } catch (err) {
                 console.error("Error fetching block tariff fallback:", err);
@@ -331,6 +344,7 @@ export default function Dashboard() {
               setBaseRatePerLiter(baseRate);
               setExcessRatePerLiter(excessRate);
               setGracePeriodDays(graceDays);
+              setLateFeePerMonth(lateFee);
             }
           } catch (e) {
             console.error("Error fetching user profile:", e);
@@ -412,89 +426,134 @@ export default function Dashboard() {
 
   if (userRole === 'ROLE_RESIDENT' && verificationStatus !== 'APPROVED' && verificationStatus !== 'VERIFIED') {
     return (
-      <div className="max-w-2xl mx-auto space-y-6 py-6">
-        <div className="flex flex-col items-center text-center mb-6">
-          <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-4 shadow-lg shadow-primary/10">
-            <ShieldAlert className="w-8 h-8 text-primary" />
+      <div className="max-w-3xl mx-auto space-y-6 py-8 px-4">
+        {/* Modern Header Banner */}
+        <div className="flex flex-col items-center text-center relative">
+          <div className="relative mb-4">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-primary/20 via-primary/10 to-blue-500/20 border border-primary/30 flex items-center justify-center shadow-xl shadow-primary/10 backdrop-blur-md">
+              <ShieldAlert className="w-10 h-10 text-primary drop-shadow-[0_0_12px_rgba(59,130,246,0.5)]" />
+            </div>
+            <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-4 w-4 bg-amber-500"></span>
+            </span>
           </div>
-          <h1 className="text-2xl font-bold text-text">Profile Verification Required</h1>
-          <p className="text-text-muted mt-1.5 text-sm max-w-md">
-            To view usage stats, billing history, and access dashboard metrics, please verify your profile with a valid document proof.
+
+          <h1 className="text-3xl font-black text-text tracking-tight">Profile Verification Required</h1>
+          <p className="text-text-muted mt-2 text-sm max-w-lg leading-relaxed">
+            Verify your household profile with a valid document to unlock your real-time water usage dashboard, invoice downloads, and smart telemetry metrics.
           </p>
+
+          {/* Verification Process Stepper */}
+          <div className="grid grid-cols-3 gap-3 w-full max-w-lg mt-6 pt-6 border-t border-border/50 text-xs">
+            <div className={`flex flex-col items-center gap-1.5 font-bold ${verificationStatus === 'NOT_SUBMITTED' ? 'text-primary' : 'text-emerald-500'}`}>
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black border ${verificationStatus === 'NOT_SUBMITTED' ? 'bg-primary/10 border-primary text-primary' : 'bg-emerald-500/10 border-emerald-500 text-emerald-500'}`}>
+                1
+              </div>
+              <span>Upload Document</span>
+            </div>
+            <div className={`flex flex-col items-center gap-1.5 font-bold ${verificationStatus === 'PENDING_VERIFICATION' ? 'text-amber-500' : 'text-text-muted'}`}>
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black border ${verificationStatus === 'PENDING_VERIFICATION' ? 'bg-amber-500/10 border-amber-500 text-amber-500' : 'bg-surface-lighter border-border text-text-muted'}`}>
+                2
+              </div>
+              <span>Admin Review</span>
+            </div>
+            <div className="flex flex-col items-center gap-1.5 font-bold text-text-muted">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black border bg-surface-lighter border-border text-text-muted">
+                3
+              </div>
+              <span>Full Access</span>
+            </div>
+          </div>
         </div>
 
-        {/* Dynamic Status Render */}
-        <div className="glass-card p-6 border-primary/20 relative overflow-hidden">
+        {/* Form / Status Card Container */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card p-8 border-primary/20 relative overflow-hidden shadow-2xl rounded-3xl"
+        >
           {verificationStatus === 'NOT_SUBMITTED' && (
-            <div className="space-y-4">
-              <div className="flex items-start gap-3 p-3.5 rounded-xl bg-primary/5 border border-primary/15 text-primary text-xs">
-                <FileText className="w-5 h-5 shrink-0" />
+            <div className="space-y-6">
+              <div className="flex items-start gap-4 p-4 rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/20 text-text">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
                 <div>
-                  <span className="font-semibold block mb-0.5">Please Submit Document</span>
-                  You must upload a document (Aadhaar, Utility Bill, Rent Agreement, PAN Card, etc.) to start verification.
+                  <span className="font-bold text-sm text-text block mb-0.5">Proof of Residence Submission</span>
+                  <p className="text-xs text-text-muted leading-relaxed">
+                    Please upload an official government ID or utility bill (Aadhaar, Electricity Bill, Rent Agreement, PAN Card) matching your apartment details.
+                  </p>
                 </div>
               </div>
 
-              <form onSubmit={handleFileUpload} className="space-y-4">
+              <form onSubmit={handleFileUpload} className="space-y-5">
                 <div>
-                  <label className="block text-xs font-semibold text-text-muted mb-1.5">Document Type</label>
+                  <label className="block text-xs font-extrabold uppercase tracking-widest text-text-muted mb-2">Select Document Type</label>
                   <select
                     value={docType}
                     onChange={(e) => setDocType(e.target.value)}
-                    className="w-full bg-surface-lighter border border-border rounded-xl px-4 py-2.5 text-sm text-text focus:outline-none focus:border-primary/50 cursor-pointer"
+                    className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-text font-semibold focus:outline-none focus:border-primary cursor-pointer shadow-sm"
                   >
-                    <option value="Aadhaar Card">Aadhaar Card</option>
-                    <option value="PAN Card">PAN Card</option>
-                    <option value="Rent Agreement">Rent Agreement</option>
-                    <option value="Electric Bill">Electric Bill</option>
-                    <option value="Driver's License">Driver's License</option>
+                    <option value="Aadhaar Card">🪪 Aadhaar Card</option>
+                    <option value="PAN Card">💳 PAN Card</option>
+                    <option value="Rent Agreement">📜 Rent Agreement</option>
+                    <option value="Electric Bill">⚡ Electric Utility Bill</option>
+                    <option value="Driver's License">🚗 Driver's License</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-text-muted mb-1.5">Select Document File</label>
-                  <div className="border-2 border-dashed border-border hover:border-primary/50 rounded-xl p-6 text-center cursor-pointer transition-colors relative">
+                  <label className="block text-xs font-extrabold uppercase tracking-widest text-text-muted mb-2">Upload Document File</label>
+                  <div className="border-2 border-dashed border-primary/30 hover:border-primary rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 relative bg-surface-lighter/30 hover:bg-primary/5 group">
                     <input
                       type="file"
                       onChange={(e) => setSelectedFile(e.target.files[0])}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                       accept=".pdf,.png,.jpg,.jpeg"
                     />
-                    <Upload className="w-8 h-8 text-text-muted mx-auto mb-2" />
+                    <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 text-primary mx-auto mb-3 flex items-center justify-center group-hover:scale-110 transition-transform shadow-md">
+                      <Upload className="w-7 h-7" />
+                    </div>
                     {selectedFile ? (
-                      <span className="text-sm font-semibold text-primary block mt-1">{selectedFile.name}</span>
+                      <div>
+                        <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-500 block">File Selected</span>
+                        <span className="text-sm font-bold text-text block mt-1 bg-surface border border-border px-3 py-1.5 rounded-lg inline-block shadow-sm">
+                          {selectedFile.name}
+                        </span>
+                      </div>
                     ) : (
                       <>
-                        <span className="text-sm font-semibold text-text block">Drag & Drop or Click to Select File</span>
-                        <span className="text-xs text-text-muted mt-1 block">Supports PDF, PNG, JPG, JPEG (Max 5MB)</span>
+                        <span className="text-sm font-bold text-text block group-hover:text-primary transition-colors">Drag & Drop or Click to Browse File</span>
+                        <span className="text-xs text-text-muted mt-1.5 block">Supports PDF, PNG, JPG, JPEG (Max size: 5MB)</span>
                       </>
                     )}
                   </div>
                 </div>
 
                 {errorMsg && (
-                  <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4" />
+                  <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold flex items-center gap-2.5">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
                     <span>{errorMsg}</span>
                   </div>
                 )}
 
                 {successMsg && (
-                  <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4" />
+                  <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold flex items-center gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
                     <span>{successMsg}</span>
                   </div>
                 )}
 
                 {uploadLoading && (
-                  <div className="space-y-1.5 mt-2">
-                    <div className="flex justify-between text-xs font-semibold text-text-muted">
-                      <span>Uploading document...</span>
-                      <span className="text-primary">{uploadProgress}%</span>
+                  <div className="space-y-2 mt-2">
+                    <div className="flex justify-between text-xs font-bold text-text-muted">
+                      <span>Encrypting & uploading document...</span>
+                      <span className="text-primary font-mono">{uploadProgress}%</span>
                     </div>
-                    <div className="h-1.5 w-full bg-surface-lighter rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-surface-lighter rounded-full overflow-hidden p-0.5 border border-border">
                       <div
-                        className="h-full bg-primary transition-all duration-150"
+                        className="h-full bg-primary rounded-full transition-all duration-200"
                         style={{ width: `${uploadProgress}%` }}
                       />
                     </div>
@@ -504,18 +563,18 @@ export default function Dashboard() {
                 <button
                   type="submit"
                   disabled={uploadLoading || !selectedFile}
-                  className="btn-next w-full disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                  className="btn-next w-full py-3.5 text-base font-bold disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none mt-4 shadow-lg shadow-primary/20"
                 >
                   {uploadLoading ? (
                     <div className="flex items-center justify-center gap-2">
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Uploading ({uploadProgress}%)</span>
+                      <span>Uploading Proof ({uploadProgress}%)</span>
                     </div>
                   ) : (
-                    <>
-                      <span>Upload & Request Verification</span>
+                    <div className="flex items-center justify-center gap-2">
+                      <span>Submit Document for Verification</span>
                       <ArrowRight className="w-5 h-5" />
-                    </>
+                    </div>
                   )}
                 </button>
               </form>
@@ -523,96 +582,105 @@ export default function Dashboard() {
           )}
 
           {verificationStatus === 'PENDING_VERIFICATION' && (
-            <div className="flex flex-col items-center py-6 text-center">
-              <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-4">
-                <Clock className="w-8 h-8 text-amber-400" />
+            <div className="flex flex-col items-center py-8 text-center space-y-4">
+              <div className="relative">
+                <div className="w-20 h-20 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shadow-lg shadow-amber-500/10">
+                  <Clock className="w-10 h-10 text-amber-400 animate-pulse" />
+                </div>
               </div>
-              <h3 className="text-lg font-bold text-text">Verification Request Pending Review</h3>
-              <p className="text-text-muted text-sm mt-2 max-w-sm">
-                Your uploaded documents are currently being verified by your Community Administrator. You will gain access as soon as your profile is approved.
+              <h3 className="text-xl font-black text-text">Verification Pending Review</h3>
+              <p className="text-text-muted text-sm max-w-md leading-relaxed">
+                Your submitted document has been securely received and is currently undergoing manual verification by your Community Administrator.
               </p>
-              <div className="mt-6 px-4 py-2 bg-surface-lighter/50 border border-border rounded-xl text-xs text-text-muted">
-                Status: <strong className="text-amber-400">PENDING APPROVAL</strong>
+              <div className="mt-4 px-5 py-2.5 bg-amber-500/10 border border-amber-500/20 rounded-full text-xs text-amber-400 font-extrabold tracking-wider uppercase">
+                Status: PENDING ADMIN APPROVAL
               </div>
             </div>
           )}
 
           {verificationStatus === 'REJECTED' && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                <div className="flex items-center gap-2 font-bold mb-1">
-                  <AlertCircle className="w-5 h-5" />
+            <div className="space-y-6">
+              <div className="p-5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                <div className="flex items-center gap-2.5 font-bold mb-1.5 text-base">
+                  <AlertCircle className="w-5 h-5 shrink-0" />
                   <span>Document Verification Rejected</span>
                 </div>
-                <p className="text-xs mt-1">
-                  <strong>Reason: </strong> {rejectReason || "Invalid document provided or name mismatch."}
+                <p className="text-xs leading-relaxed text-red-300">
+                  <strong>Reason for Rejection: </strong> {rejectReason || "The submitted document could not be verified or apartment details mismatched."}
                 </p>
               </div>
 
-              <div className="text-xs text-text-muted mt-2">
-                Please upload a new document to re-verify your residency:
+              <div className="text-xs font-extrabold uppercase tracking-widest text-text-muted">
+                Please re-upload a valid proof document below:
               </div>
 
-              <form onSubmit={handleFileUpload} className="space-y-4">
+              <form onSubmit={handleFileUpload} className="space-y-5">
                 <div>
-                  <label className="block text-xs font-semibold text-text-muted mb-1.5">Document Type</label>
+                  <label className="block text-xs font-extrabold uppercase tracking-widest text-text-muted mb-2">Document Type</label>
                   <select
                     value={docType}
                     onChange={(e) => setDocType(e.target.value)}
-                    className="w-full bg-surface-lighter border border-border rounded-xl px-4 py-2.5 text-sm text-text focus:outline-none focus:border-primary/50 cursor-pointer"
+                    className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-text font-semibold focus:outline-none focus:border-primary cursor-pointer shadow-sm"
                   >
-                    <option value="Aadhaar Card">Aadhaar Card</option>
-                    <option value="PAN Card">PAN Card</option>
-                    <option value="Rent Agreement">Rent Agreement</option>
-                    <option value="Electric Bill">Electric Bill</option>
-                    <option value="Driver's License">Driver's License</option>
+                    <option value="Aadhaar Card">🪪 Aadhaar Card</option>
+                    <option value="PAN Card">💳 PAN Card</option>
+                    <option value="Rent Agreement">📜 Rent Agreement</option>
+                    <option value="Electric Bill">⚡ Electric Utility Bill</option>
+                    <option value="Driver's License">🚗 Driver's License</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-text-muted mb-1.5">Select New Document File</label>
-                  <div className="border-2 border-dashed border-border hover:border-primary/50 rounded-xl p-6 text-center cursor-pointer transition-colors relative">
+                  <label className="block text-xs font-extrabold uppercase tracking-widest text-text-muted mb-2">Select New Document File</label>
+                  <div className="border-2 border-dashed border-primary/30 hover:border-primary rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 relative bg-surface-lighter/30 hover:bg-primary/5 group">
                     <input
                       type="file"
                       onChange={(e) => setSelectedFile(e.target.files[0])}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                       accept=".pdf,.png,.jpg,.jpeg"
                     />
-                    <Upload className="w-8 h-8 text-text-muted mx-auto mb-2" />
+                    <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 text-primary mx-auto mb-3 flex items-center justify-center group-hover:scale-110 transition-transform shadow-md">
+                      <Upload className="w-7 h-7" />
+                    </div>
                     {selectedFile ? (
-                      <span className="text-sm font-semibold text-primary block mt-1">{selectedFile.name}</span>
+                      <div>
+                        <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-500 block">File Selected</span>
+                        <span className="text-sm font-bold text-text block mt-1 bg-surface border border-border px-3 py-1.5 rounded-lg inline-block shadow-sm">
+                          {selectedFile.name}
+                        </span>
+                      </div>
                     ) : (
                       <>
-                        <span className="text-sm font-semibold text-text block">Drag & Drop or Click to Select File</span>
-                        <span className="text-xs text-text-muted mt-1 block">Supports PDF, PNG, JPG, JPEG (Max 5MB)</span>
+                        <span className="text-sm font-bold text-text block group-hover:text-primary transition-colors">Drag & Drop or Click to Browse File</span>
+                        <span className="text-xs text-text-muted mt-1.5 block">Supports PDF, PNG, JPG, JPEG (Max size: 5MB)</span>
                       </>
                     )}
                   </div>
                 </div>
 
                 {errorMsg && (
-                  <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4" />
+                  <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold flex items-center gap-2.5">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
                     <span>{errorMsg}</span>
                   </div>
                 )}
 
                 {successMsg && (
-                  <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4" />
+                  <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold flex items-center gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
                     <span>{successMsg}</span>
                   </div>
                 )}
 
                 {uploadLoading && (
-                  <div className="space-y-1.5 mt-2">
-                    <div className="flex justify-between text-xs font-semibold text-text-muted">
-                      <span>Uploading document...</span>
-                      <span className="text-primary">{uploadProgress}%</span>
+                  <div className="space-y-2 mt-2">
+                    <div className="flex justify-between text-xs font-bold text-text-muted">
+                      <span>Encrypting & uploading document...</span>
+                      <span className="text-primary font-mono">{uploadProgress}%</span>
                     </div>
-                    <div className="h-1.5 w-full bg-surface-lighter rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-surface-lighter rounded-full overflow-hidden p-0.5 border border-border">
                       <div
-                        className="h-full bg-primary transition-all duration-150"
+                        className="h-full bg-primary rounded-full transition-all duration-200"
                         style={{ width: `${uploadProgress}%` }}
                       />
                     </div>
@@ -622,7 +690,7 @@ export default function Dashboard() {
                 <button
                   type="submit"
                   disabled={uploadLoading || !selectedFile}
-                  className="btn-next w-full disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                  className="btn-next w-full py-3.5 text-base font-bold disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none mt-4 shadow-lg shadow-primary/20"
                 >
                   {uploadLoading ? (
                     <div className="flex items-center justify-center gap-2">
@@ -630,16 +698,16 @@ export default function Dashboard() {
                       <span>Uploading ({uploadProgress}%)</span>
                     </div>
                   ) : (
-                    <>
-                      <span>Re-upload & Re-submit</span>
+                    <div className="flex items-center justify-center gap-2">
+                      <span>Re-upload & Re-submit Document</span>
                       <ArrowRight className="w-5 h-5" />
-                    </>
+                    </div>
                   )}
                 </button>
               </form>
             </div>
           )}
-        </div>
+        </motion.div>
       </div>
     );
   }
@@ -687,7 +755,7 @@ export default function Dashboard() {
           title="Latest Meter Reading"
           value={`${stats.latestReading} L`}
           subtitle={stats.latestReadingDate !== 'N/A' ? `Logged: ${stats.latestReadingDate}` : "No usage logs"}
-          icon={Droplets}
+          svgSrc="/empty_state_meter_reading.svg"
           color="blue"
           delay={0.1}
         />
@@ -696,7 +764,7 @@ export default function Dashboard() {
           value={`₹${stats.unpaidBillAmount.toFixed(2)}`}
           subtitle={stats.unpaidBillAmount > 0 ? "Pending Payment" : "No Unpaid Bills"}
           infoNote={`Pay within ${gracePeriodDays} days of bill generation to avoid late fee penalties.`}
-          icon={Receipt}
+          svgSrc="/empty_state_generate_bill.svg"
           color="emerald"
           delay={0.2}
         />
@@ -803,7 +871,7 @@ export default function Dashboard() {
           </div>
           <div className="overflow-x-auto w-full custom-scrollbar">
             <div className="h-[250px] min-w-[700px]">
-              {monthlyUsageData.length > 0 ? (
+              {monthlyUsageData.length > 0 && monthlyUsageData.some(d => d.usage > 0) ? (
                 <ResponsiveContainer width="100%" height="100%">
                   {(() => {
                     if (monthlyChartType === 'bar') {
@@ -862,7 +930,17 @@ export default function Dashboard() {
                   })()}
                 </ResponsiveContainer>
               ) : (
-                <div className="h-full flex items-center justify-center text-text-muted">No monthly usage data found.</div>
+                <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                  <motion.img 
+                    src="/empty_state_charts_analytics.svg" 
+                    alt="No Monthly Usage Data" 
+                    className="w-36 sm:w-44 object-contain mb-3 drop-shadow-[0_0_15px_rgba(59,130,246,0.2)]"
+                    animate={{ y: [0, -8, 0] }}
+                    transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
+                  />
+                  <p className="text-text font-black text-base">No Monthly Water Consumption Recorded</p>
+                  <p className="text-text-muted text-xs mt-1 max-w-sm">Monthly consumption metrics and trend charts will automatically populate here once water meter readings are logged.</p>
+                </div>
               )}
             </div>
           </div>
@@ -946,7 +1024,17 @@ export default function Dashboard() {
                 })()}
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-text-muted">No weekly readings logged.</div>
+              <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                <motion.img 
+                  src="/empty_state_charts_analytics.svg" 
+                  alt="No Weekly Usage Data" 
+                  className="w-32 sm:w-40 object-contain mb-2 opacity-90"
+                  animate={{ y: [0, -6, 0] }}
+                  transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
+                />
+                <p className="text-text font-bold text-sm">No weekly readings logged</p>
+                <p className="text-text-muted text-xs mt-0.5 font-medium">Select a month with recorded readings to view chart.</p>
+              </div>
             )}
           </div>
         </motion.div>
@@ -1059,8 +1147,8 @@ export default function Dashboard() {
         </div>
 
         {/* Dynamic Tariff Rates and Estimated Charges Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 mt-6 pt-6 border-t border-border/40">
-          <div className="glass-card md:col-span-3 bg-surface-lighter/15 hover:bg-surface-lighter/25 border border-border/40 hover:border-primary/40 rounded-2xl p-5 transition-all duration-300 hover:scale-[1.02] flex flex-col justify-between shadow-sm relative overflow-hidden group">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-12 gap-5 mt-6 pt-6 border-t border-border/40">
+          <div className="glass-card lg:col-span-3 bg-surface-lighter/15 hover:bg-surface-lighter/25 border border-border/40 hover:border-primary/40 rounded-2xl p-5 transition-all duration-300 hover:scale-[1.02] flex flex-col justify-between shadow-sm relative overflow-hidden group">
             <div>
               <span className="text-[10px] font-extrabold uppercase tracking-widest text-text-muted/80">Base Rate</span>
               <h4 className="text-2xl font-black text-primary mt-2 flex items-baseline gap-1">
@@ -1074,7 +1162,7 @@ export default function Dashboard() {
             <div className="absolute -right-6 -bottom-6 w-16 h-16 bg-primary/5 rounded-full blur-xl group-hover:bg-primary/10 transition-colors" />
           </div>
 
-          <div className="glass-card md:col-span-3 bg-surface-lighter/15 hover:bg-surface-lighter/25 border border-border/40 hover:border-rose-500/30 rounded-2xl p-5 transition-all duration-300 hover:scale-[1.02] flex flex-col justify-between shadow-sm relative overflow-hidden group">
+          <div className="glass-card lg:col-span-3 bg-surface-lighter/15 hover:bg-surface-lighter/25 border border-border/40 hover:border-rose-500/30 rounded-2xl p-5 transition-all duration-300 hover:scale-[1.02] flex flex-col justify-between shadow-sm relative overflow-hidden group">
             <div>
               <span className="text-[10px] font-extrabold uppercase tracking-widest text-text-muted/80">Excess Usage Rate</span>
               <h4 className="text-2xl font-black text-rose-400 mt-2 flex items-baseline gap-1">
@@ -1088,7 +1176,35 @@ export default function Dashboard() {
             <div className="absolute -right-6 -bottom-6 w-16 h-16 bg-rose-500/5 rounded-full blur-xl group-hover:bg-rose-500/10 transition-colors" />
           </div>
 
-          <div className="glass-card md:col-span-6 bg-surface-lighter/15 hover:bg-surface-lighter/25 border border-border/40 hover:border-emerald-500/30 rounded-2xl p-5 transition-all duration-300 hover:scale-[1.02] flex flex-col justify-between shadow-sm relative overflow-hidden group">
+          <div className="glass-card lg:col-span-3 bg-surface-lighter/15 hover:bg-surface-lighter/25 border border-border/40 hover:border-amber-500/30 rounded-2xl p-5 transition-all duration-300 hover:scale-[1.02] flex flex-col justify-between shadow-sm relative overflow-hidden group">
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-text-muted/80">Late Fee Penalty</span>
+              <h4 className="text-2xl font-black text-amber-500 dark:text-amber-400 mt-2 flex items-baseline gap-1">
+                ₹{lateFeePerMonth.toFixed(2)} <span className="text-xs font-semibold text-text-muted">/ Month</span>
+              </h4>
+            </div>
+            <div className="mt-4 pt-3 border-t border-border/20 text-xs text-text-muted/95 flex items-center justify-between">
+              <span>Applied After:</span>
+              <strong className="text-amber-400 font-bold">Due Date + Grace</strong>
+            </div>
+            <div className="absolute -right-6 -bottom-6 w-16 h-16 bg-amber-500/5 rounded-full blur-xl group-hover:bg-amber-500/10 transition-colors" />
+          </div>
+
+          <div className="glass-card lg:col-span-3 bg-surface-lighter/15 hover:bg-surface-lighter/25 border border-border/40 hover:border-indigo-500/30 rounded-2xl p-5 transition-all duration-300 hover:scale-[1.02] flex flex-col justify-between shadow-sm relative overflow-hidden group">
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-text-muted/80">Grace Period</span>
+              <h4 className="text-2xl font-black text-indigo-400 mt-2 flex items-baseline gap-1">
+                {gracePeriodDays} <span className="text-xs font-semibold text-text-muted">Days</span>
+              </h4>
+            </div>
+            <div className="mt-4 pt-3 border-t border-border/20 text-xs text-text-muted/95 flex items-center justify-between">
+              <span>Penalty Window:</span>
+              <strong className="text-indigo-400 font-bold">{gracePeriodDays} Days Window</strong>
+            </div>
+            <div className="absolute -right-6 -bottom-6 w-16 h-16 bg-indigo-500/5 rounded-full blur-xl group-hover:bg-indigo-500/10 transition-colors" />
+          </div>
+
+          <div className="glass-card lg:col-span-12 bg-surface-lighter/15 hover:bg-surface-lighter/25 border border-border/40 hover:border-emerald-500/30 rounded-2xl p-5 transition-all duration-300 hover:scale-[1.01] flex flex-col justify-between shadow-sm relative overflow-hidden group mt-2">
             <div>
               <span className="text-[10px] font-extrabold uppercase tracking-widest text-text-muted/80">Est. Charge (Monthly Usage)</span>
               <h4 className="text-2xl font-black text-emerald-400 mt-2">

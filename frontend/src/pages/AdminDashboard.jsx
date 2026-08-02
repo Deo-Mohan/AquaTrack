@@ -1642,7 +1642,7 @@ export default function AdminDashboard() {
     document.body.removeChild(link);
   };
 
-  const StatCard = ({ title, value, icon: Icon, color, delay, onClick }) => (
+  const StatCard = ({ title, value, icon: Icon, svgSrc, color, delay, onClick }) => (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -1655,9 +1655,19 @@ export default function AdminDashboard() {
           <p className="text-text-muted text-sm font-medium mb-1">{title}</p>
           <h3 className="text-3xl font-bold text-text tracking-tight">{value}</h3>
         </div>
-        <div className={`p-3 rounded-xl bg-${color}-500/10 text-${color}-400 group-hover:scale-110 transition-transform duration-300`}>
-          <Icon className="w-6 h-6" />
-        </div>
+        {svgSrc ? (
+          <motion.img 
+            src={svgSrc} 
+            alt={title} 
+            className="w-16 h-16 sm:w-20 sm:h-20 object-contain group-hover:scale-110 transition-transform duration-300 -mt-2 -mr-2"
+            animate={{ y: [0, -4, 0] }}
+            transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
+          />
+        ) : (
+          <div className={`p-3 rounded-xl bg-${color}-500/10 text-${color}-400 group-hover:scale-110 transition-transform duration-300`}>
+            <Icon className="w-6 h-6" />
+          </div>
+        )}
       </div>
       <div className={`absolute -right-10 -bottom-10 w-32 h-32 bg-${color}-500/5 rounded-full blur-2xl`} />
     </motion.div>
@@ -1867,11 +1877,19 @@ export default function AdminDashboard() {
               isSuperAdmin && { id: 'colonies', label: '🏘️ Colony Management' },
               { 
                 id: 'approvals', 
-                label: `Pending Approvals${
-                  (pendingApprovals.length + users.filter(u => u.verificationStatus === 'PENDING_VERIFICATION').length) > 0 
-                    ? ` (${pendingApprovals.length + users.filter(u => u.verificationStatus === 'PENDING_VERIFICATION').length})` 
-                    : ''
-                }` 
+                renderLabel: () => {
+                  const totalPending = pendingApprovals.length + users.filter(u => u.verificationStatus === 'PENDING_VERIFICATION').length;
+                  return (
+                    <span className="flex items-center gap-2">
+                      <span>Pending Approvals</span>
+                      {totalPending > 0 && (
+                        <span className="inline-flex items-center justify-center px-2 py-0.5 text-xs font-black text-white bg-amber-500 rounded-full shadow-md shadow-amber-500/30 animate-bounce">
+                          {totalPending}
+                        </span>
+                      )}
+                    </span>
+                  );
+                }
               }
             ].filter(Boolean).map(tab => (
               <button
@@ -1883,7 +1901,7 @@ export default function AdminDashboard() {
                     : 'border-transparent text-text-muted hover:text-text'
                 }`}
               >
-                {tab.label}
+                {tab.renderLabel ? tab.renderLabel() : tab.label}
               </button>
             ))}
           </div>
@@ -1922,14 +1940,22 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <StatCard title="Total Buildings" value={stats ? `${stats.totalApartments}` : '...'} icon={Home} color="blue" delay={0.1} />
                 <StatCard title="Community Admins" value={stats ? `${stats.totalCommunityAdmins}` : '...'} icon={Users} color="emerald" delay={0.2} />
-                <StatCard title="Registered Residents" value={stats ? `${stats.totalHouseholdUsers}` : '...'} icon={Users} color="purple" delay={0.3} onClick={() => setActiveTab('users')} />
+                <StatCard title="Registered Residents" value={stats ? `${stats.totalHouseholdUsers}` : '...'} svgSrc="/colleague.svg" color="purple" delay={0.3} onClick={() => setActiveTab('users')} />
                 <StatCard title="Total Platform Users" value={stats ? `${stats.totalUsers}` : '...'} icon={Settings} color="pink" delay={0.4} />
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <StatCard title="Money to be Collected" value={stats && stats.pendingCollections !== undefined ? `₹${(stats.pendingCollections || 0).toLocaleString()}` : '₹0'} icon={Coins} color="amber" delay={0.1} />
-                <StatCard title="Registered Residents" value={stats ? `${stats.totalResidents}` : '...'} icon={Users} color="emerald" delay={0.2} onClick={() => setActiveTab('users')} />
-                <StatCard title={`Total Block Usage (${new Date().toLocaleString('default', { month: 'long' })})`} value={stats ? `${stats.totalUsageThisMonth} Liters` : '...'} icon={Droplet} color="purple" delay={0.3} onClick={() => navigate('/water-billing-history')} />
+                <StatCard title="Money to be Collected" value={stats && stats.pendingCollections !== undefined ? `₹${(stats.pendingCollections || 0).toLocaleString()}` : '₹0'} svgSrc="/coin.gif" color="amber" delay={0.1} />
+                <StatCard title="Registered Residents" value={stats ? `${stats.totalResidents}` : '...'} svgSrc="/colleague.svg" color="emerald" delay={0.2} onClick={() => setActiveTab('users')} />
+                <StatCard title={`Total Block Usage (${new Date().toLocaleString('default', { month: 'long' })})`} value={stats ? `${stats.totalUsageThisMonth} Liters` : '...'} svgSrc="/empty_state_meter_reading.svg" color="purple" delay={0.3} onClick={() => navigate('/water-billing-history')} />
+              </div>
+            )}
+
+            {/* Platform Analytics Cards */}
+            {isSuperAdmin && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <StatCard title="Total Platform Revenue" value={stats ? `₹${(stats.totalRevenue || 0).toLocaleString()}` : '...'} svgSrc="/coin.gif" color="emerald" delay={0.5} />
+                <StatCard title="Pending System Collections" value={stats ? `₹${(stats.totalPending || 0).toLocaleString()}` : '...'} svgSrc="/coin.gif" color="amber" delay={0.6} />
               </div>
             )}
 
@@ -2027,7 +2053,13 @@ export default function AdminDashboard() {
                         const monthName = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedChartMonth - 1];
                         return (
                           <div className="flex flex-col items-center justify-center h-full text-center p-6 border border-dashed border-border/40 rounded-2xl bg-surface-lighter/5 backdrop-blur-md">
-                            <Droplet className="w-12 h-12 text-primary/40 animate-pulse mb-3" />
+                            <motion.img 
+                              src="/empty_state_charts_analytics.svg" 
+                              alt="No Analytics Data" 
+                              className="w-36 sm:w-44 object-contain mb-3 opacity-90"
+                              animate={{ y: [0, -6, 0] }}
+                              transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
+                            />
                             <p className="text-text font-bold text-sm">No data found for {monthName} {selectedChartYear}</p>
                             <p className="text-text-muted text-xs mt-1">Please try logging meter readings for this cycle to populate the graph.</p>
                           </div>
@@ -2249,9 +2281,9 @@ export default function AdminDashboard() {
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <StatCard title="Monitored Blocks" value={`${totalBlocks}`} icon={Home} color="blue" delay={0.1} />
-                    <StatCard title="Total Households" value={`${totalHH}`} icon={Users} color="emerald" delay={0.2} />
-                    <StatCard title="Cumulative Usage (L)" value={`${totalUsage.toLocaleString()}`} icon={Droplet} color="purple" delay={0.3} />
-                    <StatCard title="Cumulative Collections" value={`₹${totalRevenue.toLocaleString()}`} icon={Receipt} color="pink" delay={0.4} />
+                    <StatCard title="Total Households" value={`${totalHH}`} svgSrc="/colleague.svg" color="emerald" delay={0.2} />
+                    <StatCard title="Cumulative Usage (L)" value={`${totalUsage.toLocaleString()}`} svgSrc="/empty_state_meter_reading.svg" color="purple" delay={0.3} />
+                    <StatCard title="Cumulative Collections" value={`₹${totalRevenue.toLocaleString()}`} svgSrc="/coin.gif" color="pink" delay={0.4} />
                   </div>
 
                   {/* Main Analytics Table */}
@@ -2471,10 +2503,21 @@ export default function AdminDashboard() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="space-y-6"
+            className="space-y-6 relative min-h-[500px]"
           >
+            {/* Page Level Office Worker Team Background SVG Animation (Centered at bottom, compact size) */}
+            <div className="absolute inset-x-0 bottom-0 pointer-events-none flex justify-center opacity-70 dark:opacity-50 transition-opacity duration-500 overflow-hidden z-0 pt-6">
+              <motion.img 
+                src="/bg_admin_user_directory.svg" 
+                alt="Office Worker Team Animation" 
+                className="w-64 sm:w-80 md:w-[420px] object-contain translate-y-3"
+                animate={{ y: [0, -6, 0] }}
+                transition={{ repeat: Infinity, duration: 8, ease: 'easeInOut' }}
+              />
+            </div>
+
             {/* Smart Search Toolbar */}
-            <div className="space-y-3">
+            <div className="space-y-3 relative z-10">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <SmartSearchBar
@@ -2503,16 +2546,16 @@ export default function AdminDashboard() {
                   <>
                     <button
                       onClick={() => { setBulkInviteFile(null); setBulkInviteReport(null); setBulkInviteModalOpen(true); }}
-                      className="px-4 py-2.5 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 border border-violet-500/20 rounded-xl font-medium transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap flex-shrink-0"
+                      className="px-4 py-2.5 bg-violet-500/20 text-violet-700 dark:text-violet-300 hover:bg-violet-500/30 border border-violet-500/40 rounded-xl font-bold transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap flex-shrink-0 shadow-sm"
                     >
-                      <Upload className="w-4 h-4" />
+                      <Upload className="w-4 h-4 text-violet-700 dark:text-violet-300" />
                       Bulk Invite
                     </button>
                     <button
                       onClick={downloadCsvTemplate}
-                      className="px-4 py-2.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-xl font-medium transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap flex-shrink-0"
+                      className="px-4 py-2.5 bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40 rounded-xl font-bold transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap flex-shrink-0 shadow-sm"
                     >
-                      <Download className="w-4 h-4" />
+                      <Download className="w-4 h-4 text-emerald-800 dark:text-emerald-300" />
                       Template
                     </button>
                   </>
@@ -2677,7 +2720,7 @@ export default function AdminDashboard() {
               </div>
             ) : (
               /* ===== COMMUNITY ADMIN: Simple blue-tinted table ===== */
-              <div className="glass-card overflow-hidden border-blue-500/20">
+              <div className="glass-card overflow-hidden border-blue-500/20 relative z-10">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
@@ -2734,8 +2777,8 @@ export default function AdminDashboard() {
             className="space-y-6"
           >
             {/* Sub-tabs: Registration Requests is Super Admin only */}
-            <div className="flex bg-surface-lighter/50 p-1.5 rounded-2xl border border-border/40 max-w-lg shadow-sm">
-              {isSuperAdmin && (
+            {isSuperAdmin && (
+              <div className="flex bg-surface-lighter/50 p-1.5 rounded-2xl border border-border/40 max-w-lg shadow-sm">
                 <button
                   onClick={() => setApprovalSubTab('registrations')}
                   className={`flex-1 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
@@ -2755,27 +2798,28 @@ export default function AdminDashboard() {
                     </span>
                   )}
                 </button>
-              )}
-              <button
-                onClick={() => setApprovalSubTab('verifications')}
-                className={`flex-1 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                  approvalSubTab === 'verifications'
-                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                    : 'text-text-muted hover:text-text'
-                }`}
-              >
-                <span>Profile Verifications</span>
-                {users.filter(u => u.verificationStatus === 'PENDING_VERIFICATION').length > 0 && (
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                    approvalSubTab === 'verifications' 
-                      ? 'bg-white/25 text-white' 
-                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                  }`}>
-                    {users.filter(u => u.verificationStatus === 'PENDING_VERIFICATION').length}
-                  </span>
-                )}
-              </button>
-            </div>
+
+                <button
+                  onClick={() => setApprovalSubTab('verifications')}
+                  className={`flex-1 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    approvalSubTab === 'verifications'
+                      ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                      : 'text-text-muted hover:text-text'
+                  }`}
+                >
+                  <span>Profile Verifications</span>
+                  {users.filter(u => u.verificationStatus === 'PENDING_VERIFICATION').length > 0 && (
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                      approvalSubTab === 'verifications' 
+                        ? 'bg-white/25 text-white' 
+                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    }`}>
+                      {users.filter(u => u.verificationStatus === 'PENDING_VERIFICATION').length}
+                    </span>
+                  )}
+                </button>
+              </div>
+            )}
 
             <AnimatePresence mode="wait">
               {isSuperAdmin && approvalSubTab === 'registrations' ? (
@@ -2933,16 +2977,17 @@ export default function AdminDashboard() {
       <AnimatePresence>
         {/* User Modal */}
         {userModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto pt-20 pb-10">
+          <div className={`fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto pt-20 pb-10 ${loading ? 'pointer-events-none' : ''}`}>
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-surface border border-border w-full max-w-2xl rounded-2xl p-6 shadow-2xl relative my-8"
+              className="bg-surface border border-border w-full max-w-2xl rounded-2xl p-6 shadow-2xl relative my-8 pointer-events-auto"
             >
               <button 
                 onClick={() => setUserModalOpen(false)}
-                className="absolute top-4 right-4 text-text-muted hover:text-text cursor-pointer"
+                disabled={loading}
+                className="absolute top-4 right-4 text-text-muted hover:text-text cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3284,7 +3329,7 @@ export default function AdminDashboard() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="col-span-1 md:col-span-2 mt-4 py-3 bg-primary hover:bg-primary-dark text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="col-span-1 md:col-span-2 mt-4 py-3 bg-primary hover:bg-primary-dark text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading 
                     ? 'Saving...' 
@@ -3605,7 +3650,7 @@ export default function AdminDashboard() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full mt-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                 >
                   {editingBill ? 'Update & Save Bill' : 'Generate & Save Bill'}
                 </button>
@@ -3688,7 +3733,7 @@ export default function AdminDashboard() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-6 py-3 bg-yellow-500 text-slate-950 hover:bg-yellow-600 rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full mt-6 py-3 bg-yellow-500 text-slate-950 hover:bg-yellow-600 rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                 >
                   <Send className="w-4 h-4" />
                   Dispatch Notification

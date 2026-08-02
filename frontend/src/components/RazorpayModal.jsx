@@ -308,22 +308,28 @@ export default function RazorpayModal({ bill, onClose, onSuccess }) {
 
             {/* STEP: Success */}
             {step === 'success' && (
-              <div className="py-8 flex flex-col items-center justify-center text-center space-y-4">
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-                  className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center"
-                >
-                  <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-                </motion.div>
+              <div className="py-6 flex flex-col items-center justify-center text-center space-y-4">
+                <motion.img
+                  src="/thankyou.svg"
+                  alt="Thank You"
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1, y: [0, -6, 0] }}
+                  transition={{ 
+                    scale: { type: 'spring', stiffness: 200, damping: 15 },
+                    y: { repeat: Infinity, duration: 3, ease: 'easeInOut' }
+                  }}
+                  className="w-48 h-36 object-contain drop-shadow-[0_10px_20px_rgba(37,99,235,0.3)]"
+                />
                 <div className="space-y-1">
-                  <p className="font-bold text-lg text-emerald-400">Payment Successful!</p>
-                  <p className="text-xs text-slate-400">Receipt generated for House {bill?.houseNumber}</p>
+                  <p className="font-extrabold text-xl text-emerald-400">Payment Successful!</p>
+                  <p className="text-xs text-slate-400 font-medium">Receipt generated for House {bill?.houseNumber}</p>
                 </div>
                 {paymentData && (
-                  <div className="w-full bg-emerald-500/5 border border-emerald-500/15 rounded-xl p-3 text-left space-y-1.5 text-[11px]">
-                    <p className="font-bold text-emerald-400 border-b border-emerald-500/10 pb-1">Transaction Details</p>
+                  <div className="w-full bg-emerald-500/5 border border-emerald-500/15 rounded-xl p-3.5 text-left space-y-1.5 text-[11px] shadow-inner">
+                    <p className="font-bold text-emerald-400 border-b border-emerald-500/10 pb-1.5 flex items-center justify-between">
+                      <span>Transaction Verified</span>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    </p>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Payment ID</span>
                       <span className="font-mono font-bold text-emerald-300 text-[10px]">{paymentData.paymentId}</span>

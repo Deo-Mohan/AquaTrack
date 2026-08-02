@@ -36,7 +36,14 @@ const UserAvatar = ({ gender, role, size = 40 }) => {
   // Male Household / Community Admin custom image
   if ((!gender || gender.toLowerCase() === 'male') && role !== 'ROLE_ADMIN') {
     return (
-      <img src="/male_household.png" alt="User Avatar" className="rounded-full object-cover" style={{ width: size, height: size }} />
+      <img src="/male_03.svg" alt="User Avatar" className="rounded-full object-cover" style={{ width: size, height: size }} />
+    );
+  }
+
+  // Female custom image
+  if (gender && gender.toLowerCase() === 'female') {
+    return (
+      <img src="/female_05.svg" alt="Female Avatar" className="rounded-full object-cover" style={{ width: size, height: size }} />
     );
   }
 
@@ -411,7 +418,7 @@ export default function Header({ toggleSidebar }) {
                               : 'text-text hover:bg-surface-lighter'
                           }`}
                         >
-                          <span className="flex items-center gap-2">
+                          <span className="notranslate flex items-center gap-2">
                             <span className="text-base">{l.flag}</span>
                             <span className="font-bold">{l.name}</span>
                           </span>
@@ -438,7 +445,7 @@ export default function Header({ toggleSidebar }) {
                             : 'text-text hover:bg-surface-lighter'
                         }`}
                       >
-                        <span className="flex items-center gap-2">
+                        <span className="notranslate flex items-center gap-2">
                           <span className="text-base">{l.flag}</span>
                           <span>{l.name}</span>
                         </span>
@@ -515,7 +522,7 @@ export default function Header({ toggleSidebar }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
-                className="fixed sm:absolute right-4 sm:right-0 left-4 sm:left-auto top-16 sm:top-full mt-3 w-auto sm:w-96 max-h-[480px] bg-surface/95 dark:bg-surface/90 backdrop-blur-2xl border border-border/80 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-hidden z-50 notification-dropdown"
+                className="fixed sm:absolute right-4 sm:right-0 left-4 sm:left-auto top-16 sm:top-full mt-3 w-auto sm:w-96 max-h-[480px] bg-surface/90 dark:bg-surface/90 backdrop-blur-[40px] backdrop-saturate-200 border border-primary/30 rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.35)] overflow-hidden z-50 notification-dropdown"
               >
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-border">

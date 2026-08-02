@@ -7,6 +7,7 @@ import {
   Send, Activity, Download, Upload, AlertTriangle, ShieldAlert
 } from 'lucide-react';
 import api from '../api';
+import MicSearchBox from '../components/MicSearchBox';
 
 const levenshtein = (a, b) => {
   const m = a.length, n = b.length;
@@ -21,9 +22,9 @@ const levenshtein = (a, b) => {
 
 const fuzzy = (q, t) => {
   q = q.toLowerCase(); t = t.toLowerCase();
-  if (t.includes(q)) return true;
-  if (q.length <= 3) return t.startsWith(q);
-  return levenshtein(q, t) <= 2;
+  if (t.includes(q)) return true;            // substring match (covers house#, meter ID, etc.)
+  if (q.length <= 2) return t.startsWith(q); // very short: prefix only
+  return levenshtein(q, t) <= 2;             // typo tolerance
 };
 
 const getBillingMonthLabel = (dateStr) => {
@@ -72,6 +73,7 @@ export default function MeterWorkstation() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showAllDropdown, setShowAllDropdown] = useState(false);
   const [selected,    setSelected]    = useState(null);
+  const [focusedIdx,  setFocusedIdx]  = useState(-1); // keyboard nav index in dropdown
   const searchRef = useRef(null);
   const allDropdownRef = useRef(null);
 
@@ -401,7 +403,9 @@ export default function MeterWorkstation() {
   };
 
   const matched = query.trim().length === 0 ? [] : residents.filter(u =>
-    [u.fullName, u.username, u.houseNumber, u.meterId, u.meterNumber, u.email, u.mobileNumber]
+    [u.fullName, u.username, u.apartmentBlock,
+     String(u.houseNumber ?? ''), String(u.meterId ?? ''), String(u.meterNumber ?? ''),
+     u.email, u.mobileNumber]
       .filter(Boolean)
       .some(f => fuzzy(query.trim(), String(f)))
   ).slice(0, 8);
@@ -753,20 +757,63 @@ Are you sure you want to finalize these bills and lock the cycle?`;
     }
   };
 
+  // ── Keyboard navigation for search dropdown ────────────────────────
+  const handleSearchKeyDown = (e) => {
+    if (!showDropdown || matched.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setFocusedIdx(i => Math.min(i + 1, matched.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setFocusedIdx(i => Math.max(i - 1, 0));
+    } else if (e.key === 'Tab' || e.key === 'Enter') {
+      if (focusedIdx >= 0 && focusedIdx < matched.length) {
+        e.preventDefault();
+        selectResident(matched[focusedIdx]);
+        setFocusedIdx(-1);
+      }
+    } else if (e.key === 'Escape') {
+      setShowDropdown(false);
+      setFocusedIdx(-1);
+    }
+  };
+
   // ── Resident Card ────────────────────────────────────────────────
-  const ResidentCard = ({ u, onClick }) => (
+  // ── Highlight matching text in search results ─────────────────────────────
+  const highlightMatch = (text, query) => {
+    if (!query || !text) return text;
+    const idx = String(text).toLowerCase().indexOf(query.toLowerCase());
+    if (idx === -1) return text;
+    return (
+      <>
+        {String(text).slice(0, idx)}
+        <mark className="bg-transparent text-blue-400 font-extrabold not-italic">
+          {String(text).slice(idx, idx + query.length)}
+        </mark>
+        {String(text).slice(idx + query.length)}
+      </>
+    );
+  };
+
+  const ResidentCard = ({ u, onClick, isFocused, query: q }) => (
     <button
       onMouseDown={e => { e.preventDefault(); onClick(u); }}
-      className="w-full px-4 py-3 flex items-center gap-3 hover:bg-primary/8 transition-colors text-left cursor-pointer border-b border-border/30 last:border-0"
+      className={`w-full px-4 py-3 flex items-center gap-3 transition-colors text-left cursor-pointer border-b border-border/30 last:border-0 ${
+        isFocused
+          ? 'bg-primary/12 outline-none ring-1 ring-inset ring-primary/30'
+          : 'hover:bg-primary/8'
+      }`}
     >
       <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
         <User className="w-4 h-4 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-text truncate">{u.fullName || u.username}</p>
+        <p className="text-sm font-semibold text-text truncate">
+          {highlightMatch(u.fullName || u.username, q)}
+        </p>
         <p className="text-xs text-text-muted truncate">
-          House #{u.houseNumber} · {u.apartmentBlock}
-          {u.meterId || u.meterNumber ? ` · Meter: ${u.meterId || u.meterNumber}` : ''}
+          House #{highlightMatch(String(u.houseNumber || ''), q)} · {highlightMatch(u.apartmentBlock || '', q)}
+          {(u.meterId || u.meterNumber) && <> · Meter: {highlightMatch(String(u.meterId || u.meterNumber), q)}</>}
         </p>
       </div>
       <ChevronRight className="w-4 h-4 text-text-muted flex-shrink-0" />
@@ -983,22 +1030,16 @@ Are you sure you want to finalize these bills and lock the cycle?`;
           {/* Resident Search & Browse */}
           <div className="flex flex-col md:flex-row gap-4 items-stretch">
             <div ref={searchRef} className="relative flex-1">
-              <div className={`flex items-center gap-3 px-4 py-3.5 bg-surface-lighter/60 border border-border/80 rounded-2xl transition-all ${showDropdown || selected ? 'border-primary/50 shadow-lg shadow-primary/10' : 'border-border'} hover:border-primary/40`}>
-                <Search className="w-5 h-5 text-primary flex-shrink-0" />
-                <input
-                  type="text"
-                  value={query}
-                  onChange={e => { setQuery(e.target.value); setShowDropdown(true); if (!e.target.value) { setSelected(null); setBillCalc(null); } }}
-                  onFocus={() => query && setShowDropdown(true)}
-                  placeholder="Search resident by name, house number, username..."
-                  className="flex-1 bg-transparent text-text placeholder-text-muted text-sm focus:outline-none"
-                />
-                {query && (
-                  <button onClick={() => { setQuery(''); setSelected(null); setBillCalc(null); setShowDropdown(false); }} className="text-text-muted hover:text-text cursor-pointer">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
+              <MicSearchBox
+                value={query}
+                onChange={v => { setQuery(v); setShowDropdown(true); setFocusedIdx(-1); if (!v) { setSelected(null); setBillCalc(null); } }}
+                onFocus={() => query && setShowDropdown(true)}
+                onClear={() => { setQuery(''); setSelected(null); setBillCalc(null); setShowDropdown(false); setFocusedIdx(-1); }}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Search resident by name, house number, username..."
+                active={showDropdown || !!selected}
+              />
+
 
               {/* Dropdown */}
               <AnimatePresence>
@@ -1013,7 +1054,7 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                       <p className="text-xs font-medium text-text-muted">Select a resident</p>
                       <span className="text-xs text-primary font-semibold">{matched.length} found</span>
                     </div>
-                    {matched.map(u => <ResidentCard key={u.id || u.username} u={u} onClick={selectResident} />)}
+                    {matched.map((u, i) => <ResidentCard key={u.id || u.username} u={u} onClick={selectResident} isFocused={i === focusedIdx} query={query} />)}
                   </motion.div>
                 )}
                 {showDropdown && query.trim().length > 0 && matched.length === 0 && (
@@ -1123,16 +1164,39 @@ Are you sure you want to finalize these bills and lock the cycle?`;
 
               <div className="p-6 space-y-4">
                 {!selected && (
-                  <div className="flex flex-col items-center py-10 text-center text-text-muted">
-                    <Droplet className="w-12 h-12 mb-3 opacity-20" />
-                    <p className="text-sm font-medium">Search and select a resident above</p>
-                    <p className="text-xs mt-1 opacity-70">to log their meter reading</p>
+                  <div className="flex flex-col items-center py-6 text-center text-text-muted">
+                    <motion.img 
+                      src="/empty_state_meter_reading.svg" 
+                      alt="Search and select resident to log meter reading" 
+                      className="w-36 sm:w-44 object-contain mb-3 opacity-90"
+                      animate={{ y: [0, -6, 0] }}
+                      transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
+                    />
+                    <p className="text-sm font-bold text-text">Search and select a resident above</p>
+                    <p className="text-xs mt-1 text-text-muted">to log their meter reading</p>
                   </div>
                 )}
 
                 {selected && (
                   <form onSubmit={submitLog} className="space-y-4">
                     <StatusBanner status={logStatus} />
+
+                    {(selected.meterId || selected.meterNumber) && (
+                      <div className="meter-pill flex items-center gap-2 px-3 py-2 w-full">
+                        {/* Round Icon */}
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(120,60,10,0.15)', border: '1px solid rgba(120,60,10,0.3)' }}>
+                          <Zap className="w-3.5 h-3.5" style={{ color: '#92400e', filter: 'drop-shadow(0 0 5px rgba(146,64,14,0.6))' }} />
+                        </div>
+                        {/* Label */}
+                        <span className="text-[11px] font-extrabold uppercase tracking-widest shrink-0" style={{ color: '#78350f' }}>Smart Meter:</span>
+                        {/* Value */}
+                        <span className="text-sm font-black tracking-wide" style={{ color: '#431407' }}>{selected.meterId || selected.meterNumber}</span>
+                        {/* Active badge — pushed to far right */}
+                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ml-auto shrink-0" style={{ background: 'rgba(120,53,15,0.12)', color: '#7c2d12', border: '1px solid rgba(120,53,15,0.25)' }}>
+                          ACTIVE
+                        </span>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -1144,13 +1208,6 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                         <div className="px-3 py-2.5 bg-surface-lighter/50 border border-border/80 rounded-xl text-sm text-text font-medium">{selected.apartmentBlock}</div>
                       </div>
                     </div>
-
-                    {(selected.meterId || selected.meterNumber) && (
-                      <div className="meter-pill w-full px-5 py-2">
-                        <Zap className="w-4 h-4 flex-shrink-0 mr-2.5" style={{ color: '#92600a', filter: 'drop-shadow(0 0 5px rgba(200,134,10,0.6))' }} />
-                        <p className="text-xs font-semibold tracking-wide" style={{ color: '#6b4500' }}>Meter ID: <strong style={{ color: '#92600a', fontWeight: 900 }}>{selected.meterId || selected.meterNumber}</strong></p>
-                      </div>
-                    )}
 
                     <div>
                       <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Log Period</label>
@@ -1230,10 +1287,16 @@ Are you sure you want to finalize these bills and lock the cycle?`;
 
               <div className="p-6 space-y-4">
                 {!selected && (
-                  <div className="flex flex-col items-center py-10 text-center text-text-muted">
-                    <Receipt className="w-12 h-12 mb-3 opacity-20" />
-                    <p className="text-sm font-medium">Select a resident first</p>
-                    <p className="text-xs mt-1 opacity-70">Bill amount will be auto-calculated from usage logs</p>
+                  <div className="flex flex-col items-center py-6 text-center text-text-muted">
+                    <motion.img 
+                      src="/empty_state_generate_bill.svg" 
+                      alt="Select resident for bill generation" 
+                      className="w-36 sm:w-44 object-contain mb-3 opacity-90"
+                      animate={{ y: [0, -6, 0] }}
+                      transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
+                    />
+                    <p className="text-sm font-bold text-text">Select a resident first</p>
+                    <p className="text-xs mt-1 text-text-muted">Bill amount will be auto-calculated from usage logs</p>
                   </div>
                 )}
 
@@ -1330,8 +1393,8 @@ Are you sure you want to finalize these bills and lock the cycle?`;
 
                     {!billCalc.isFinalized && billCalc.unbilled.length === 0 && (
                       <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-                        <Info className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-                        <p className="text-xs text-amber-300">No unbilled water logs found. Please submit a meter reading first using the panel on the left.</p>
+                        <Info className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#92400e' }} />
+                        <p className="text-xs font-semibold" style={{ color: '#78350f' }}>No unbilled water logs found. Please submit a meter reading first using the panel on the left.</p>
                       </div>
                     )}
 
@@ -1451,8 +1514,18 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                     if (filteredCycles.length === 0) {
                       return (
                         <tr>
-                          <td colSpan="9" className="px-6 py-10 text-center text-text-muted text-sm">
-                            No billing cycles defined yet. Click "Create Billing Cycle" to define one.
+                          <td colSpan="9" className="px-6 py-16 text-center text-text-muted">
+                            <div className="flex flex-col items-center justify-center relative py-6">
+                              <motion.img 
+                                src="/empty_state_billing_cycles.svg" 
+                                alt="No Billing Cycles" 
+                                className="w-56 sm:w-64 md:w-72 object-contain mb-4 opacity-90"
+                                animate={{ y: [0, -8, 0] }}
+                                transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
+                              />
+                              <p className="text-base font-bold text-text">No billing cycles defined yet</p>
+                              <p className="text-xs text-text-muted mt-1">Click "Create Billing Cycle" above to establish a new billing period.</p>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1532,18 +1605,22 @@ Are you sure you want to finalize these bills and lock the cycle?`;
             <div>
               <h3 className="font-bold text-text text-lg">Payment Reminder Control Panel</h3>
               <p className="text-text-muted text-sm mt-0.5">
-                Notify community admins of blocks with pending bills, and dispatch email notices to unpaid residents.
+                {isSuperAdmin 
+                  ? "Notify community admins of blocks with pending bills, and dispatch email notices to unpaid residents."
+                  : `Dispatch email notices and payment reminders to unpaid households in ${block || 'your block'}.`}
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <button 
-                onClick={handleScanAlertAdmins}
-                disabled={actionLoading}
-                className="px-4 py-2.5 bg-blue-500/10 text-blue-450 hover:bg-blue-500/20 border border-blue-500/20 rounded-xl font-semibold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 text-sm"
-              >
-                <Activity className="w-4 h-4" />
-                Scan & Alert Admins
-              </button>
+              {isSuperAdmin && (
+                <button 
+                  onClick={handleScanAlertAdmins}
+                  disabled={actionLoading}
+                  className="px-4 py-2.5 bg-blue-500/10 text-blue-450 hover:bg-blue-500/20 border border-blue-500/20 rounded-xl font-semibold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 text-sm"
+                >
+                  <Activity className="w-4 h-4" />
+                  Scan & Alert Admins
+                </button>
+              )}
 
               <button 
                 onClick={handleSendAllReminders}
@@ -1637,8 +1714,18 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                         })
                       ) : (
                         <tr>
-                          <td colSpan="7" className="px-6 py-10 text-center text-text-muted">
-                            No unpaid household bills found. All clear!
+                          <td colSpan="7" className="px-6 py-16 text-center text-text-muted">
+                            <div className="flex flex-col items-center justify-center relative py-6">
+                              <motion.img 
+                                src="/empty_state_payment_reminders.svg" 
+                                alt="No Pending Reminders" 
+                                className="w-56 sm:w-64 md:w-72 object-contain mb-4 opacity-90"
+                                animate={{ y: [0, -8, 0] }}
+                                transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
+                              />
+                              <p className="text-base font-bold text-text">No unpaid household bills found</p>
+                              <p className="text-xs text-text-muted mt-1">All clear! No pending payment reminders to dispatch.</p>
+                            </div>
                           </td>
                         </tr>
                       )}

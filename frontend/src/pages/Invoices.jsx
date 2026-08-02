@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { Receipt, Calendar, ArrowRight, Download, Search, FileText, X } from 'lucide-react';
 import api from '../api';
 import { printInvoice } from '../utils/invoiceGenerator';
+import MicSearchBox from '../components/MicSearchBox';
+
 
 export default function Invoices() {
   const [bills, setBills] = useState([]);
@@ -65,24 +67,24 @@ export default function Invoices() {
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full md:w-80">
-          <Search className="absolute left-3 top-2.5 h-4.5 w-4.5 text-text-muted" />
-          <input
-            type="text"
-            placeholder="Search by Inv ID, Date..."
+        <div className="w-full md:w-96">
+          <MicSearchBox
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-surface-light border border-border rounded-xl text-text placeholder-text-muted focus:outline-none focus:border-primary text-sm"
+            onChange={setSearchTerm}
+            onClear={() => setSearchTerm('')}
+            placeholder="Search by Inv ID, Date..."
           />
         </div>
+
       </div>
 
       {loading ? (
         <div className="p-8 text-center text-text-muted">Loading your invoices...</div>
       ) : filteredBills.length === 0 ? (
-        <div className="p-8 text-center text-text-muted flex flex-col items-center glass-card">
-          <FileText className="w-12 h-12 mb-3 opacity-20 text-primary" />
-          <p>No paid invoices found matching your query.</p>
+        <div className="py-24 px-12 text-center text-text-muted flex flex-col items-center justify-center min-h-[480px] glass-card">
+          <img src="/get_things_done.svg" alt="No Invoices" className="w-56 h-56 mb-5 object-contain opacity-90" />
+          <p className="font-bold text-lg text-text">No paid invoices found matching your query.</p>
+          <p className="text-xs text-text-muted mt-1.5">Settle your pending bills to view and download official receipts here.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -305,9 +305,7 @@ export default function MyUsage() {
           animate={{ opacity: 1, y: 0 }}
           className="glass-card p-5 border border-primary/10 flex items-center gap-4 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300"
         >
-          <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.15)]">
-            <Activity className="w-6 h-6" />
-          </div>
+          <img src="/daily_average.svg" alt="Daily Average" className="w-12 h-12 object-contain drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]" />
           <div>
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-text-muted">Daily Average</span>
             <h4 className="text-xl font-black text-text mt-1">
@@ -324,9 +322,7 @@ export default function MyUsage() {
           transition={{ delay: 0.05 }}
           className="glass-card p-5 border border-amber-500/10 flex items-center gap-4 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300"
         >
-          <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
-            <Calendar className="w-6 h-6" />
-          </div>
+          <img src="/schedule.svg" alt="Schedule" className="w-12 h-12 object-contain drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]" />
           <div>
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-text-muted">Peak Consumption Day</span>
             <h4 className="text-xl font-black text-text mt-1">
@@ -345,9 +341,7 @@ export default function MyUsage() {
           transition={{ delay: 0.1 }}
           className="glass-card p-5 border border-emerald-500/10 flex items-center gap-4 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300"
         >
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
-            <Coins className="w-6 h-6" />
-          </div>
+          <img src="/coin.gif" alt="Coin" className="w-12 h-12 object-contain drop-shadow-[0_0_10px_rgba(16,185,129,0.3)]" />
           <div>
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-text-muted">Estimated Cost</span>
             <h4 className="text-xl font-black text-emerald-400 mt-1">
@@ -540,9 +534,16 @@ export default function MyUsage() {
                   </div>
                 </div>
               ) : usageData.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-2">
-                  <Droplet className="w-10 h-10 text-text-muted/40 mx-auto animate-pulse" />
-                  <p className="text-text text-sm font-medium">No usage logs for this month</p>
+                <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                  <motion.img 
+                    src="/empty_state_charts_analytics.svg" 
+                    alt="No Usage Logs" 
+                    className="w-32 sm:w-40 object-contain mb-2 opacity-90"
+                    animate={{ y: [0, -6, 0] }}
+                    transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
+                  />
+                  <p className="text-text text-sm font-bold">No usage logs for this month</p>
+                  <p className="text-text-muted text-xs mt-0.5 font-medium">Daily consumption graphs will render once readings are submitted.</p>
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
@@ -611,8 +612,21 @@ export default function MyUsage() {
 
             <div className="grid grid-cols-7 gap-2.5">
               {/* Day headers */}
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="text-center text-[10px] font-bold text-text-muted py-1">{day}</div>
+              {[
+                { name: 'Sun', color: 'text-rose-500 dark:text-rose-400 bg-rose-500/10 border-rose-500/20' },
+                { name: 'Mon', color: 'text-blue-500 dark:text-blue-400 bg-blue-500/10 border-blue-500/20' },
+                { name: 'Tue', color: 'text-purple-500 dark:text-purple-400 bg-purple-500/10 border-purple-500/20' },
+                { name: 'Wed', color: 'text-amber-500 dark:text-amber-400 bg-amber-500/10 border-amber-500/20' },
+                { name: 'Thu', color: 'text-cyan-500 dark:text-cyan-400 bg-cyan-500/10 border-cyan-500/20' },
+                { name: 'Fri', color: 'text-emerald-500 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
+                { name: 'Sat', color: 'text-indigo-500 dark:text-indigo-400 bg-indigo-500/10 border-indigo-500/20' },
+              ].map(d => (
+                <div 
+                  key={d.name} 
+                  className={`text-center text-[10px] font-black uppercase tracking-wider py-1.5 rounded-lg border shadow-xs transition-transform hover:scale-105 ${d.color}`}
+                >
+                  {d.name}
+                </div>
               ))}
               
               {/* Calendar Grid cells */}

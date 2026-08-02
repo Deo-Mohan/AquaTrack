@@ -88,9 +88,7 @@ export default function Landing() {
       setCurrentLang(localStorage.getItem('selectedLang') || 'en');
     };
     window.addEventListener('storage', syncLang);
-    // Also poll briefly for same-tab changes
-    const interval = setInterval(syncLang, 500);
-    return () => { window.removeEventListener('storage', syncLang); clearInterval(interval); };
+    return () => { window.removeEventListener('storage', syncLang); };
   }, []);
 
   const toggleTheme = () => {

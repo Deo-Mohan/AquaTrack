@@ -171,9 +171,9 @@ export default function UsageHistory() {
             <div className="h-12 w-full rounded-lg skeleton-pulse" />
           </div>
         ) : filteredAndSortedLogs.length === 0 ? (
-          <div className="p-12 text-center text-text-muted flex flex-col items-center">
-            <Activity className="w-12 h-12 mb-3 opacity-20" />
-            <p className="font-bold text-sm">No usage history matches the selected filters.</p>
+          <div className="py-20 px-12 text-center text-text-muted flex flex-col items-center justify-center min-h-[360px]">
+            <img src="/history.svg" alt="No History" className="w-44 h-44 mb-4 object-contain opacity-90" />
+            <p className="font-bold text-base text-text">No usage history matches the selected filters.</p>
             <p className="text-xs text-text-muted mt-1">Try resetting the dropdown filters to see all readings.</p>
           </div>
         ) : (

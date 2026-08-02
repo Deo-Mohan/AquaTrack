@@ -8,6 +8,8 @@ export default function Notifications() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('ALL'); // ALL, UNREAD
   const [selectedNotif, setSelectedNotif] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
 
   const fetchNotifications = async () => {
     try {
@@ -50,15 +52,18 @@ export default function Notifications() {
     }
   };
 
-  const handleDeleteAll = async () => {
-    if (!window.confirm("Are you sure you want to delete all notifications? This cannot be undone.")) return;
+  const confirmDeleteAll = async () => {
     try {
+      setDeletingAll(true);
       const username = localStorage.getItem('username');
       if (!username) return;
       await api.delete(`/notifications/delete-all/${username}`);
+      setShowDeleteConfirm(false);
       await fetchNotifications();
     } catch (err) {
       console.error("Error deleting all notifications:", err);
+    } finally {
+      setDeletingAll(false);
     }
   };
 
@@ -150,7 +155,7 @@ export default function Notifications() {
           )}
           {notifications.length > 0 && (
             <button
-              onClick={handleDeleteAll}
+              onClick={() => setShowDeleteConfirm(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 text-red-400 rounded-xl text-sm font-semibold transition-all cursor-pointer border border-red-500/25"
             >
               <Trash2 className="w-4 h-4" />
@@ -179,9 +184,16 @@ export default function Notifications() {
       {loading ? (
         <div className="p-8 text-center text-text-muted">Loading notifications...</div>
       ) : notifications.length === 0 ? (
-        <div className="p-8 text-center text-text-muted flex flex-col items-center glass-card">
-          <Bell className="w-12 h-12 mb-3 opacity-20 text-primary" />
-          <p>No notifications found.</p>
+        <div className="p-12 sm:p-16 text-center flex flex-col items-center justify-center glass-card min-h-[440px]">
+          <motion.img 
+            src="/empty_state_notifications.svg" 
+            alt="No Notifications" 
+            className="w-64 sm:w-80 md:w-96 object-contain mb-6 opacity-90"
+            animate={{ y: [0, -8, 0] }}
+            transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
+          />
+          <h3 className="text-text font-black text-xl mb-1.5">No notifications found</h3>
+          <p className="text-text-muted text-sm max-w-md font-medium leading-relaxed">You're all caught up! Updates regarding bills, meter logs, and alerts will appear here.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -235,6 +247,51 @@ export default function Notifications() {
           </AnimatePresence>
         </div>
       )}
+
+      {/* Custom Delete All Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 10 }}
+              className="bg-surface border border-red-500/30 w-full max-w-lg rounded-3xl p-8 shadow-2xl relative overflow-hidden"
+            >
+              <div className="flex items-start gap-5 mb-6">
+                <div className="p-4 rounded-2xl bg-red-500/15 text-red-500 border border-red-500/30 shrink-0">
+                  <AlertTriangle className="w-8 h-8 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-text">Delete All Notifications?</h3>
+                  <p className="text-sm text-text-muted mt-1.5 leading-relaxed font-medium">
+                    Are you sure you want to delete all notifications? This action is permanent and cannot be undone.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 pt-5 border-t border-border/40">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deletingAll}
+                  className="flex-1 py-3 px-5 rounded-2xl border border-border text-sm font-bold text-text-muted hover:text-text hover:bg-surface-lighter transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteAll}
+                  disabled={deletingAll}
+                  className="flex-1 py-3 px-5 bg-red-500 hover:bg-red-600 text-white rounded-2xl text-sm font-extrabold transition-all cursor-pointer shadow-lg shadow-red-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {deletingAll ? 'Deleting...' : 'Yes, Delete All'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Selected notification details modal */}
       {selectedNotif && (

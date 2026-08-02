@@ -5,6 +5,8 @@ import {
   Search, X, ChevronDown, ChevronUp, Loader2, AlertCircle, QrCode, Calendar
 } from 'lucide-react';
 import api from '../api';
+import MicSearchBox from '../components/MicSearchBox';
+
 
 const getBillingMonthLabel = (dateStr) => {
   if (!dateStr) return 'N/A';
@@ -282,18 +284,14 @@ export default function WaterBillingHistory() {
       {/* ── Toolbar ──────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-          <input
-            type="text" value={searchQ} onChange={e => setSearchQ(e.target.value)}
+          <MicSearchBox
+            value={searchQ}
+            onChange={setSearchQ}
+            onClear={() => setSearchQ('')}
             placeholder={activeTab === 'usage' ? 'Search by house, block, liters…' : 'Search by house, amount, status…'}
-            className="w-full bg-surface border border-border rounded-xl pl-10 pr-10 py-2.5 text-sm text-text placeholder-text-muted/50 focus:outline-none focus:border-primary/60 transition-all"
           />
-          {searchQ && (
-            <button onClick={() => setSearchQ('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text cursor-pointer">
-              <X className="w-4 h-4" />
-            </button>
-          )}
         </div>
+
 
         <button
           onClick={() => setSortDir(d => d === 'desc' ? 'asc' : 'desc')}
@@ -432,7 +430,7 @@ export default function WaterBillingHistory() {
                           <Calendar className="w-4.5 h-4.5 text-emerald-400" />
                           {group.month}
                         </h3>
-                        <span className="text-xs font-extrabold text-emerald-400 bg-emerald-500/15 px-3 py-1 rounded-full border border-emerald-500/20">
+                        <span className="text-xs font-black text-emerald-950 dark:text-emerald-200 bg-emerald-500/20 px-3 py-1 rounded-full border border-transparent">
                           Total Billed: ₹{group.totalAmount.toLocaleString('en-IN')}
                         </span>
                       </div>

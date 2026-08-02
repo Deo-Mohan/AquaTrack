@@ -280,7 +280,7 @@ export default function SharedHeader({ activeTab = 'home' }) {
                                 : 'text-text hover:bg-surface-lighter'
                             }`}
                           >
-                            <span className="flex items-center gap-2">
+                            <span className="notranslate flex items-center gap-2">
                               <span className="text-base">{l.flag}</span>
                               <span className="font-bold">{l.name}</span>
                             </span>
@@ -306,7 +306,7 @@ export default function SharedHeader({ activeTab = 'home' }) {
                               : 'text-text hover:bg-surface-lighter'
                           }`}
                         >
-                          <span className="flex items-center gap-2">
+                          <span className="notranslate flex items-center gap-2">
                             <span className="text-base">{l.flag}</span>
                             <span>{l.name}</span>
                           </span>

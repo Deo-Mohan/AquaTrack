@@ -111,20 +111,71 @@ export default function TariffSettings() {
       <AnimatePresence>
         {msg && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className={`p-4 rounded-xl flex items-center gap-3 text-sm font-medium border ${
+            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+            className={`p-4 rounded-2xl flex items-center justify-between gap-3 text-sm font-bold border shadow-xl ${
               msg.type === 'success'
-                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                : 'bg-red-500/10 border-red-500/20 text-red-400'
+                ? 'bg-emerald-500/15 border-emerald-500/35 text-emerald-500 dark:text-emerald-400 backdrop-blur-md'
+                : 'bg-red-500/15 border-red-500/35 text-red-500 dark:text-red-400 backdrop-blur-md'
             }`}
           >
-            {msg.type === 'success' ? <CheckCircle2 className="w-5 h-5 shrink-0" /> : <AlertTriangle className="w-5 h-5 shrink-0" />}
-            {msg.text}
+            <div className="flex items-center gap-3">
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                msg.type === 'success' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-red-500/20 text-red-500'
+              }`}>
+                {msg.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+              </div>
+              <div>
+                <span className="font-black text-base block">{msg.type === 'success' ? 'Tariff Updated Successfully!' : 'Update Error'}</span>
+                <p className="text-xs font-semibold opacity-90">{msg.text}</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setMsg(null)}
+              className="p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+            >
+              ✕
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Currently Active Tariff & Rules Card (Moved to Top) */}
+      {saved && (
+        <div className="glass-card p-5 border border-emerald-500/20 shadow-md">
+          <h4 className="text-sm font-bold text-emerald-500 dark:text-emerald-400 mb-3 flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5" /> Currently Active Tariff & Rules
+          </h4>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+            <div className="bg-surface-lighter rounded-2xl p-3.5 border border-border/50">
+              <p className="text-xs text-text-muted font-medium mb-1">Base Rate</p>
+              <p className="text-lg font-black text-primary">₹{(saved.baseRatePerLiter || 0).toFixed(4)}</p>
+              <p className="text-[10px] text-text-muted mt-0.5">per liter</p>
+            </div>
+            <div className="bg-surface-lighter rounded-2xl p-3.5 border border-border/50">
+              <p className="text-xs text-text-muted font-medium mb-1">Monthly Limit</p>
+              <p className="text-lg font-black text-amber-500 dark:text-amber-400">{(saved.monthlyLimitLiters || 0).toLocaleString()}</p>
+              <p className="text-[10px] text-text-muted mt-0.5">liters/flat</p>
+            </div>
+            <div className="bg-surface-lighter rounded-2xl p-3.5 border border-border/50">
+              <p className="text-xs text-text-muted font-medium mb-1">Excess Rate</p>
+              <p className="text-lg font-black text-red-500 dark:text-red-400">₹{(saved.excessRatePerLiter || 0).toFixed(4)}</p>
+              <p className="text-[10px] text-text-muted mt-0.5">per liter</p>
+            </div>
+            <div className="bg-surface-lighter rounded-2xl p-3.5 border border-border/50">
+              <p className="text-xs text-text-muted font-medium mb-1">Late Fee</p>
+              <p className="text-lg font-black text-rose-500 dark:text-rose-400">₹{(saved.lateFeePerMonth || 0).toFixed(2)}</p>
+              <p className="text-[10px] text-text-muted mt-0.5">per month</p>
+            </div>
+            <div className="bg-surface-lighter rounded-2xl p-3.5 border border-border/50">
+              <p className="text-xs text-text-muted font-medium mb-1">Grace Period</p>
+              <p className="text-lg font-black text-cyan-500 dark:text-cyan-400">{saved.gracePeriodDays || 20} Days</p>
+              <p className="text-[10px] text-text-muted mt-0.5">due window</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Settings Form */}
@@ -272,42 +323,6 @@ export default function TariffSettings() {
               {saving ? 'Saving & Propagating...' : 'Save Tariff Settings'}
             </button>
           </div>
-
-          {/* Current Saved Settings */}
-          {saved && (
-            <div className="glass-card p-5 border border-emerald-500/20">
-              <h4 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4" /> Currently Active Tariff & Rules
-              </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
-                <div className="bg-surface-lighter rounded-xl p-3">
-                  <p className="text-xs text-text-muted">Base Rate</p>
-                  <p className="text-base font-bold text-primary">₹{(saved.baseRatePerLiter || 0).toFixed(4)}</p>
-                  <p className="text-[10px] text-text-muted">per liter</p>
-                </div>
-                <div className="bg-surface-lighter rounded-xl p-3">
-                  <p className="text-xs text-text-muted">Monthly Limit</p>
-                  <p className="text-base font-bold text-amber-400">{(saved.monthlyLimitLiters || 0).toLocaleString()}</p>
-                  <p className="text-[10px] text-text-muted">liters/flat</p>
-                </div>
-                <div className="bg-surface-lighter rounded-xl p-3">
-                  <p className="text-xs text-text-muted">Excess Rate</p>
-                  <p className="text-base font-bold text-red-400">₹{(saved.excessRatePerLiter || 0).toFixed(4)}</p>
-                  <p className="text-[10px] text-text-muted">per liter</p>
-                </div>
-                <div className="bg-surface-lighter rounded-xl p-3">
-                  <p className="text-xs text-text-muted">Late Fee</p>
-                  <p className="text-base font-bold text-rose-400">₹{(saved.lateFeePerMonth || 0).toFixed(2)}</p>
-                  <p className="text-[10px] text-text-muted">per month</p>
-                </div>
-                <div className="bg-surface-lighter rounded-xl p-3">
-                  <p className="text-xs text-text-muted">Grace Period</p>
-                  <p className="text-base font-bold text-cyan-400">{saved.gracePeriodDays || 20} Days</p>
-                  <p className="text-[10px] text-text-muted">due window</p>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Live Bill Preview */}

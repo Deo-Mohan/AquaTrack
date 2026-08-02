@@ -4,7 +4,6 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 // Lazy load secondary global components for initial bundle optimization
 const HouseholdChatbot = lazy(() => import('./components/HouseholdChatbot'));
-const PrivacyDialog = lazy(() => import('./components/PrivacyDialog'));
 
 // Lazy load page components for code-splitting and optimized initial load times
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -126,7 +125,6 @@ function App() {
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Suspense>
-      <PrivacyDialog />
     </Router>
   );
 }
