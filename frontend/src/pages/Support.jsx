@@ -296,8 +296,12 @@ export default function Support() {
         
         <div className="z-10 max-w-xl flex-1">
           <div className="flex flex-wrap items-center gap-3 mb-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-              <Sparkles className="w-6 h-6 text-blue-600 dark:text-cyan-400" />
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
+              <img 
+                src="/customer-service.gif" 
+                alt="Customer Service Support" 
+                className="w-9 h-9 sm:w-10 sm:h-10 object-contain rounded-xl mix-blend-multiply dark:mix-blend-screen"
+              />
               Support & Resolution Center
             </h1>
             <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-blue-600/10 text-blue-700 dark:bg-cyan-500/20 dark:text-cyan-300 border border-blue-600/20 dark:border-cyan-400/30">
@@ -440,26 +444,28 @@ export default function Support() {
               <div className="flex flex-col justify-between h-full space-y-4">
                 <div className="space-y-4">
                   {/* Filter Bar */}
-                  <div className="flex items-center justify-between gap-1.5 bg-surface-lighter/60 dark:bg-surface-lighter/30 p-1.5 rounded-2xl border border-primary/10">
-                    {[
-                      { id: 'ALL', label: 'ALL' },
-                      { id: 'OPEN', label: 'OPEN' },
-                      !isSuperAdmin && { id: 'ESCALATED', label: 'SENT TO ADMIN' },
-                      { id: 'RESOLVED', label: 'RESOLVED' }
-                    ].filter(Boolean).map((f) => (
-                      <button
-                        key={f.id}
-                        onClick={() => setStatusFilter(f.id)}
-                        className={`flex-1 py-1.5 rounded-xl text-[10px] sm:text-[11px] font-extrabold transition-all uppercase tracking-wider ${
-                          statusFilter === f.id 
-                            ? 'bg-primary text-white shadow-md shadow-primary/20' 
-                            : 'text-text-muted hover:text-primary dark:hover:text-white'
-                        }`}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                    <div className="flex items-center gap-1.5 border-l border-border/40 pl-1.5">
+                  <div className="flex items-center justify-between gap-1.5 bg-surface-lighter/60 dark:bg-surface-lighter/30 p-1.5 rounded-2xl border border-primary/10 overflow-x-auto custom-scrollbar">
+                    <div className="flex items-center gap-1.5 min-w-max flex-1">
+                      {[
+                        { id: 'ALL', label: 'ALL' },
+                        { id: 'OPEN', label: 'OPEN' },
+                        !isSuperAdmin && { id: 'ESCALATED', label: 'SENT TO ADMIN' },
+                        { id: 'RESOLVED', label: 'RESOLVED' }
+                      ].filter(Boolean).map((f) => (
+                        <button
+                          key={f.id}
+                          onClick={() => setStatusFilter(f.id)}
+                          className={`px-3 py-1.5 rounded-xl text-[10px] sm:text-[11px] font-extrabold transition-all uppercase tracking-wider whitespace-nowrap ${
+                            statusFilter === f.id 
+                              ? 'bg-primary text-white shadow-md shadow-primary/20' 
+                              : 'text-text-muted hover:text-primary dark:hover:text-white'
+                          }`}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-1.5 border-l border-border/40 pl-1.5 shrink-0">
                       <button 
                         onClick={fetchTickets}
                         className="p-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-cyan-400 border border-blue-500/20 transition-all scale-100 hover:scale-110 active:scale-95 shadow-sm group cursor-pointer" 
@@ -742,21 +748,21 @@ export default function Support() {
                 </div>
 
                 {/* Reply Input Form - WhatsApp Green Send Button */}
-                <form onSubmit={handleSendReply} className="border-t border-slate-200 dark:border-slate-800 pt-3 flex gap-2">
+                <form onSubmit={handleSendReply} className="border-t border-slate-200 dark:border-slate-800 pt-3 flex items-center gap-1.5 sm:gap-2">
                   <input
                     type="text"
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
                     placeholder="Type a message..."
-                    className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-2xl px-4 py-3 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all shadow-inner"
+                    className="flex-1 min-w-0 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-2xl px-3.5 py-2.5 sm:px-4 sm:py-3 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all shadow-inner"
                   />
                   <button
                     type="submit"
                     disabled={submittingReply || !replyText.trim()}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-black text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/30 disabled:opacity-50 transition-all scale-100 active:scale-95"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-2xl font-black text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/30 disabled:opacity-50 transition-all scale-100 active:scale-95 cursor-pointer"
                   >
-                    {submittingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    <span>Send</span>
+                    {submittingReply ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : <Send className="w-4 h-4 shrink-0" />}
+                    <span className="hidden sm:inline">Send</span>
                   </button>
                 </form>
               </div>
@@ -844,8 +850,8 @@ export default function Support() {
                     </div>
 
                     <div className="card-title-area">
-                      <span className="font-extrabold pr-2 truncate flex-1">
-                        {contact.fullName ? `${contact.fullName} (${contact.username})` : contact.username}
+                      <span className="font-extrabold pr-2 truncate flex-1 capitalize" lang="en">
+                        {contact.fullName ? `${contact.fullName}` : contact.username}
                       </span>
                       <span className="card-tag">{roleLabel}</span>
                     </div>
@@ -862,7 +868,7 @@ export default function Support() {
                               <path d="M20,4C21.1,4 22,4.9 22,6V18C22,19.1 21.1,20 20,20H4C2.9,20 2,19.1 2,18V6C2,4.9 2.9,4 4,4H20M4,6V18H20V6H4M6,9H18V11H6V9M6,13H16V15H6V13Z"></path>
                             </svg>
                           </div>
-                          <span className="feature-text select-all">{contact.email}</span>
+                          <span className="feature-text select-all notranslate" translate="no">{contact.email}</span>
                         </div>
 
                         {(contact.mobileNumber || contact.whatsAppNumber) && (
@@ -872,7 +878,7 @@ export default function Support() {
                                 <path d="M6.62,10.79C8.06,13.62 10.38,15.93 13.21,17.38L15.41,15.18C15.69,14.9 16.08,14.82 16.43,14.93C17.55,15.3 18.75,15.5 20,15.5A1,1 0 0,1 21,16.5V20A1,1 0 0,1 20,21A17,17 0 0,1 3,4A1,1 0 0,1 4,3H7.5A1,1 0 0,1 8.5,4C8.5,5.25 8.7,6.45 9.07,7.57C9.18,7.92 9.1,8.31 8.82,8.59L6.62,10.79Z"></path>
                               </svg>
                             </div>
-                            <span className="feature-text select-all">
+                            <span className="feature-text select-all notranslate" translate="no">
                               {contact.mobileNumber ? `Mob: ${contact.mobileNumber}` : ''}
                               {contact.whatsAppNumber && contact.whatsAppNumber !== contact.mobileNumber ? ` | WA: ${contact.whatsAppNumber}` : ''}
                             </span>
@@ -885,7 +891,7 @@ export default function Support() {
                               <path d="M12,17.56L16.07,16.43L16.62,10.33H9.38L9.2,8.3H16.8L17,6.31H7L7.56,12.32H14.45L14.22,14.9L12,15.5L9.78,14.9L9.64,13.24H7.64L7.93,16.43L12,17.56M4.07,3H19.93L18.5,19.2L12,21L5.5,19.2L4.07,3Z"></path>
                             </svg>
                           </div>
-                          <span className="feature-text">{locationText}</span>
+                          <span className="feature-text capitalize" lang="en">{locationText}</span>
                         </div>
 
                         <div className="feature-item">

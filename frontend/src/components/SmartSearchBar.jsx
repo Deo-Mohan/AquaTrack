@@ -132,78 +132,77 @@ export default function SmartSearchBar({
 
   return (
     <div className="space-y-2 w-full">
-      {/* ── Row 1: Search + Controls ── */}
-      <div className="flex flex-wrap gap-2 items-center">
+      {/* ── Row 1: Search Input (full width) ── */}
+      <div ref={wrapperRef} className="relative w-full">
+        <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+          onKeyDown={handleKeyDown}
+          placeholder='Smart search: "comm", "Block A"...'
+          className="w-full bg-surface border border-border rounded-xl pl-10 pr-10 py-2.5 text-sm text-text placeholder-text-muted/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all"
+        />
+        {query && (
+          <button
+            onClick={() => onQueryChange('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text transition-colors cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
 
-        {/* Smart Search Input */}
-        <div ref={wrapperRef} className="relative flex-1 min-w-[220px]">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-            onKeyDown={handleKeyDown}
-            placeholder='Smart search: "community admin", "no rate set", "Block A"...'
-            className="w-full bg-surface border border-border rounded-xl pl-10 pr-10 py-2.5 text-sm text-text placeholder-text-muted/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all"
-          />
-          {query && (
-            <button
-              onClick={() => onQueryChange('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text transition-colors cursor-pointer"
+        {/* Autocomplete Dropdown */}
+        <AnimatePresence>
+          {showSuggestions && suggestions.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -4, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.98 }}
+              transition={{ duration: 0.15 }}
+              className="absolute top-full left-0 right-0 mt-1.5 bg-surface/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl z-50 overflow-hidden"
             >
-              <X className="w-4 h-4" />
-            </button>
+              <div className="px-3 py-2 border-b border-border/50 flex items-center gap-2">
+                <Search className="w-3 h-3 text-text-muted" />
+                <p className="text-xs font-medium text-text-muted">Suggestions</p>
+              </div>
+              {suggestions.map((sug, i) => {
+                const qIdx = sug.toLowerCase().indexOf(query.toLowerCase());
+                return (
+                  <button
+                    key={sug}
+                    onMouseDown={(e) => { e.preventDefault(); onQueryChange(sug); setShowSuggestions(false); }}
+                    className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors cursor-pointer ${
+                      i === selectedSugg ? 'bg-primary/15 text-primary' : 'text-text hover:bg-surface-lighter'
+                    }`}
+                  >
+                    <Search className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
+                    <span>
+                      {qIdx >= 0 ? (
+                        <>
+                          {sug.slice(0, qIdx)}
+                          <strong className="text-primary">{sug.slice(qIdx, qIdx + query.length)}</strong>
+                          {sug.slice(qIdx + query.length)}
+                        </>
+                      ) : sug}
+                    </span>
+                  </button>
+                );
+              })}
+            </motion.div>
           )}
+        </AnimatePresence>
+      </div>
 
-          {/* Autocomplete Dropdown */}
-          <AnimatePresence>
-            {showSuggestions && suggestions.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                transition={{ duration: 0.15 }}
-                className="absolute top-full left-0 right-0 mt-1.5 bg-surface/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl z-50 overflow-hidden"
-              >
-                <div className="px-3 py-2 border-b border-border/50 flex items-center gap-2">
-                  <Search className="w-3 h-3 text-text-muted" />
-                  <p className="text-xs font-medium text-text-muted">Suggestions</p>
-                </div>
-                {suggestions.map((sug, i) => {
-                  const qIdx = sug.toLowerCase().indexOf(query.toLowerCase());
-                  return (
-                    <button
-                      key={sug}
-                      onMouseDown={(e) => { e.preventDefault(); onQueryChange(sug); setShowSuggestions(false); }}
-                      className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors cursor-pointer ${
-                        i === selectedSugg ? 'bg-primary/15 text-primary' : 'text-text hover:bg-surface-lighter'
-                      }`}
-                    >
-                      <Search className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
-                      <span>
-                        {qIdx >= 0 ? (
-                          <>
-                            {sug.slice(0, qIdx)}
-                            <strong className="text-primary">{sug.slice(qIdx, qIdx + query.length)}</strong>
-                            {sug.slice(qIdx + query.length)}
-                          </>
-                        ) : sug}
-                      </span>
-                    </button>
-                  );
-                })}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
+      {/* ── Row 2: Block Filter + Sort + Filter controls ── */}
+      <div className="flex items-center gap-2 flex-wrap">
         {/* Block Filter Select */}
         <select
           value={blockFilter}
           onChange={(e) => onBlockFilterChange(e.target.value)}
-          className="bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 min-w-[120px] cursor-pointer"
+          className="flex-1 sm:flex-none bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 min-w-[100px] cursor-pointer"
         >
           <option value="">All Blocks</option>
           {blocks.map(b => <option key={b} value={b}>{b}</option>)}

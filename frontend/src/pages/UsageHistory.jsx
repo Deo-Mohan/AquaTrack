@@ -13,6 +13,8 @@ export default function UsageHistory() {
   const [filterMonth, setFilterMonth] = useState('all'); // all, 1-12
   const [filterYear, setFilterYear] = useState('all'); // all, years...
 
+  const [monthlyLimit, setMonthlyLimit] = useState(10000);
+
   useEffect(() => {
     const fetchHistory = async () => {
       try {
@@ -20,9 +22,18 @@ export default function UsageHistory() {
         if (token) {
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
           const houseNumber = localStorage.getItem('houseNumber');
+          const username = localStorage.getItem('username');
           if (!houseNumber) { setLoading(false); return; }
-          const res = await api.get(`/usage/household/${houseNumber}`);
+
+          const [res, profileRes] = await Promise.all([
+            api.get(`/usage/household/${houseNumber}`),
+            username ? api.get(`/users/profile/${username}`) : Promise.resolve({ data: null })
+          ]);
+
           setLogs(res.data || []);
+          if (profileRes.data && profileRes.data.monthlyLimitLiters) {
+            setMonthlyLimit(profileRes.data.monthlyLimitLiters);
+          }
         }
       } catch (err) {
         console.error("Error fetching usage history:", err);
@@ -34,8 +45,21 @@ export default function UsageHistory() {
     fetchHistory();
   }, []);
 
-  const getStatusColor = (status) => {
-    if (status === 'Overuse' || status === 'OVERUSE') {
+  const calculateEffectiveStatus = (log) => {
+    const type = (log.logType || 'DAILY').toUpperCase();
+    let threshold = monthlyLimit / 30; // Daily threshold
+
+    if (type === 'WEEKLY') {
+      threshold = (monthlyLimit / 30) * 7;
+    } else if (type === 'MONTHLY') {
+      threshold = monthlyLimit;
+    }
+
+    return log.readingLiters > threshold ? 'OVERUSE' : 'NORMAL';
+  };
+
+  const getStatusColor = (isOveruse) => {
+    if (isOveruse) {
       return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
     }
     return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
@@ -183,36 +207,58 @@ export default function UsageHistory() {
                 <tr className="bg-surface-lighter/50 border-b border-border text-sm text-text-muted">
                   <th className="p-4 font-medium">Log ID</th>
                   <th className="p-4 font-medium">Reading Date</th>
+                  <th className="p-4 font-medium">Log Type</th>
                   <th className="p-4 font-medium">Volume (Liters)</th>
                   <th className="p-4 font-medium">Status</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredAndSortedLogs.map((log, index) => (
-                  <motion.tr 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: Math.min(index * 0.03, 0.5) }}
-                    key={log.id} 
-                    className="border-b border-border/50 hover:bg-surface-lighter/30 transition-colors"
-                  >
-                    <td className="p-4 font-medium text-text">#{log.id.toString().padStart(5, '0')}</td>
-                    <td className="p-4 text-text-muted">
-                      {new Date(log.readingDate).toLocaleDateString('en-US', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric'
-                      })}
-                    </td>
-                    <td className="p-4 font-semibold text-text">{log.readingLiters.toLocaleString()} L</td>
-                    <td className="p-4">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(log.status)}`}>
-                        {(log.status === 'Overuse' || log.status === 'OVERUSE') && <AlertTriangle className="w-3 h-3" />}
-                        {log.status === 'Overuse' || log.status === 'OVERUSE' ? 'Overuse' : 'Normal'}
-                      </span>
-                    </td>
-                  </motion.tr>
-                ))}
+                {filteredAndSortedLogs.map((log, index) => {
+                  const typeLabel = (log.logType || 'DAILY').toUpperCase();
+                  const typeBadgeStyle = 
+                    typeLabel === 'MONTHLY' 
+                      ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' 
+                      : typeLabel === 'WEEKLY'
+                      ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                      : 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+
+                  return (
+                    <motion.tr 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: Math.min(index * 0.03, 0.5) }}
+                      key={log.id} 
+                      className="border-b border-border/50 hover:bg-surface-lighter/30 transition-colors"
+                    >
+                      <td className="p-4 font-medium text-text">#{log.id.toString().padStart(5, '0')}</td>
+                      <td className="p-4 text-text-muted">
+                        {new Date(log.readingDate).toLocaleDateString('en-US', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric'
+                        })}
+                      </td>
+                      <td className="p-4">
+                        <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${typeBadgeStyle}`}>
+                          {typeLabel}
+                        </span>
+                      </td>
+                      <td className="p-4 font-semibold text-text">{log.readingLiters.toLocaleString()} L</td>
+                      <td className="p-4">
+                        {(() => {
+                          const effectiveStatus = calculateEffectiveStatus(log);
+                          const isOveruse = effectiveStatus === 'OVERUSE';
+                          return (
+                            <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(isOveruse)}`}>
+                              {isOveruse && <AlertTriangle className="w-3.5 h-3.5" />}
+                              {isOveruse ? 'Overuse' : 'Normal'}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                    </motion.tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

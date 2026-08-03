@@ -237,45 +237,47 @@ export default function WaterPurchase() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
           {/* Billing Month Selector */}
-          <div className="flex items-center gap-2 bg-surface-lighter px-3 py-2 rounded-xl border border-border">
-            <Calendar className="w-4 h-4 text-primary" />
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="bg-transparent text-xs font-bold text-text focus:outline-none cursor-pointer"
-            >
-              {(() => {
-                const currentYr = new Date().getFullYear();
-                const defaultMonths = [
-                  'January', 'February', 'March', 'April', 'May', 'June',
-                  'July', 'August', 'September', 'October', 'November', 'December'
-                ].map(m => `${m} ${currentYr}`);
+          <div className="flex items-center justify-between gap-2 bg-surface-lighter px-3.5 py-2.5 rounded-xl border border-border">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-primary shrink-0" />
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="bg-transparent text-xs font-bold text-text focus:outline-none cursor-pointer"
+              >
+                {(() => {
+                  const currentYr = new Date().getFullYear();
+                  const defaultMonths = [
+                    'January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'
+                  ].map(m => `${m} ${currentYr}`);
 
-                const monthSet = new Set(defaultMonths);
-                if (selectedMonth) monthSet.add(selectedMonth);
+                  const monthSet = new Set(defaultMonths);
+                  if (selectedMonth) monthSet.add(selectedMonth);
 
-                return Array.from(monthSet).map(m => (
-                  <option
-                    key={m}
-                    value={m}
-                    className="bg-slate-900 text-slate-100 font-semibold"
-                    style={{ backgroundColor: '#0f172a', color: '#f8fafc' }}
-                  >
-                    {m}
-                  </option>
-                ));
-              })()}
-            </select>
+                  return Array.from(monthSet).map(m => (
+                    <option
+                      key={m}
+                      value={m}
+                      className="bg-slate-900 text-slate-100 font-semibold"
+                      style={{ backgroundColor: '#0f172a', color: '#f8fafc' }}
+                    >
+                      {m}
+                    </option>
+                  ));
+                })()}
+              </select>
+            </div>
           </div>
 
           {/* Log Purchase Button */}
           <button
             onClick={() => setModalOpen(true)}
-            className="btn-next flex items-center gap-2 text-xs py-2.5 px-4 cursor-pointer"
+            className="flex items-center justify-center gap-2 text-xs sm:text-sm font-bold py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 shrink-0" />
             <span>Log Water Purchase</span>
           </button>
         </div>

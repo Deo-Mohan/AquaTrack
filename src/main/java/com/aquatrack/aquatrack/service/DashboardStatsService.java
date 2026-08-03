@@ -44,6 +44,8 @@ public class DashboardStatsService {
         stats.put("totalHouseholdUsers", userRepository.countApprovedHouseholdUsers());
         stats.put("totalBills", billRepository.count());
         stats.put("totalUsageLogs", waterUsageRepository.count());
+        stats.put("totalRevenue", billRepository.sumTotalRevenue());
+        stats.put("totalPending", billRepository.sumTotalPending());
         return stats;
     }
 

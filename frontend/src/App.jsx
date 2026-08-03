@@ -54,6 +54,8 @@ const PageLoader = () => (
   </div>
 );
 
+import ErrorBoundary from './components/ErrorBoundary';
+
 // A simple layout wrapper for authenticated pages
 const AuthLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -71,7 +73,9 @@ const AuthLayout = ({ children }) => {
         <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
         
         <main className="flex-1 overflow-y-auto p-6 lg:p-8 custom-scrollbar">
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </main>
       </div>
 
@@ -79,6 +83,15 @@ const AuthLayout = ({ children }) => {
       <HouseholdChatbot />
     </div>
   );
+};
+
+// Route wrapper to ensure user is logged in
+const ProtectedRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
 };
 
 // A route wrapper to restrict access only to Community Admins
@@ -105,21 +118,21 @@ function App() {
           <Route path="/register/invite/:token" element={<InviteRegister />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
 
-          {/* Protected Routes (wrapping in AuthLayout) */}
-          <Route path="/dashboard" element={<AuthLayout><Dashboard /></AuthLayout>} />
-          <Route path="/admin" element={<AuthLayout><AdminDashboard /></AuthLayout>} />
-          <Route path="/bills" element={<AuthLayout><Bills /></AuthLayout>} />
-          <Route path="/invoices" element={<AuthLayout><Invoices /></AuthLayout>} />
-          <Route path="/notifications" element={<AuthLayout><Notifications /></AuthLayout>} />
-          <Route path="/tips" element={<AuthLayout><WaterTips /></AuthLayout>} />
-          <Route path="/history" element={<AuthLayout><UsageHistory /></AuthLayout>} />
-          <Route path="/usage" element={<AuthLayout><MyUsage /></AuthLayout>} />
-          <Route path="/profile" element={<AuthLayout><Profile /></AuthLayout>} />
-          <Route path="/support" element={<AuthLayout><Support /></AuthLayout>} />
-          <Route path="/tariff" element={<AuthLayout><CommunityAdminRoute><TariffSettings /></CommunityAdminRoute></AuthLayout>} />
-          <Route path="/water-purchase" element={<AuthLayout><CommunityAdminRoute><WaterPurchase /></CommunityAdminRoute></AuthLayout>} />
-          <Route path="/meter-workstation" element={<AuthLayout><MeterWorkstation /></AuthLayout>} />
-          <Route path="/water-billing-history" element={<AuthLayout><WaterBillingHistory /></AuthLayout>} />
+          {/* Protected Routes (wrapping in AuthLayout & ProtectedRoute) */}
+          <Route path="/dashboard" element={<ProtectedRoute><AuthLayout><Dashboard /></AuthLayout></ProtectedRoute>} />
+          <Route path="/admin" element={<ProtectedRoute><AuthLayout><AdminDashboard /></AuthLayout></ProtectedRoute>} />
+          <Route path="/bills" element={<ProtectedRoute><AuthLayout><Bills /></AuthLayout></ProtectedRoute>} />
+          <Route path="/invoices" element={<ProtectedRoute><AuthLayout><Invoices /></AuthLayout></ProtectedRoute>} />
+          <Route path="/notifications" element={<ProtectedRoute><AuthLayout><Notifications /></AuthLayout></ProtectedRoute>} />
+          <Route path="/tips" element={<ProtectedRoute><AuthLayout><WaterTips /></AuthLayout></ProtectedRoute>} />
+          <Route path="/history" element={<ProtectedRoute><AuthLayout><UsageHistory /></AuthLayout></ProtectedRoute>} />
+          <Route path="/usage" element={<ProtectedRoute><AuthLayout><MyUsage /></AuthLayout></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><AuthLayout><Profile /></AuthLayout></ProtectedRoute>} />
+          <Route path="/support" element={<ProtectedRoute><AuthLayout><Support /></AuthLayout></ProtectedRoute>} />
+          <Route path="/tariff" element={<ProtectedRoute><AuthLayout><CommunityAdminRoute><TariffSettings /></CommunityAdminRoute></AuthLayout></ProtectedRoute>} />
+          <Route path="/water-purchase" element={<ProtectedRoute><AuthLayout><CommunityAdminRoute><WaterPurchase /></CommunityAdminRoute></AuthLayout></ProtectedRoute>} />
+          <Route path="/meter-workstation" element={<ProtectedRoute><AuthLayout><MeterWorkstation /></AuthLayout></ProtectedRoute>} />
+          <Route path="/water-billing-history" element={<ProtectedRoute><AuthLayout><WaterBillingHistory /></AuthLayout></ProtectedRoute>} />
           
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/login" replace />} />

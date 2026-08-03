@@ -6,6 +6,7 @@ import {
   BarChart, Bar, LineChart, Line, Cell
 } from 'recharts';
 import api from '../api';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#f43f5e', '#06b6d4', '#6366f1', '#f97316'];
 
@@ -718,21 +719,25 @@ export default function Dashboard() {
         <div>
           <h1 className="text-2xl font-bold text-text">Household User Dashboard</h1>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1 text-sm text-text-muted">
-            <span>{getGreeting()}, <span className="font-extrabold text-amber-500 dark:text-amber-400">{displayName}</span></span>
+            <span>{getGreeting()}, <span className="font-extrabold text-amber-500 dark:text-amber-400 capitalize" lang="en">{displayName}</span></span>
             <span className="w-1.5 h-1.5 rounded-full bg-border shrink-0 hidden sm:inline" />
             <div className="flex items-center gap-1.5 bg-surface-lighter/50 px-2.5 py-0.5 rounded-full border border-border/60 text-xs">
+              <span className="text-text-muted font-medium">Block:</span>
+              <strong className="text-primary font-semibold notranslate" translate="no">{localStorage.getItem('apartmentBlock') || 'The White House'}</strong>
+            </div>
+            <div className="flex items-center gap-1.5 bg-surface-lighter/50 px-2.5 py-0.5 rounded-full border border-border/60 text-xs">
               <span className="text-text-muted font-medium">Flat:</span>
-              <strong className="text-primary font-semibold">{localStorage.getItem('houseNumber') || 'N/A'}</strong>
+              <strong className="text-primary font-semibold capitalize" lang="en">{localStorage.getItem('houseNumber') || 'N/A'}</strong>
             </div>
             <div className="flex items-center gap-1.5 bg-surface-lighter/50 px-2.5 py-0.5 rounded-full border border-border/60 text-xs">
               <span className="text-text-muted font-medium">Community/Area:</span>
-              <strong className="text-emerald-400 font-semibold">{localStorage.getItem('colonyName') || 'Qutub Minar'}</strong>
+              <strong className="text-emerald-400 font-semibold notranslate" translate="no">{localStorage.getItem('colonyName') || 'Bharat Nagar'}</strong>
             </div>
           </div>
         </div>
 
         {/* Glowing bulb for quick guide */}
-        <div className="relative pb-1" style={{ zIndex: 40 }}>
+        <div className="relative pb-1" style={{ zIndex: 10 }}>
           <button
             onMouseEnter={() => setShowTooltip(true)}
             onMouseLeave={() => setShowTooltip(false)}
@@ -871,7 +876,8 @@ export default function Dashboard() {
           </div>
           <div className="overflow-x-auto w-full custom-scrollbar">
             <div className="h-[250px] min-w-[700px]">
-              {monthlyUsageData.length > 0 && monthlyUsageData.some(d => d.usage > 0) ? (
+              <ErrorBoundary fallbackText="Monthly Usage chart could not be loaded.">
+                {monthlyUsageData.length > 0 && monthlyUsageData.some(d => d.usage > 0) ? (
                 <ResponsiveContainer width="100%" height="100%">
                   {(() => {
                     if (monthlyChartType === 'bar') {
@@ -942,9 +948,10 @@ export default function Dashboard() {
                   <p className="text-text-muted text-xs mt-1 max-w-sm">Monthly consumption metrics and trend charts will automatically populate here once water meter readings are logged.</p>
                 </div>
               )}
-            </div>
+            </ErrorBoundary>
           </div>
-        </motion.div>
+        </div>
+      </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -977,65 +984,67 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="h-[250px] w-full">
-            {weeklyUsage.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                {(() => {
-                  if (weeklyChartType === 'area') {
+            <ErrorBoundary fallbackText="Weekly Usage chart could not be loaded.">
+              {weeklyUsage.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  {(() => {
+                    if (weeklyChartType === 'area') {
+                      return (
+                        <AreaChart data={weeklyUsage} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="colorUsageWeekly" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                          <XAxis dataKey="name" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={40} />
+                          <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                          <Tooltip content={<WeeklyTooltip />} />
+                          <Area type="monotone" dataKey="usage" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorUsageWeekly)" />
+                        </AreaChart>
+                      );
+                    }
+                    if (weeklyChartType === 'line') {
+                      return (
+                        <LineChart data={weeklyUsage} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                          <XAxis dataKey="name" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={40} />
+                          <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                          <Tooltip content={<WeeklyTooltip />} />
+                          <Line type="monotone" dataKey="usage" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                        </LineChart>
+                      );
+                    }
                     return (
-                      <AreaChart data={weeklyUsage} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="colorUsageWeekly" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
+                      <BarChart data={weeklyUsage} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                         <XAxis dataKey="name" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={40} />
                         <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                        <Tooltip content={<WeeklyTooltip />} />
-                        <Area type="monotone" dataKey="usage" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorUsageWeekly)" />
-                      </AreaChart>
+                        <Tooltip cursor={{ fill: '#334155', opacity: 0.2 }} content={<WeeklyTooltip />} />
+                        <Bar dataKey="usage" radius={[4, 4, 0, 0]}>
+                          {weeklyUsage.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
                     );
-                  }
-                  if (weeklyChartType === 'line') {
-                    return (
-                      <LineChart data={weeklyUsage} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                        <XAxis dataKey="name" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={40} />
-                        <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                        <Tooltip content={<WeeklyTooltip />} />
-                        <Line type="monotone" dataKey="usage" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                      </LineChart>
-                    );
-                  }
-                  return (
-                    <BarChart data={weeklyUsage} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                      <XAxis dataKey="name" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={40} />
-                      <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                      <Tooltip cursor={{ fill: '#334155', opacity: 0.2 }} content={<WeeklyTooltip />} />
-                      <Bar dataKey="usage" radius={[4, 4, 0, 0]}>
-                        {weeklyUsage.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  );
-                })()}
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-4">
-                <motion.img 
-                  src="/empty_state_charts_analytics.svg" 
-                  alt="No Weekly Usage Data" 
-                  className="w-32 sm:w-40 object-contain mb-2 opacity-90"
-                  animate={{ y: [0, -6, 0] }}
-                  transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
-                />
-                <p className="text-text font-bold text-sm">No weekly readings logged</p>
-                <p className="text-text-muted text-xs mt-0.5 font-medium">Select a month with recorded readings to view chart.</p>
-              </div>
-            )}
+                  })()}
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                  <motion.img 
+                    src="/empty_state_charts_analytics.svg" 
+                    alt="No Weekly Usage Data" 
+                    className="w-32 sm:w-40 object-contain mb-2 opacity-90"
+                    animate={{ y: [0, -6, 0] }}
+                    transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
+                  />
+                  <p className="text-text font-bold text-sm">No weekly readings logged</p>
+                  <p className="text-text-muted text-xs mt-0.5 font-medium">Select a month with recorded readings to view chart.</p>
+                </div>
+              )}
+            </ErrorBoundary>
           </div>
         </motion.div>
       </div>
@@ -1243,12 +1252,12 @@ export default function Dashboard() {
 
       {/* Quick Help Modal */}
       {quickHelpModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="help-modal-box border w-full max-w-2xl rounded-2xl p-6 shadow-2xl relative my-8"
+            className="help-modal-box border w-full max-w-2xl max-h-[85vh] overflow-y-auto custom-scrollbar rounded-2xl p-4 sm:p-6 shadow-2xl relative my-auto bg-surface"
           >
             <button
               onClick={() => setQuickHelpModalOpen(false)}

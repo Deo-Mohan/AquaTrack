@@ -156,11 +156,11 @@ export default function SharedHeader({ activeTab = 'home' }) {
         className="flex items-center justify-between w-full"
       >
         {/* Brand Section at Very Left */}
-        <Link to="/" className="flex items-center gap-3.5 group">
-          <div className="w-14 h-14 md:w-16 md:h-16 flex-shrink-0 rounded-full overflow-hidden shadow-lg shadow-primary/20 border border-primary/30 bg-surface/80 group-hover:scale-105 transition-transform backdrop-blur-md">
+        <Link to="/" className="flex items-center gap-2 sm:gap-3.5 group">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 flex-shrink-0 rounded-full overflow-hidden shadow-lg shadow-primary/20 border border-primary/30 bg-surface/80 group-hover:scale-105 transition-transform backdrop-blur-md">
             <img src="/logo.png" alt="AquaTrack Logo" className="w-full h-full object-cover scale-110" />
           </div>
-          <div className="loader loader-md md:loader-lg">
+          <div className="loader loader-responsive">
             <span className="outline-layer">AquaTrack</span>
             <span className="fill-layer">AquaTrack</span>
           </div>
@@ -216,12 +216,12 @@ export default function SharedHeader({ activeTab = 'home' }) {
                 ensureGoogleTranslate();
                 setLangDropdownOpen(!langDropdownOpen);
               }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface/80 hover:bg-surface-lighter border border-border/70 text-xs font-bold text-text transition-all hover:scale-105 shadow-sm"
+              className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-2 rounded-xl bg-surface/80 hover:bg-surface-lighter border border-border/70 text-xs font-bold text-text transition-all hover:scale-105 shadow-sm"
               title="Change Website Language"
             >
               <Globe className="w-4 h-4 text-primary animate-spin-slow" />
               <span className="hidden sm:inline uppercase tracking-wider">{currentLang}</span>
-              <ChevronDown className="w-3.5 h-3.5 text-text-muted" />
+              <ChevronDown className="w-3.5 h-3.5 text-text-muted hidden sm:inline" />
             </button>
 
             {/* Glassmorphic Dropdown Panel */}

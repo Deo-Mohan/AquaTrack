@@ -258,31 +258,32 @@ export default function WaterBillingHistory() {
       </AnimatePresence>
 
       {/* ── Tab Switcher ─────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 bg-surface-lighter border border-border p-1 rounded-xl w-fit">
+      <div className="flex items-center gap-1 bg-surface-lighter border border-border p-1 rounded-xl w-full sm:w-fit">
         {[
-          { id: 'usage',   label: 'Water Usage Logs', icon: Droplet,  count: filteredLogs.length },
-          { id: 'billing', label: 'Billing Records',   icon: Receipt,  count: filteredBills.length },
+          { id: 'usage',   label: 'Water Usage Logs', shortLabel: 'Usage Logs', icon: Droplet,  count: filteredLogs.length },
+          { id: 'billing', label: 'Billing Records', shortLabel: 'Billing',   icon: Receipt,  count: filteredBills.length },
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
               activeTab === tab.id
                 ? 'bg-surface text-text shadow-sm border border-border'
                 : 'text-text-muted hover:text-text'
             }`}
           >
-            <tab.icon className="w-4 h-4" />
-            {tab.label}
-            <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-full ${
+            <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="hidden sm:inline">{tab.label}</span>
+            <span className="sm:hidden">{tab.shortLabel}</span>
+            <span className="text-[10px] sm:text-[11px] font-bold px-1.5 py-0.2 rounded-full shrink-0 ${
               activeTab === tab.id ? 'bg-primary/15 text-primary' : 'bg-surface-lighter text-text-muted'
-            }`}>{tab.count}</span>
+            }">{tab.count}</span>
           </button>
         ))}
       </div>
 
       {/* ── Toolbar ──────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <MicSearchBox
             value={searchQ}
@@ -292,16 +293,15 @@ export default function WaterBillingHistory() {
           />
         </div>
 
-
         <button
           onClick={() => setSortDir(d => d === 'desc' ? 'asc' : 'desc')}
-          className="flex items-center gap-2 px-3 py-2.5 bg-surface border border-border rounded-xl text-sm text-text-muted hover:text-text transition-all cursor-pointer"
+          className="flex-1 sm:flex-none justify-center flex items-center gap-1.5 sm:gap-2 px-3 py-2.5 bg-surface border border-border rounded-xl text-xs sm:text-sm text-text-muted hover:text-text transition-all cursor-pointer whitespace-nowrap"
         >
-          {sortDir === 'desc' ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+          {sortDir === 'desc' ? <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <ChevronUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
           {sortDir === 'desc' ? 'Newest first' : 'Oldest first'}
         </button>
 
-        <button onClick={fetchAll} className="px-3 py-2.5 bg-primary/10 text-primary border border-primary/20 rounded-xl text-sm font-medium hover:bg-primary/20 transition-all cursor-pointer">
+        <button onClick={fetchAll} className="px-3.5 py-2.5 bg-primary/10 text-primary border border-primary/20 rounded-xl text-xs sm:text-sm font-medium hover:bg-primary/20 transition-all cursor-pointer shrink-0">
           Refresh
         </button>
       </div>
@@ -324,12 +324,12 @@ export default function WaterBillingHistory() {
                 <div className="space-y-6">
                   {monthlyLogsGrouped.map(group => (
                     <div key={group.month} className="space-y-3">
-                      <div className="flex items-center justify-between bg-primary/10 border border-primary/20 px-5 py-3 rounded-2xl shadow-sm">
-                        <h3 className="font-bold text-text text-sm flex items-center gap-2">
-                          <Calendar className="w-4.5 h-4.5 text-primary" />
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-primary/10 border border-primary/20 px-4 sm:px-5 py-3 rounded-2xl shadow-sm">
+                        <h3 className="font-bold text-text text-xs sm:text-sm flex items-center gap-2">
+                          <Calendar className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-primary shrink-0" />
                           {group.month}
                         </h3>
-                        <span className="text-xs font-extrabold text-primary bg-primary/15 px-3 py-1 rounded-full border border-primary/20">
+                        <span className="text-[10px] sm:text-xs font-extrabold text-primary bg-primary/15 px-3 py-1 rounded-full border border-primary/20 w-fit whitespace-nowrap">
                           Cumulative Usage: {group.totalLiters.toLocaleString()} L
                         </span>
                       </div>

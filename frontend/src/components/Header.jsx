@@ -353,18 +353,18 @@ export default function Header({ toggleSidebar }) {
         </div>
       </div>
 
-      <div className="flex items-center gap-4 lg:gap-6">
+      <div className="flex items-center gap-1.5 sm:gap-3 lg:gap-6">
 
         {/* Universal & Indian Language Selector with Globe Icon */}
         <div className="relative" ref={langRef}>
           <button
             onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface/80 hover:bg-surface-lighter border border-border/70 text-xs font-bold text-text transition-all hover:scale-105 shadow-sm"
+            className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-2 rounded-xl bg-surface/80 hover:bg-surface-lighter border border-border/70 text-xs font-bold text-text transition-all hover:scale-105 shadow-sm"
             title="Change Website Language"
           >
             <Globe className="w-4 h-4 text-primary animate-spin-slow" />
             <span className="hidden sm:inline uppercase tracking-wider">{currentLang}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-text-muted" />
+            <ChevronDown className="w-3.5 h-3.5 text-text-muted hidden sm:inline" />
           </button>
 
           <AnimatePresence>
@@ -522,7 +522,7 @@ export default function Header({ toggleSidebar }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
-                className="fixed sm:absolute right-4 sm:right-0 left-4 sm:left-auto top-16 sm:top-full mt-3 w-auto sm:w-96 max-h-[480px] bg-surface/90 dark:bg-surface/90 backdrop-blur-[40px] backdrop-saturate-200 border border-primary/30 rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.35)] overflow-hidden z-50 notification-dropdown"
+                className="fixed sm:absolute right-4 sm:right-0 left-4 sm:left-auto top-16 sm:top-full mt-3 w-auto sm:w-96 max-h-[480px] bg-[#f0f9ff] dark:bg-[#071324] border-2 border-primary/50 rounded-2xl shadow-[0_25px_70px_rgba(0,0,0,0.6)] overflow-hidden z-[9999] notification-dropdown"
               >
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-border">
@@ -576,8 +576,8 @@ export default function Header({ toggleSidebar }) {
                         onClick={() => !notif.isRead && handleMarkRead(notif.id)}
                         className={`px-5 py-3.5 border-b border-border/50 transition-colors cursor-pointer ${
                           notif.isRead 
-                            ? 'bg-transparent hover:bg-surface-lighter/30' 
-                            : 'bg-primary/[0.03] hover:bg-primary/[0.06]'
+                            ? 'bg-white/80 dark:bg-[#071324] hover:bg-slate-100 dark:hover:bg-[#0f2442]' 
+                            : 'bg-blue-50/90 dark:bg-[#0b1d38] hover:bg-blue-100/90 dark:hover:bg-[#122b52]'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -610,16 +610,16 @@ export default function Header({ toggleSidebar }) {
           </AnimatePresence>
         </div>
 
-        <div className="h-8 w-px bg-border mx-1"></div>
+        <div className="h-8 w-px bg-border mx-1 hidden sm:block"></div>
 
-        {/* User Profile - Gender-based Avatar */}
+        {/* User Profile - Gender-based Avatar (Visible on tablet & desktop) */}
         <div 
           onClick={() => navigate('/profile')}
           title="Click to view & edit your profile"
-          className="flex items-center gap-3 cursor-pointer group hover:scale-105 transition-all"
+          className="hidden sm:flex items-center gap-3 cursor-pointer group hover:scale-105 transition-all"
         >
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-medium text-text group-hover:text-primary transition-colors">
+          <div className="text-right">
+            <p className="text-sm font-medium text-text group-hover:text-primary transition-colors capitalize" lang="en">
               {username}
             </p>
             <p className="text-xs text-text-muted">

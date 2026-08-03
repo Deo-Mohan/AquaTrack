@@ -853,28 +853,30 @@ Are you sure you want to finalize these bills and lock the cycle?`;
       </div>
 
       {/* ── Sub-Tab Switcher ─────────────────────────────────────── */}
-      <div className="flex gap-4 border-b border-border pb-4">
-        {[
-          ...(!isSuperAdmin ? [{ id: 'workstation', label: 'Workstation', icon: Droplet }] : []),
-          { id: 'cycles', label: 'Billing Cycles & Periods', icon: Calendar },
-          { id: 'reminders', label: 'Payment Reminders 🔔', icon: Zap }
-        ].map(tab => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => { setActiveTab(tab.id); setActionStatus(null); }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === tab.id
-                  ? 'bg-primary text-white shadow-md shadow-primary/15'
-                  : 'text-text-muted hover:text-text bg-surface-lighter/50 border border-border/40'
-              }`}
-            >
-              <Icon className="w-4.5 h-4.5" />
-              {tab.label}
-            </button>
-          );
-        })}
+      <div className="flex gap-2 sm:gap-4 border-b border-border pb-4 overflow-x-auto custom-scrollbar">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-max">
+          {[
+            ...(!isSuperAdmin ? [{ id: 'workstation', label: 'Workstation', icon: Droplet }] : []),
+            { id: 'cycles', label: 'Billing Cycles & Periods', icon: Calendar },
+            { id: 'reminders', label: 'Payment Reminders 🔔', icon: Zap }
+          ].map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => { setActiveTab(tab.id); setActionStatus(null); }}
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? 'bg-primary text-white shadow-md shadow-primary/15'
+                    : 'text-text-muted hover:text-text bg-surface-lighter/50 border border-border/40'
+                }`}
+              >
+                <Icon className="w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Tab-Specific Action Status Alerts */}
@@ -961,10 +963,10 @@ Are you sure you want to finalize these bills and lock the cycle?`;
             <div className="flex flex-col gap-3 glass-card p-5 flex-1 justify-between">
               <div className="flex flex-col gap-4">
                 <span className="text-xs font-black text-text-muted uppercase tracking-wider">Bulk Billing</span>
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-2 bg-surface-lighter/50 border border-border/60 px-3.5 py-2 rounded-xl">
-                      <span className="text-xs font-extrabold text-text-muted uppercase tracking-wider">Month:</span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                    <div className="flex-1 sm:flex-none flex items-center justify-between gap-2 bg-surface-lighter/50 border border-border/60 px-3 sm:px-3.5 py-2 rounded-xl">
+                      <span className="text-[10px] sm:text-xs font-extrabold text-text-muted uppercase tracking-wider">Month:</span>
                       <select
                         value={selectedBulkMonth}
                         onChange={e => setSelectedBulkMonth(parseInt(e.target.value, 10))}
@@ -981,8 +983,8 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                       </select>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-surface-lighter/50 border border-border/60 px-3.5 py-2 rounded-xl">
-                      <span className="text-xs font-extrabold text-text-muted uppercase tracking-wider">Year:</span>
+                    <div className="flex-1 sm:flex-none flex items-center justify-between gap-2 bg-surface-lighter/50 border border-border/60 px-3 sm:px-3.5 py-2 rounded-xl">
+                      <span className="text-[10px] sm:text-xs font-extrabold text-text-muted uppercase tracking-wider">Year:</span>
                       <select
                         value={selectedBulkYear}
                         onChange={e => setSelectedBulkYear(parseInt(e.target.value, 10))}
@@ -995,11 +997,11 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                     </div>
 
                     {pendingBulkCount > 0 ? (
-                      <div className="text-xs font-black text-amber-400 bg-amber-500/15 px-3 py-2 rounded-xl border border-amber-500/25 shadow-sm">
+                      <div className="w-full sm:w-auto text-center text-xs font-black text-amber-400 bg-amber-500/15 px-3 py-2 rounded-xl border border-amber-500/25 shadow-sm">
                         {pendingBulkCount} pending
                       </div>
                     ) : (
-                      <div className="text-xs font-black text-text-muted bg-surface-lighter/30 px-3 py-2 rounded-xl border border-border/40">
+                      <div className="w-full sm:w-auto text-center text-xs font-black text-text-muted bg-surface-lighter/30 px-3 py-2 rounded-xl border border-border/40">
                         0 pending
                       </div>
                     )}
@@ -1007,10 +1009,10 @@ Are you sure you want to finalize these bills and lock the cycle?`;
 
                   <button
                     onClick={handleGenerateAllBills}
-                    className="generate-bills-button cursor-pointer flex-shrink-0"
+                    className="generate-bills-button cursor-pointer shrink-0 w-full sm:w-auto text-center"
                   >
-                    <div className="button-outer">
-                      <div className="button-inner">
+                    <div className="button-outer w-full">
+                      <div className="button-inner w-full flex items-center justify-center">
                         <span>
                           <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
                           Finalize Bills
@@ -1067,10 +1069,10 @@ Are you sure you want to finalize these bills and lock the cycle?`;
             </div>
 
             {/* Complete List Dropdown */}
-            <div ref={allDropdownRef} className="relative">
+            <div ref={allDropdownRef} className="relative w-full sm:w-auto">
               <button
                 onClick={() => setShowAllDropdown(!showAllDropdown)}
-                className={`h-full px-5 py-3.5 bg-surface-lighter/60 border border-border/80 rounded-2xl font-semibold text-sm text-text hover:border-primary/50 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap min-w-[200px] justify-between ${showAllDropdown ? 'border-primary/50 shadow-lg shadow-primary/10' : ''}`}
+                className={`w-full sm:w-auto h-full px-5 py-3.5 bg-surface-lighter/60 border border-border/80 rounded-2xl font-semibold text-sm text-text hover:border-primary/50 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap min-w-full sm:min-w-[200px] justify-between ${showAllDropdown ? 'border-primary/50 shadow-lg shadow-primary/10' : ''}`}
               >
                 <span className="flex items-center gap-2">
                   <User className="w-4 h-4 text-primary" />
@@ -1182,17 +1184,17 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                     <StatusBanner status={logStatus} />
 
                     {(selected.meterId || selected.meterNumber) && (
-                      <div className="meter-pill flex items-center gap-2 px-3 py-2 w-full">
+                      <div className="meter-pill flex items-center gap-2 px-3 py-2 w-full bg-amber-500/10 dark:bg-amber-400/10 border border-amber-500/30 dark:border-amber-400/30 rounded-2xl transition-all">
                         {/* Round Icon */}
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(120,60,10,0.15)', border: '1px solid rgba(120,60,10,0.3)' }}>
-                          <Zap className="w-3.5 h-3.5" style={{ color: '#92400e', filter: 'drop-shadow(0 0 5px rgba(146,64,14,0.6))' }} />
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 bg-amber-500/20 dark:bg-amber-400/20 border border-amber-500/40 dark:border-amber-400/40">
+                          <Zap className="w-3.5 h-3.5 text-amber-600 dark:text-amber-300 drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
                         </div>
                         {/* Label */}
-                        <span className="text-[11px] font-extrabold uppercase tracking-widest shrink-0" style={{ color: '#78350f' }}>Smart Meter:</span>
+                        <span className="text-[11px] font-extrabold uppercase tracking-widest shrink-0 text-amber-800 dark:text-amber-200">Smart Meter:</span>
                         {/* Value */}
-                        <span className="text-sm font-black tracking-wide" style={{ color: '#431407' }}>{selected.meterId || selected.meterNumber}</span>
+                        <span className="text-sm font-black tracking-wide text-amber-950 dark:text-amber-100">{selected.meterId || selected.meterNumber}</span>
                         {/* Active badge — pushed to far right */}
-                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ml-auto shrink-0" style={{ background: 'rgba(120,53,15,0.12)', color: '#7c2d12', border: '1px solid rgba(120,53,15,0.25)' }}>
+                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ml-auto shrink-0 bg-amber-500/20 dark:bg-amber-400/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 dark:border-amber-400/30">
                           ACTIVE
                         </span>
                       </div>

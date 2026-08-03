@@ -1839,11 +1839,11 @@ export default function AdminDashboard() {
                 <span className="w-1.5 h-1.5 rounded-full bg-border shrink-0 hidden sm:inline" />
                 <div className="flex items-center gap-1.5 bg-surface-lighter/50 px-2.5 py-0.5 rounded-full border border-border/60 text-xs">
                   <span className="text-text-muted font-medium">Block:</span>
-                  <strong className="text-primary font-semibold">{block}</strong>
+                  <strong className="text-primary font-semibold notranslate" translate="no">{block || 'The White House'}</strong>
                 </div>
                 <div className="flex items-center gap-1.5 bg-surface-lighter/50 px-2.5 py-0.5 rounded-full border border-border/60 text-xs">
                   <span className="text-text-muted font-medium">Community/Area:</span>
-                  <strong className="text-emerald-400 font-semibold">{colony}</strong>
+                  <strong className="text-emerald-400 font-semibold notranslate" translate="no">{colony || 'Bharat Nagar'}</strong>
                 </div>
               </div>
             )}
@@ -1907,7 +1907,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Glowing bulb for quick guide */}
-          <div className="relative pb-1" style={{ zIndex: 40 }}>
+          <div className="relative pb-1" style={{ zIndex: 10 }}>
             <button 
               onMouseEnter={() => setShowTooltip(true)}
               onMouseLeave={() => setShowTooltip(false)}
@@ -2518,7 +2518,7 @@ export default function AdminDashboard() {
 
             {/* Smart Search Toolbar */}
             <div className="space-y-3 relative z-10">
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2.5 sm:gap-3">
                 <div className="flex-1 min-w-0">
                   <SmartSearchBar
                     users={users}
@@ -2535,31 +2535,33 @@ export default function AdminDashboard() {
                     onGenderFilterChange={setGenderFilter}
                   />
                 </div>
-                <button
-                  onClick={handleOpenCreateUser}
-                  className="px-4 py-2.5 bg-primary text-white hover:bg-primary-dark rounded-xl font-medium transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap flex-shrink-0"
-                >
-                  <Plus className="w-4 h-4" />
-                  {isSuperAdmin ? 'Register New User' : 'Invite Resident'}
-                </button>
-                {!isSuperAdmin && (
-                  <>
-                    <button
-                      onClick={() => { setBulkInviteFile(null); setBulkInviteReport(null); setBulkInviteModalOpen(true); }}
-                      className="px-4 py-2.5 bg-violet-500/20 text-violet-700 dark:text-violet-300 hover:bg-violet-500/30 border border-violet-500/40 rounded-xl font-bold transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap flex-shrink-0 shadow-sm"
-                    >
-                      <Upload className="w-4 h-4 text-violet-700 dark:text-violet-300" />
-                      Bulk Invite
-                    </button>
-                    <button
-                      onClick={downloadCsvTemplate}
-                      className="px-4 py-2.5 bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40 rounded-xl font-bold transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap flex-shrink-0 shadow-sm"
-                    >
-                      <Download className="w-4 h-4 text-emerald-800 dark:text-emerald-300" />
-                      Template
-                    </button>
-                  </>
-                )}
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                  <button
+                    onClick={handleOpenCreateUser}
+                    className="flex-1 sm:flex-none justify-center px-3.5 sm:px-4 py-2.5 bg-primary text-white hover:bg-primary-dark rounded-xl font-medium transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 text-xs sm:text-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                    {isSuperAdmin ? 'Register New User' : 'Invite Resident'}
+                  </button>
+                  {!isSuperAdmin && (
+                    <>
+                      <button
+                        onClick={() => { setBulkInviteFile(null); setBulkInviteReport(null); setBulkInviteModalOpen(true); }}
+                        className="flex-1 sm:flex-none justify-center px-3.5 sm:px-4 py-2.5 bg-violet-500/20 text-violet-700 dark:text-violet-300 hover:bg-violet-500/30 border border-violet-500/40 rounded-xl font-bold transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 shadow-sm text-xs sm:text-sm"
+                      >
+                        <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-violet-700 dark:text-violet-300" />
+                        Bulk Invite
+                      </button>
+                      <button
+                        onClick={downloadCsvTemplate}
+                        className="flex-1 sm:flex-none justify-center px-3.5 sm:px-4 py-2.5 bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40 rounded-xl font-bold transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 shadow-sm text-xs sm:text-sm"
+                      >
+                        <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-emerald-800 dark:text-emerald-300" />
+                        Template
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -2633,40 +2635,46 @@ export default function AdminDashboard() {
                           <div key={admin.id} className={`glass-card overflow-hidden ${!hasRate ? 'border-amber-500/40' : 'border-emerald-500/20'}`}>
                             <div
                               onClick={() => toggleExpandAdmin(admin.apartmentBlock)}
-                              className={`px-5 py-4 flex items-center justify-between cursor-pointer select-none transition-colors ${!hasRate ? 'bg-amber-500/5 hover:bg-amber-500/10' : 'bg-emerald-500/5 hover:bg-emerald-500/10'}`}
+                              className={`px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none transition-colors ${!hasRate ? 'bg-amber-500/5 hover:bg-amber-500/10' : 'bg-emerald-500/5 hover:bg-emerald-500/10'}`}
                             >
-                              <div className="flex items-center gap-4">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${!hasRate ? 'bg-amber-500/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-400'}`}>
+                              {/* Left: Avatar + Name */}
+                              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                                <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full shrink-0 flex items-center justify-center font-bold text-sm ${!hasRate ? 'bg-amber-500/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-400'}`}>
                                   {(admin.fullName||admin.username)?.[0]?.toUpperCase()}
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap">
-                                    <p className="font-bold text-text">{admin.fullName || admin.username}</p>
-                                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Community Admin</span>
+                                    <p className="font-bold text-text text-sm sm:text-base">{admin.fullName || admin.username}</p>
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap">Community Admin</span>
                                   </div>
-                                  <p className="text-text-muted text-xs mt-0.5">{admin.apartmentBlock} · {admin.email}</p>
+                                  <p className="text-text-muted text-[11px] sm:text-xs mt-0.5 truncate">{admin.apartmentBlock} · {admin.email}</p>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-3 flex-wrap">
+                              {/* Right: Actions row */}
+                              <div className="flex items-center gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
                                 {hasRate ? (
-                                  <span className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-sm font-bold">₹{admin.waterRatePerLiter}/L</span>
+                                  <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold">₹{admin.waterRatePerLiter}/L</span>
                                 ) : (
                                   <button
                                     onClick={(e) => { e.stopPropagation(); setQuickRateUser(admin); setQuickRateValue(''); }}
-                                    className="px-3 py-1.5 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs font-bold animate-pulse hover:animate-none hover:bg-amber-500/25 cursor-pointer"
+                                    className="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs font-bold animate-pulse hover:animate-none hover:bg-amber-500/25 cursor-pointer"
                                   >⚠️ Set Rate!</button>
                                 )}
-                                <span className="text-text-muted text-xs">{blockHH.length} household(s)</span>
+                                <span className="text-text-muted text-[10px] sm:text-xs whitespace-nowrap">{blockHH.length} household(s)</span>
                                 <button onClick={(e) => { e.stopPropagation(); handleOpenEditUser(admin); }} className="p-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20 rounded-lg cursor-pointer"><Edit className="w-3.5 h-3.5" /></button>
                                 <button onClick={(e) => { e.stopPropagation(); handleOpenNotify(admin.username); }} className="p-1.5 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/25 border border-yellow-500/20 rounded-lg cursor-pointer"><Send className="w-3.5 h-3.5" /></button>
                                 <button onClick={(e) => { e.stopPropagation(); handleDeleteUser(admin.id); }} className="p-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/25 border border-red-500/20 rounded-lg cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
-                                <span className={`text-text-muted transition-transform duration-200 select-none ${isExpanded ? 'rotate-180' : ''}`} style={{display:'inline-block'}}>▼</span>
+                                <span
+                                  className={`text-text-muted transition-transform duration-200 select-none ${isExpanded ? 'rotate-180' : ''}`}
+                                  style={{display:'inline-block'}}
+                                  onClick={() => toggleExpandAdmin(admin.apartmentBlock)}
+                                >▼</span>
                               </div>
                             </div>
                             {isExpanded && (
-                              <div className="border-t border-border">
+                              <div className="border-t border-border overflow-x-auto">
                                 {blockHH.length > 0 ? (
-                                  <table className="w-full text-left border-collapse">
+                                  <table className="w-full text-left border-collapse min-w-[480px]">
                                     <thead>
                                       <tr className="bg-blue-500/5 border-b border-blue-500/10">
                                         <th className="px-5 py-3 text-xs font-bold text-blue-400 uppercase">House #</th>
@@ -4676,12 +4684,12 @@ export default function AdminDashboard() {
 
       {/* Quick Help Modal */}
       {quickHelpModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="help-modal-box border w-full max-w-2xl rounded-2xl p-6 shadow-2xl relative my-8"
+            className="help-modal-box border w-full max-w-2xl max-h-[85vh] overflow-y-auto custom-scrollbar rounded-2xl p-4 sm:p-6 shadow-2xl relative my-auto bg-surface"
           >
             <button 
               onClick={() => setQuickHelpModalOpen(false)}

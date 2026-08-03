@@ -5,8 +5,10 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, LineChart, Line, Cell
 } from 'recharts';
+import ErrorBoundary from '../components/ErrorBoundary';
 import api from '../api';
 
+// CHART_COLORS array
 const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#f43f5e', '#06b6d4', '#6366f1', '#f97316'];
 
 const UsageTooltip = ({ active, payload }) => {
@@ -28,6 +30,7 @@ export default function MyUsage() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1); // 1 to 12
   const [loading, setLoading] = useState(true);
   const [chartType, setChartType] = useState('area'); // area, bar, line
+  const [activeTooltipDay, setActiveTooltipDay] = useState(null);
 
   // Tariff States
   const [safeWaterLimit, setSafeWaterLimit] = useState(0);
@@ -103,8 +106,13 @@ export default function MyUsage() {
 
   // Filter logs for selected month
   const filteredLogs = rawLogs.filter(log => {
+    if (!log.readingDate) return false;
+    const parts = log.readingDate.split('-');
+    if (parts.length >= 2) {
+      return parseInt(parts[1], 10) === selectedMonth;
+    }
     const d = new Date(log.readingDate);
-    return d.getFullYear() === new Date().getFullYear() && (d.getMonth() + 1) === selectedMonth;
+    return (d.getMonth() + 1) === selectedMonth;
   });
 
   const usageData = filteredLogs.map(log => ({
@@ -525,73 +533,75 @@ export default function MyUsage() {
             </div>
 
             <div className="h-[250px] w-full">
-              {loading ? (
-                <div className="w-full h-full flex flex-col gap-4 p-2">
-                  <div className="flex-1 w-full flex items-end gap-3 animate-pulse">
-                    <div className="w-full h-1/3 rounded-t-lg bg-surface-lighter" />
-                    <div className="w-full h-2/3 rounded-t-lg bg-surface-lighter" />
-                    <div className="w-full h-1/2 rounded-t-lg bg-surface-lighter" />
+              <ErrorBoundary fallbackText="Daily consumption trend chart could not be loaded.">
+                {loading ? (
+                  <div className="w-full h-full flex flex-col gap-4 p-2">
+                    <div className="flex-1 w-full flex items-end gap-3 animate-pulse">
+                      <div className="w-full h-1/3 rounded-t-lg bg-surface-lighter" />
+                      <div className="w-full h-2/3 rounded-t-lg bg-surface-lighter" />
+                      <div className="w-full h-1/2 rounded-t-lg bg-surface-lighter" />
+                    </div>
                   </div>
-                </div>
-              ) : usageData.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-4">
-                  <motion.img 
-                    src="/empty_state_charts_analytics.svg" 
-                    alt="No Usage Logs" 
-                    className="w-32 sm:w-40 object-contain mb-2 opacity-90"
-                    animate={{ y: [0, -6, 0] }}
-                    transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
-                  />
-                  <p className="text-text text-sm font-bold">No usage logs for this month</p>
-                  <p className="text-text-muted text-xs mt-0.5 font-medium">Daily consumption graphs will render once readings are submitted.</p>
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  {(() => {
-                    if (chartType === 'bar') {
+                ) : usageData.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                    <motion.img 
+                      src="/empty_state_charts_analytics.svg" 
+                      alt="No Usage Logs" 
+                      className="w-32 sm:w-40 object-contain mb-2 opacity-90"
+                      animate={{ y: [0, -6, 0] }}
+                      transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
+                    />
+                    <p className="text-text text-sm font-bold">No usage logs for this month</p>
+                    <p className="text-text-muted text-xs mt-0.5 font-medium">Daily consumption graphs will render once readings are submitted.</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    {(() => {
+                      if (chartType === 'bar') {
+                        return (
+                          <BarChart data={usageData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                            <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                            <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                            <Tooltip content={<UsageTooltip />} />
+                            <Bar dataKey="usage" radius={[4, 4, 0, 0]}>
+                              {usageData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        );
+                      }
+                      if (chartType === 'line') {
+                        return (
+                          <LineChart data={usageData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                            <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                            <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                            <Tooltip content={<UsageTooltip />} />
+                            <Line type="monotone" dataKey="usage" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                          </LineChart>
+                        );
+                      }
                       return (
-                        <BarChart data={usageData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                        <AreaChart data={usageData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="colorUsageBlue" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                           <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                           <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                           <Tooltip content={<UsageTooltip />} />
-                          <Bar dataKey="usage" radius={[4, 4, 0, 0]}>
-                            {usageData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                            ))}
-                          </Bar>
-                        </BarChart>
+                          <Area type="monotone" dataKey="usage" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorUsageBlue)" />
+                        </AreaChart>
                       );
-                    }
-                    if (chartType === 'line') {
-                      return (
-                        <LineChart data={usageData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                          <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                          <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                          <Tooltip content={<UsageTooltip />} />
-                          <Line type="monotone" dataKey="usage" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                        </LineChart>
-                      );
-                    }
-                    return (
-                      <AreaChart data={usageData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="colorUsageBlue" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
-                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                        <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                        <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                        <Tooltip content={<UsageTooltip />} />
-                        <Area type="monotone" dataKey="usage" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorUsageBlue)" />
-                      </AreaChart>
-                    );
-                  })()}
-                </ResponsiveContainer>
-              )}
+                    })()}
+                  </ResponsiveContainer>
+                )}
+              </ErrorBoundary>
             </div>
           </motion.div>
 
@@ -656,9 +666,15 @@ export default function MyUsage() {
                   }
                 }
 
+                const isTooltipOpen = activeTooltipDay === day.dayNum;
+
                 return (
                   <div 
                     key={idx}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveTooltipDay(isTooltipOpen ? null : day.dayNum);
+                    }}
                     className={`h-10 flex flex-col items-center justify-center rounded-lg text-xs transition-all duration-200 cursor-pointer shadow-sm relative group ${bgCls}`}
                   >
                     <span className="text-[10px] font-semibold">{day.dayNum}</span>
@@ -667,9 +683,11 @@ export default function MyUsage() {
                     )}
                     
                     {/* Inline custom Tooltip */}
-                    <div className="absolute bottom-11 scale-0 group-hover:scale-100 transition-all origin-bottom bg-slate-950 border border-slate-700/80 p-2.5 rounded-lg shadow-2xl z-50 text-[10px] text-slate-300 w-32 text-center pointer-events-none">
+                    <div className={`absolute bottom-11 transition-all origin-bottom bg-slate-950 border border-slate-700/80 p-2.5 rounded-lg shadow-2xl z-50 text-[10px] text-slate-300 w-32 text-center pointer-events-none ${
+                      isTooltipOpen ? 'scale-100 opacity-100' : 'scale-0 group-hover:scale-100'
+                    }`}>
                       <p className="font-bold text-white mb-0.5">Day {day.dayNum}</p>
-                      <p className="text-slate-400 font-semibold">{day.hasLog ? `${day.liters.toLocaleString()} Liters` : "No Log"}</p>
+                      <p className="text-slate-400 font-semibold">{day.hasLog ? `${day.liters.toLocaleString()} Liters` : "No Log 😔"}</p>
                       {day.hasLog && (
                         <>
                           <p className="text-[9px] text-amber-400 font-bold mt-0.5">{percentageOfLimit}% of Daily Limit</p>

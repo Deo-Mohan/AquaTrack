@@ -253,9 +253,11 @@ export default function Profile() {
                 </div>
               </div>
               <div className="headings *:text-center *:leading-4 [transform:translateZ(30px)]">
-                <p className="text-xl font-serif font-semibold text-text uppercase">{profileData.fullName || profileData.username || 'ANNA WILSON'}</p>
-                <p className="text-xs font-semibold text-text-muted mt-1">@{profileData.username}</p>
-                <p className="text-xs font-semibold text-text-muted uppercase mt-1">{profileData.role || 'DEVELOPER'}</p>
+                <p className="text-xl font-serif font-semibold text-text capitalize" lang="en">
+                  {profileData.fullName || profileData.username || 'AquaTrack User'}
+                </p>
+                <p className="text-xs font-semibold text-text-muted mt-1 notranslate" translate="no">@{profileData.username || 'user'}</p>
+                <p className="text-xs font-semibold text-text-muted uppercase mt-1">{profileData.role || 'RESIDENT'}</p>
               </div>
               <div className="w-full items-center justify-center flex [transform:translateZ(20px)]">
                 <ul className="flex flex-col items-start gap-2 has-[:last]:border-b-0 *:inline-flex *:gap-2 *:items-center *:justify-center *:border-b-[1.5px] *:border-b-border *:border-dotted *:text-xs *:font-semibold *:text-text-muted pb-3">
@@ -265,7 +267,7 @@ export default function Profile() {
                         <path d="M0 0h24v24H0V0z" fill="none"></path>
                         <path d="M19.23 15.26l-2.54-.29c-.61-.07-1.21.14-1.64.57l-1.84 1.84c-2.83-1.44-5.15-3.75-6.59-6.59l1.85-1.85c.43-.43.64-1.03.57-1.64l-.29-2.52c-.12-1.01-.97-1.77-1.99-1.77H5.03c-1.13 0-2.07.94-2 2.07.53 8.54 7.36 15.36 15.89 15.89 1.13.07 2.07-.87 2.07-2v-1.73c.01-1.01-.75-1.86-1.76-1.98z"></path>
                       </svg>
-                      <p>+91 {profileData.mobileNumber}</p>
+                      <p className="notranslate" translate="no">+91 {profileData.mobileNumber}</p>
                     </li>
                   )}
                   {profileData.whatsAppNumber && (
@@ -273,7 +275,7 @@ export default function Profile() {
                       <svg className="fill-text-muted group-hover:fill-primary transition-colors" height="15" width="15" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path fill="currentColor" d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.488 1.459 5.407 1.461 5.563 0 10.09-4.519 10.093-10.078a10.022 10.022 0 00-2.952-7.133 10.022 10.022 0 00-7.143-2.95c-5.567 0-10.094 4.52-10.098 10.079-.001 1.916.499 3.794 1.448 5.402L5.436 20.31l1.21-.356zM17.11 14.18c-.28-.14-1.654-.816-1.91-.908-.255-.092-.44-.14-.624.14-.184.28-.71.908-.87 1.092-.158.184-.317.208-.597.068-.28-.14-1.182-.435-2.251-1.39-1.378-1.23-1.644-2.856-1.727-3.003-.083-.14-.009-.216.061-.285.063-.063.14-.163.21-.244.07-.08.093-.135.14-.227.046-.093.023-.173-.011-.243-.035-.07-.624-1.503-.855-2.058-.225-.542-.472-.468-.624-.476l-.532-.007c-.183 0-.482.068-.734.34-.252.272-.962.94-.962 2.294 0 1.353.984 2.66 1.122 2.845.138.184 1.937 2.956 4.693 4.146.655.283 1.168.452 1.567.579.66.21 1.258.18 1.733.11.53-.08 1.654-.676 1.888-1.33.234-.654.234-1.216.164-1.33-.07-.11-.256-.18-.536-.32z"/>
                       </svg>
-                      <p>+91 {profileData.whatsAppNumber}</p>
+                      <p className="notranslate" translate="no">+91 {profileData.whatsAppNumber}</p>
                     </li>
                   )}
                   <li>
@@ -281,7 +283,7 @@ export default function Profile() {
                       <path d="M16,14.81,28.78,6.6A3,3,0,0,0,27,6H5a3,3,0,0,0-1.78.6Z"></path>
                       <path d="M16.54,16.84h0l-.17.08-.08,0A1,1,0,0,1,16,17h0a1,1,0,0,1-.25,0l-.08,0-.17-.08h0L2.1,8.26A3,3,0,0,0,2,9V23a3,3,0,0,0,3,3H27a3,3,0,0,0,3-3V9a3,3,0,0,0-.1-.74Z"></path>
                     </svg>
-                    <p>{profileData.email || 'smkys@gmail.com'}</p>
+                    <p className="notranslate" translate="no">{profileData.email || 'smkys@gmail.com'}</p>
                   </li>
                   <li>
                     <svg className="fill-text-muted group-hover:fill-primary transition-colors" height="15" width="15" id="globe" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -289,14 +291,14 @@ export default function Profile() {
                         <path data-name="globe" d="M22 12A10 10 0 0 0 12 2a10 10 0 0 0 0 20 10 10 0 0 0 10-10zm-2.07-1H17a12.91 12.91 0 0 0-2.33-6.54A8 8 0 0 1 19.93 11zM9.08 13H15a11.44 11.44 0 0 1-3 6.61A11 11 0 0 1 9.08 13zm0-2A11.4 11.4 0 0 1 12 4.4a11.19 11.19 0 0 1 3 6.6zm.36-6.57A13.18 13.18 0 0 0 7.07 11h-3a8 8 0 0 1 5.37-6.57zM4.07 13h3a12.86 12.86 0 0 0 2.35 6.56A8 8 0 0 1 4.07 13zm10.55 6.55A13.14 13.14 0 0 0 17 13h2.95a8 8 0 0 1-5.33 6.55z"></path>
                       </g>
                     </svg>
-                    <p>aquatrack.app</p>
+                    <p className="notranslate" translate="no">aquatrack.app</p>
                   </li>
                   {profileData.role !== 'Admin' && (
                     <li>
                       <svg id="map" viewBox="0 0 16 16" className="fill-text-muted group-hover:fill-primary transition-colors" height="15" width="15" xmlns="http://www.w3.org/2000/svg">
                         <path d="M8 0C5.2 0 3 2.2 3 5s4 11 5 11 5-8.2 5-11-2.2-5-5-5zm0 8C6.3 8 5 6.7 5 5s1.3-3 3-3 3 1.3 3-3 3z"></path>
                       </svg>
-                      <p>
+                      <p className="capitalize" lang="en">
                         {profileData.role === 'Community Admin' 
                           ? `${profileData.apartmentBlock}${profileData.colonyName ? ', ' + profileData.colonyName : ''}` 
                           : `${profileData.apartmentBlock}, ${profileData.houseNumber}${profileData.colonyName ? ' (' + profileData.colonyName + ')' : ''}`}

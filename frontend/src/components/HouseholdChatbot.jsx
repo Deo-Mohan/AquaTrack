@@ -203,7 +203,9 @@ const HouseholdChatbot = () => {
     unreadTickets: 0
   });
 
-  // Ultra-Smooth Screen Dragging Implementation
+  // Ultra-Smooth Screen Dragging Implementation (RAF throttled for 60fps performance)
+  const animFrameIdRef = useRef(null);
+
   const handleMouseDown = (e) => {
     if (isMaximized) return;
     if (e.target.closest('button') || e.target.closest('input')) return;
@@ -234,20 +236,29 @@ const HouseholdChatbot = () => {
     const handleMouseMove = (e) => {
       if (!isDragging) return;
       
-      const deltaX = e.clientX - dragStartRef.current.mouseX;
-      const deltaY = e.clientY - dragStartRef.current.mouseY;
+      if (animFrameIdRef.current) {
+        cancelAnimationFrame(animFrameIdRef.current);
+      }
 
-      const windowWidth = windowRef.current ? windowRef.current.offsetWidth : 400;
-      const windowHeight = windowRef.current ? windowRef.current.offsetHeight : 550;
+      animFrameIdRef.current = requestAnimationFrame(() => {
+        const deltaX = e.clientX - dragStartRef.current.mouseX;
+        const deltaY = e.clientY - dragStartRef.current.mouseY;
 
-      const newX = Math.max(10, Math.min(window.innerWidth - windowWidth - 10, dragStartRef.current.windowX + deltaX));
-      const newY = Math.max(10, Math.min(window.innerHeight - windowHeight - 10, dragStartRef.current.windowY + deltaY));
+        const windowWidth = windowRef.current ? windowRef.current.offsetWidth : 400;
+        const windowHeight = windowRef.current ? windowRef.current.offsetHeight : 550;
 
-      setPosition({ x: newX, y: newY });
+        const newX = Math.max(10, Math.min(window.innerWidth - windowWidth - 10, dragStartRef.current.windowX + deltaX));
+        const newY = Math.max(10, Math.min(window.innerHeight - windowHeight - 10, dragStartRef.current.windowY + deltaY));
+
+        setPosition({ x: newX, y: newY });
+      });
     };
 
     const handleMouseUp = () => {
       if (isDragging) {
+        if (animFrameIdRef.current) {
+          cancelAnimationFrame(animFrameIdRef.current);
+        }
         setIsDragging(false);
       }
     };
@@ -258,6 +269,9 @@ const HouseholdChatbot = () => {
     }
 
     return () => {
+      if (animFrameIdRef.current) {
+        cancelAnimationFrame(animFrameIdRef.current);
+      }
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
@@ -316,7 +330,7 @@ const HouseholdChatbot = () => {
   // Clear/Reset chat conversation history
   const handleClearChat = () => {
     stopSpeaking();
-    let welcomeText = `Hello **${displayName}**! 👋 I am your **AI Insights Assistant** for House **${houseNo}**.\n\n`;
+    let welcomeText = `Hello **${displayName}**! 👋 I'm **Buddy**, your AI assistant for House **${houseNo}**.\n\n`;
     if (dbData.recentBill) {
       const amt = dbData.recentBill.amount ? dbData.recentBill.amount.toFixed(2) : '0.00';
       const status = dbData.recentBill.status || 'UNPAID';
@@ -468,7 +482,7 @@ const HouseholdChatbot = () => {
         botResponseText = `Hello **${displayName}**! 👋 Welcome. How can I assist you with your water bills, usage, or maintenance tickets for House **${houseNo}** today?`;
         botActions = getContextualActions(location.pathname);
       } else if (lower.includes('who are you') || lower.includes('your name')) {
-        botResponseText = `I am your **AI Insights Assistant**! ⚡\n\nI can help you track daily water usage, view & pay monthly bills, report leaks, and discover water-saving tips.`;
+        botResponseText = `I'm **Buddy**, your AI assistant! ⚡\n\nI can help you track daily water usage, view & pay monthly bills, report leaks, and discover water-saving tips.`;
         botActions = getContextualActions(location.pathname);
       } else if (lower.includes('how are you')) {
         botResponseText = `I'm doing great and ready to assist you! How is everything with the water supply in House **${houseNo}**?`;
@@ -498,7 +512,7 @@ const HouseholdChatbot = () => {
           { label: '💳 Bills History', action: 'nav', path: '/bills', type: 'secondary' }
         ];
       } else {
-        botResponseText = `I am tuned specifically for your household water services! 💧\n\nI can help you with your **water bills, usage analytics, leakage reports, and conservation tips** for House **${houseNo}**.`;
+        botResponseText = `I'm **Buddy**, tuned specifically for your household water services! 💧\n\nI can help you with your **water bills, usage analytics, leakage reports, and conservation tips** for House **${houseNo}**.`;
         botActions = getContextualActions(location.pathname);
       }
 
@@ -559,34 +573,34 @@ const HouseholdChatbot = () => {
                 : { right: '24px', bottom: '90px', position: 'fixed', zIndex: 9999 }
             }
             className={`${
-              isMaximized ? '' : 'w-[390px] sm:w-[430px] max-w-[calc(100vw-32px)] h-[600px]'
+              isMaximized ? '' : 'w-[390px] sm:w-[430px] max-w-[calc(100vw-24px)] h-[540px] sm:h-[600px] max-h-[85vh]'
             } rounded-3xl bg-surface/95 backdrop-blur-2xl border-2 border-primary/40 shadow-[0_20px_50px_rgba(0,120,255,0.25)] flex flex-col overflow-hidden text-text select-none ${
               isDragging ? 'transition-none ring-4 ring-primary/60' : 'transition-all duration-300'
             }`}
           >
-            {/* Header: Aqua Accent Banner */}
+            {/* Header: Adaptable Neumorphic Banner */}
             <div
               onMouseDown={handleMouseDown}
-              className="px-5 py-4 bg-gradient-to-r from-blue-600/20 via-primary/15 to-cyan-500/20 border-b border-border/80 flex items-center justify-between cursor-grab active:cursor-grabbing z-20"
+              className="px-5 py-4 bg-gradient-to-r from-[#c4b5fd] via-[#b8a5fe] to-[#a78bfa] dark:from-slate-900 dark:via-indigo-950 dark:to-slate-900 border-b-2 border-white/80 dark:border-indigo-900/40 flex items-center justify-between cursor-grab active:cursor-grabbing z-20 shadow-[0_4px_12px_rgba(109,40,217,0.15)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.5)]"
             >
               <div className="flex items-center space-x-3 pointer-events-none">
-                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-primary/40 shadow-md flex items-center justify-center bg-black relative">
+                <div className="w-11 h-11 shrink-0 aspect-square rounded-full overflow-hidden border-2 border-white dark:border-indigo-500/50 shadow-[3px_3px_8px_rgba(109,40,217,0.25),-2px_-2px_6px_rgba(255,255,255,0.9)] dark:shadow-[0_0_12px_rgba(99,102,241,0.4)] flex items-center justify-center bg-slate-950 relative">
                   <img 
                     src="https://cdn.dribbble.com/userupload/17215135/file/original-d9010db81823243083723c4ff1e1b909.gif" 
-                    alt="AI Insights GIF" 
+                    alt="Buddy GIF" 
                     className="w-full h-full object-cover scale-[2.25] rounded-full"
                   />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black tracking-tight text-text flex items-center gap-1.5">
-                    AI Insights
+                  <h3 className="text-base font-extrabold tracking-tight text-purple-950 dark:text-indigo-100 flex items-center gap-1.5 drop-shadow-xs">
+                    Buddy <span className="text-cyan-500 dark:text-cyan-400 animate-pulse">💧</span>
                   </h3>
-                  <p className="text-[10px] text-text-muted font-semibold">Smart Household Recommendations</p>
+                  <p className="text-[11px] text-purple-900/80 dark:text-indigo-300/80 font-bold">Your AI Water Assistant</p>
                 </div>
               </div>
 
               {/* Header Controls: Voice TTS Toggle, Minimize, Maximize, Close */}
-              <div className="flex items-center space-x-1.5 z-30">
+              <div className="flex items-center space-x-2 z-30">
                 {/* TTS Voice Toggle Button */}
                 <button
                   onClick={() => {
@@ -595,10 +609,10 @@ const HouseholdChatbot = () => {
                     }
                     setTtsEnabled(!ttsEnabled);
                   }}
-                  className={`w-8 h-8 rounded-xl border flex items-center justify-center transition-all cursor-pointer active:scale-90 ${
+                  className={`w-9 h-9 rounded-2xl border transition-all flex items-center justify-center cursor-pointer active:shadow-[inset_2px_2px_4px_rgba(160,154,170,0.5)] ${
                     ttsEnabled 
-                      ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40 hover:bg-cyan-500/30' 
-                      : 'bg-surface text-text-muted border-border hover:bg-surface-lighter'
+                      ? 'bg-cyan-500 text-white border-cyan-400 shadow-[3px_3px_6px_rgba(6,182,212,0.35),-2px_-2px_6px_rgba(255,255,255,0.8)] font-bold' 
+                      : 'bg-[#e1d2f9] dark:bg-slate-800 text-indigo-900 dark:text-indigo-200 border-white/90 dark:border-slate-700 shadow-[3px_3px_6px_rgba(160,154,170,0.45),-3px_-3px_6px_rgba(255,255,255,0.9)] dark:shadow-[2px_2px_5px_rgba(0,0,0,0.4),-2px_-2px_5px_rgba(255,255,255,0.05)]'
                   }`}
                   title={ttsEnabled ? "Voice Output Active (Click to Mute TTS)" : "Voice Output Muted (Click to Enable TTS)"}
                   aria-label="TTS Voice Toggle"
@@ -617,7 +631,7 @@ const HouseholdChatbot = () => {
                 {/* Clear / Refresh Chat Button */}
                 <button
                   onClick={handleClearChat}
-                  className="w-8 h-8 rounded-xl bg-surface hover:bg-primary/20 text-text-muted hover:text-primary border border-border flex items-center justify-center transition-all cursor-pointer active:scale-90 active:rotate-180 duration-300"
+                  className="w-9 h-9 rounded-2xl bg-[#e1d2f9] dark:bg-slate-800 text-indigo-900 dark:text-indigo-200 border border-white/90 dark:border-slate-700 shadow-[3px_3px_6px_rgba(160,154,170,0.45),-3px_-3px_6px_rgba(255,255,255,0.9)] dark:shadow-[2px_2px_5px_rgba(0,0,0,0.4),-2px_-2px_5px_rgba(255,255,255,0.05)] flex items-center justify-center transition-all cursor-pointer active:shadow-[inset_2px_2px_4px_rgba(160,154,170,0.5)] duration-300"
                   title="Clear Chat / Reset Conversation"
                   aria-label="Refresh Chat"
                 >
@@ -628,8 +642,11 @@ const HouseholdChatbot = () => {
 
                 {/* Minimize Window Button */}
                 <button
-                  onClick={() => setIsOpen(false)}
-                  className="w-8 h-8 rounded-xl bg-surface hover:bg-primary/20 text-text-muted hover:text-primary border border-border flex items-center justify-center transition-all cursor-pointer active:scale-90"
+                  onClick={() => {
+                    setIsOpen(false);
+                    setIsHovered(false);
+                  }}
+                  className="flex w-9 h-9 rounded-2xl bg-[#e1d2f9] dark:bg-slate-800 text-indigo-900 dark:text-indigo-200 border border-white/90 dark:border-slate-700 shadow-[3px_3px_6px_rgba(160,154,170,0.45),-3px_-3px_6px_rgba(255,255,255,0.9)] dark:shadow-[2px_2px_5px_rgba(0,0,0,0.4),-2px_-2px_5px_rgba(255,255,255,0.05)] items-center justify-center transition-all cursor-pointer active:shadow-[inset_2px_2px_4px_rgba(160,154,170,0.5)]"
                   title="Minimize Window"
                   aria-label="Minimize Chat"
                 >
@@ -638,10 +655,10 @@ const HouseholdChatbot = () => {
                   </svg>
                 </button>
 
-                {/* Maximize / Restore Button */}
+                {/* Maximize / Restore Button (Hidden on smartphone view) */}
                 <button
                   onClick={() => setIsMaximized(!isMaximized)}
-                  className="w-8 h-8 rounded-xl bg-surface hover:bg-primary/20 text-text-muted hover:text-primary border border-border flex items-center justify-center transition-all cursor-pointer active:scale-90"
+                  className="hidden sm:flex w-9 h-9 rounded-2xl bg-[#e1d2f9] dark:bg-slate-800 text-indigo-900 dark:text-indigo-200 border border-white/90 dark:border-slate-700 shadow-[3px_3px_6px_rgba(160,154,170,0.45),-3px_-3px_6px_rgba(255,255,255,0.9)] dark:shadow-[2px_2px_5px_rgba(0,0,0,0.4),-2px_-2px_5px_rgba(255,255,255,0.05)] items-center justify-center transition-all cursor-pointer active:shadow-[inset_2px_2px_4px_rgba(160,154,170,0.5)]"
                   title={isMaximized ? "Restore Window" : "Maximize Window"}
                 >
                   {isMaximized ? (
@@ -657,8 +674,11 @@ const HouseholdChatbot = () => {
 
                 {/* Close Button */}
                 <button
-                  onClick={() => setIsOpen(false)}
-                  className="w-8 h-8 rounded-xl bg-surface hover:bg-rose-500 hover:text-white text-text-muted border border-border flex items-center justify-center transition-all cursor-pointer active:scale-90"
+                  onClick={() => {
+                    setIsOpen(false);
+                    setIsHovered(false);
+                  }}
+                  className="w-9 h-9 rounded-2xl bg-[#e1d2f9] dark:bg-slate-800 text-rose-600 dark:text-rose-400 border border-white/90 dark:border-slate-700 shadow-[3px_3px_6px_rgba(160,154,170,0.45),-3px_-3px_6px_rgba(255,255,255,0.9)] dark:shadow-[2px_2px_5px_rgba(0,0,0,0.4),-2px_-2px_5px_rgba(255,255,255,0.05)] flex items-center justify-center transition-all cursor-pointer active:shadow-[inset_2px_2px_4px_rgba(160,154,170,0.5)]"
                   title="Close Assistant"
                   aria-label="Close Chat"
                 >
@@ -669,8 +689,13 @@ const HouseholdChatbot = () => {
               </div>
             </div>
 
-            {/* Messages Container */}
-            <div className="flex-1 p-4 overflow-y-auto space-y-4 custom-scrollbar bg-background/20 select-text z-10">
+            {/* Messages Container: SVG Pattern Wallpaper with Light & Dark Theme Adaptability */}
+            <div 
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='192' height='192' viewBox='0 0 192 192'%3E%3Cpath fill='%23a09aaa' fill-opacity='0.32' d='M192 15v2a11 11 0 0 0-11 11c0 1.94 1.16 4.75 2.53 6.11l2.36 2.36a6.93 6.93 0 0 1 1.22 7.56l-.43.84a8.08 8.08 0 0 1-6.66 4.13H145v35.02a6.1 6.1 0 0 0 3.03 4.87l.84.43c1.58.79 4 .4 5.24-.85l2.36-2.36a12.04 12.04 0 0 1 7.51-3.11 13 13 0 1 1 .02 26 12 12 0 0 1-7.53-3.11l-2.36-2.36a4.93 4.93 0 0 0-5.24-.85l-.84.43a6.1 6.1 0 0 0-3.03 4.87V143h35.02a8.08 8.08 0 0 1 6.66 4.13l.43.84a6.91 6.91 0 0 1-1.22 7.56l-2.36 2.36A10.06 10.06 0 0 0 181 164a11 11 0 0 0 11 11v2a13 13 0 0 1-13-13 12 12 0 0 1 3.11-7.53l2.36-2.36a4.93 4.93 0 0 0 .85-5.24l-.43-.84a6.1 6.1 0 0 0-4.87-3.03H145v35.02a8.08 8.08 0 0 1-4.13 6.66l-.84.43a6.91 6.91 0 0 1-7.56-1.22l-2.36-2.36A10.06 10.06 0 0 0 124 181a11 11 0 0 0-11 11h-2a13 13 0 0 1 13-13c2.47 0 5.79 1.37 7.53 3.11l2.36 2.36a4.94 4.94 0 0 0 5.24.85l.84-.43a6.1 6.1 0 0 0 3.03-4.87V145h-35.02a8.08 8.08 0 0 1-6.66-4.13l-.43-.84a6.91 6.91 0 0 1 1.22-7.56l2.36-2.36A10.06 10.06 0 0 0 107 124a11 11 0 0 0-22 0c0 1.94 1.16 4.75 2.53 6.11l2.36 2.36a6.93 6.93 0 0 1 1.22 7.56l-.43.84a8.08 8.08 0 0 1-6.66 4.13H49v35.02a6.1 6.1 0 0 0 3.03 4.87l.84.43c1.58.79 4 .4 5.24-.85l2.36-2.36a12.04 12.04 0 0 1 7.51-3.11A13 13 0 0 1 81 192h-2a11 11 0 0 0-11-11c-1.94 0-4.75 1.16-6.11 2.53l-2.36 2.36a6.93 6.93 0 0 1-7.56 1.22l-.84-.43a8.08 8.08 0 0 1-4.13-6.66V145H11.98a6.1 6.1 0 0 0-4.87 3.03l-.43.84c-.79 1.58-.4 4 .85 5.24l2.36 2.36a12.04 12.04 0 0 1 3.11 7.51A13 13 0 0 1 0 177v-2a11 11 0 0 0 11-11c0-1.94-1.16-4.75-2.53-6.11l-2.36-2.36a6.93 6.93 0 0 1-1.22-7.56l.43-.84a8.08 8.08 0 0 1 6.66-4.13H47v-35.02a6.1 6.1 0 0 0-3.03-4.87l-.84-.43c-1.59-.8-4-.4-5.24.85l-2.36 2.36A12 12 0 0 1 28 109a13 13 0 1 1 0-26c2.47 0 5.79 1.37 7.53 3.11l2.36 2.36a4.94 4.94 0 0 0 5.24.85l.84-.43A6.1 6.1 0 0 0 47 84.02V49H11.98a8.08 8.08 0 0 1-6.66-4.13l-.43-.84a6.91 6.91 0 0 1 1.22-7.56l2.36-2.36A10.06 10.06 0 0 0 11 28 11 11 0 0 0 0 17v-2a13 13 0 0 1 13 13c0 2.47-1.37 5.79-3.11 7.53l-2.36 2.36a4.94 4.94 0 0 0-.85 5.24l.43.84A6.1 6.1 0 0 0 11.98 47H47V11.98a8.08 8.08 0 0 1 4.13-6.66l.84-.43a6.91 6.91 0 0 1 7.56 1.22l2.36 2.36A10.06 10.06 0 0 0 68 11 11 11 0 0 0 79 0h2a13 13 0 0 1-13 13 12 12 0 0 1-7.53-3.11l-2.36-2.36a4.93 4.93 0 0 0-5.24-.85l-.84.43A6.1 6.1 0 0 0 49 11.98V47h35.02a8.08 8.08 0 0 1 6.66 4.13l.43.84a6.91 6.91 0 0 1-1.22 7.56l-2.36 2.36A10.06 10.06 0 0 0 85 68a11 11 0 0 0 22 0c0-1.94-1.16-4.75-2.53-6.11l-2.36-2.36a6.93 6.93 0 0 1-1.22-7.56l.43-.84a8.08 8.08 0 0 1 6.66-4.13H143V11.98a6.1 6.1 0 0 0-3.03-4.87l-.84-.43c-1.59-.8-4-.4-5.24.85l-2.36 2.36A12 12 0 0 1 124 13a13 13 0 0 1-13-13h2a11 11 0 0 0 11 11c1.94 0 4.75-1.16 6.11-2.53l2.36-2.36a6.93 6.93 0 0 1 7.56-1.22l.84.43a8.08 8.08 0 0 1 4.13 6.66V47h35.02a6.1 6.1 0 0 0 4.87-3.03l.43-.84c.8-1.59.4-4-.85-5.24l-2.36-2.36A12 12 0 0 1 179 28a13 13 0 0 1 13-13zM84.02 143a6.1 6.1 0 0 0 4.87-3.03l.43-.84c.8-1.59.4-4-.85-5.24l-2.36-2.36A12 12 0 0 1 83 124a13 13 0 1 1 26 0c0 2.47-1.37 5.79-3.11 7.53l-2.36 2.36a4.94 4.94 0 0 0-.85 5.24l.43.84a6.1 6.1 0 0 0 4.87 3.03H143v-35.02a8.08 8.08 0 0 1 4.13-6.66l.84-.43a6.91 6.91 0 0 1 7.56 1.22l2.36 2.36A10.06 10.06 0 0 0 164 107a11 11 0 0 0 0-22c-1.94 0-4.75-1.16-6.11-2.53l-2.36-2.36a6.93 6.93 0 0 1-7.56-1.22l.84.43a8.08 8.08 0 0 1-4.13 6.66V143h35.02z'%3E%3C/path%3E%3C/svg%3E")`
+              }}
+              className={`flex-1 p-4 overflow-y-auto space-y-4 custom-scrollbar select-text z-10 bg-[#e1d2f9] dark:bg-slate-900/90 dark:bg-blend-overlay ${isMaximized ? 'p-8 space-y-6 w-full' : ''}`}
+            >
               {messages.map((msg, idx) => (
                 <motion.div
                   key={msg.id}
@@ -680,27 +705,28 @@ const HouseholdChatbot = () => {
                   className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
                 >
                   <div
-                    className={`max-w-[88%] rounded-2xl px-4 py-3 text-xs leading-relaxed shadow-xs transition-all ${
+                    className={`max-w-[85%] md:max-w-[75%] rounded-2xl px-4 py-3 leading-relaxed transition-all relative ${
+                      isMaximized ? 'text-base md:text-lg px-6 py-4 rounded-3xl' : 'text-xs'
+                    } ${
                       msg.sender === 'user'
-                        ? 'bg-gradient-to-r from-blue-600 via-primary to-cyan-500 text-white rounded-br-none font-bold shadow-md shadow-primary/30'
-                        : 'bg-surface text-text border border-border rounded-bl-none shadow-sm'
+                        ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 dark:from-blue-600 dark:to-indigo-600 text-white rounded-tr-none font-medium shadow-[6px_6px_12px_rgba(99,102,241,0.35),-3px_-3px_8px_rgba(255,255,255,0.4)] dark:shadow-[4px_4px_12px_rgba(0,0,0,0.5)] border border-white/20'
+                        : 'bg-white/95 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-tl-none border border-purple-200/80 dark:border-slate-800 shadow-[6px_6px_16px_rgba(147,112,219,0.25),-4px_-4px_10px_rgba(255,255,255,0.9)] dark:shadow-[4px_4px_12px_rgba(0,0,0,0.6)] backdrop-blur-md'
                     }`}
                   >
                     {renderMessageContent(msg.text)}
 
                     {/* Styled Action Pill Buttons */}
                     {msg.actions && msg.actions.length > 0 && (
-                      <div className="mt-3 pt-2.5 border-t border-border/80 flex flex-wrap gap-2">
+                      <div className={`mt-3 pt-2.5 border-t border-purple-300/40 dark:border-slate-800 flex flex-wrap gap-2 ${isMaximized ? 'mt-4 pt-3.5 gap-3' : ''}`}>
                         {msg.actions.map((act, i) => {
-                          let btnStyle = "bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 font-bold";
+                          let btnStyle = "bg-[#f3ebff] dark:bg-slate-800 text-indigo-950 dark:text-purple-200 border border-purple-300/60 dark:border-slate-700 shadow-[3px_3px_6px_rgba(147,112,219,0.3)] dark:shadow-[2px_2px_5px_rgba(0,0,0,0.4)] font-bold";
                           
-                          // Distinct color themes per action button type/label
                           if (act.type === 'primary' || act.label.toLowerCase().includes('bill')) {
-                            btnStyle = "bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 text-white border border-blue-400/50 shadow-sm font-extrabold hover:shadow-blue-500/30";
+                            btnStyle = "bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 text-white border border-white/40 shadow-[4px_4px_8px_rgba(37,99,235,0.35)] dark:shadow-[2px_2px_6px_rgba(0,0,0,0.5)] font-extrabold";
                           } else if (act.label.toLowerCase().includes('tips') || act.label.toLowerCase().includes('usage')) {
-                            btnStyle = "bg-gradient-to-r from-cyan-500 to-teal-500 text-white border border-cyan-300/50 shadow-sm font-extrabold hover:shadow-cyan-500/30";
+                            btnStyle = "bg-gradient-to-r from-cyan-500 to-teal-500 text-white border border-white/40 shadow-[4px_4px_8px_rgba(6,182,212,0.35)] dark:shadow-[2px_2px_6px_rgba(0,0,0,0.5)] font-extrabold";
                           } else if (act.type === 'danger' || act.label.toLowerCase().includes('report') || act.label.toLowerCase().includes('issue')) {
-                            btnStyle = "bg-gradient-to-r from-rose-500 to-amber-600 text-white border border-rose-400/50 shadow-sm font-extrabold hover:shadow-rose-500/30";
+                            btnStyle = "bg-gradient-to-r from-rose-500 to-amber-600 text-white border border-white/40 shadow-[4px_4px_8px_rgba(244,63,94,0.35)] dark:shadow-[2px_2px_6px_rgba(0,0,0,0.5)] font-extrabold";
                           }
 
                           return (
@@ -709,10 +735,12 @@ const HouseholdChatbot = () => {
                               whileHover={{ scale: 1.04, y: -1 }}
                               whileTap={{ scale: 0.96 }}
                               onClick={() => handleActionClick(act)}
-                              className={`px-3.5 py-1.5 text-[11px] rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${btnStyle}`}
+                              className={`rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
+                                isMaximized ? 'px-5 py-2.5 text-sm md:text-base rounded-2xl gap-2' : 'px-3.5 py-1.5 text-[11px]'
+                              } ${btnStyle}`}
                             >
                               <span>{act.label}</span>
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3 h-3">
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className={isMaximized ? "w-4 h-4" : "w-3 h-3"}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                               </svg>
                             </motion.button>
@@ -721,7 +749,7 @@ const HouseholdChatbot = () => {
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between mt-1.5 pt-1 border-t border-border/40">
+                    <div className="flex items-center justify-between mt-1.5 pt-1 border-t border-purple-300/30 dark:border-slate-800">
                       {msg.sender === 'bot' && (
                         <button
                           onClick={() => {
@@ -731,16 +759,18 @@ const HouseholdChatbot = () => {
                               speakText(msg.text, msg.id);
                             }
                           }}
-                          className="text-[10px] text-primary hover:text-cyan-400 font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                          className={`text-indigo-700 dark:text-indigo-300 hover:text-indigo-900 font-bold flex items-center gap-1 cursor-pointer transition-colors ${
+                            isMaximized ? 'text-xs gap-1.5' : 'text-[10px]'
+                          }`}
                           title="Listen to message voice output"
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-3 h-3 ${isSpeaking && speakingMsgIdRef.current === msg.id ? 'animate-pulse text-cyan-400' : ''}`}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`${isMaximized ? 'w-4 h-4' : 'w-3 h-3'} ${isSpeaking && speakingMsgIdRef.current === msg.id ? 'animate-pulse text-cyan-400' : ''}`}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.287a5.25 5.25 0 010 7.426M12 6.75v10.5a.75.75 0 01-1.28.53l-4.72-4.72H4.5A2.25 2.25 0 012.25 10.8v-1.6c0-1.243 1.007-2.25 2.25-2.25h1.5l4.72-4.72a.75.75 0 011.28.53z" />
                           </svg>
                           <span>{isSpeaking && speakingMsgIdRef.current === msg.id ? 'Stop' : 'Listen'}</span>
                         </button>
                       )}
-                      <span className={`text-[9px] font-medium ml-auto ${msg.sender === 'user' ? 'text-white/80' : 'text-text-muted'}`}>
+                      <span className={`font-medium ml-auto ${isMaximized ? 'text-xs' : 'text-[9px]'} ${msg.sender === 'user' ? 'text-white/80' : 'text-slate-600 dark:text-slate-400'}`}>
                         {msg.timestamp}
                       </span>
                     </div>
@@ -752,42 +782,50 @@ const HouseholdChatbot = () => {
                 <motion.div 
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center space-x-2 bg-white dark:bg-slate-900 border border-lime-300 dark:border-lime-900 px-4 py-3 rounded-2xl rounded-bl-none w-fit shadow-sm"
+                  className="flex items-center space-x-2 bg-white/95 dark:bg-slate-900 border border-purple-200/80 dark:border-slate-800 px-4 py-3 rounded-2xl rounded-bl-none w-fit shadow-[4px_4px_12px_rgba(147,112,219,0.2),-3px_-3px_8px_rgba(255,255,255,0.9)] dark:shadow-[4px_4px_12px_rgba(0,0,0,0.5)]"
                 >
-                  <span className="w-2 h-2 bg-[#84cc16] rounded-full animate-bounce"></span>
-                  <span className="w-2 h-2 bg-lime-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                  <span className="w-2 h-2 bg-indigo-600 dark:bg-indigo-400 rounded-full animate-bounce"></span>
+                  <span className="w-2 h-2 bg-purple-500 dark:bg-purple-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                  <span className="w-2 h-2 bg-pink-500 dark:bg-pink-400 rounded-full animate-bounce [animation-delay:0.4s]"></span>
                 </motion.div>
               )}
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Quick Suggestion Pills */}
-            <div className="px-3.5 py-2.5 bg-[#d9f99d]/60 dark:bg-[#274e13]/60 border-t border-[#bef264] overflow-x-auto whitespace-nowrap [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex items-center space-x-2 z-10">
+            {/* Quick Suggestion Pills with Dark Mode Adaptability */}
+            <div className={`bg-gradient-to-r from-[#d8c3f7] to-[#d1bbf5] dark:from-slate-900 dark:to-slate-950 border-t-2 border-white/80 dark:border-slate-800 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex items-center z-10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] ${
+              isMaximized ? 'px-6 py-3.5 space-x-3 w-full' : 'px-3.5 py-2.5 space-x-2'
+            }`}>
               {getContextualPills(location.pathname).map((pill, idx) => (
                 <motion.button
                   key={idx}
                   whileHover={{ scale: 1.04 }}
                   whileTap={{ scale: 0.96 }}
                   onClick={() => processUserQuery(pill)}
-                  className="text-[10px] font-bold px-3 py-1.5 rounded-full bg-white dark:bg-slate-900 border border-lime-400 text-lime-900 dark:text-lime-300 hover:border-lime-600 transition-all flex-shrink-0 cursor-pointer shadow-xs"
+                  className={`font-bold rounded-full bg-[#f3ebff] dark:bg-slate-800 border border-white/90 dark:border-slate-700 text-purple-950 dark:text-purple-200 transition-all flex-shrink-0 cursor-pointer shadow-[3px_3px_6px_rgba(147,112,219,0.35),-3px_-3px_6px_rgba(255,255,255,0.9)] dark:shadow-[3px_3px_6px_rgba(0,0,0,0.5),-2px_-2px_5px_rgba(255,255,255,0.05)] active:shadow-[inset_2px_2px_4px_rgba(147,112,219,0.4),inset_-2px_-2px_4px_rgba(255,255,255,0.9)] ${
+                    isMaximized ? 'text-xs md:text-sm px-4 py-2' : 'text-[10px] px-3 py-1.5'
+                  }`}
                 >
                   {pill}
                 </motion.button>
               ))}
             </div>
 
-            {/* Input Bar */}
-            <form onSubmit={handleSend} className="p-3 bg-white dark:bg-slate-900 border-t border-[#bef264] flex items-center gap-2 z-10">
+            {/* Input Bar with Dark Mode Adaptability */}
+            <form onSubmit={handleSend} className={`bg-gradient-to-r from-[#d8c3f7] to-[#d1bbf5] dark:from-slate-900 dark:to-slate-950 border-t-2 border-white/80 dark:border-slate-800 flex items-center gap-1.5 sm:gap-2 z-10 ${
+              isMaximized ? 'p-5 w-full gap-3' : 'p-2.5 sm:p-3'
+            }`}>
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={isListening ? "Listening... speak now" : "Ask about water bills, leakages, or usage..."}
-                className={`flex-1 text-xs px-4 py-2.5 rounded-2xl border transition-all focus:outline-none ${
+                placeholder={isListening ? "Listening..." : "Ask Buddy a question..."}
+                className={`flex-1 min-w-0 rounded-2xl border-2 transition-all focus:outline-none shadow-[inset_4px_4px_8px_rgba(147,112,219,0.35),inset_-4px_-4px_8px_rgba(255,255,255,0.9)] dark:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.6)] ${
+                  isMaximized ? 'text-sm md:text-base px-5 py-3.5 rounded-3xl' : 'text-xs px-3 py-2 sm:px-4 sm:py-2.5'
+                } ${
                   isListening 
                     ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/50 animate-pulse placeholder:text-rose-400 font-bold' 
-                    : 'bg-lime-50/50 dark:bg-slate-800/80 text-slate-800 dark:text-slate-100 border-lime-300 dark:border-slate-700 focus:border-[#84cc16] focus:ring-2 focus:ring-[#84cc16]/30 placeholder:text-slate-400'
+                    : 'bg-[#f3ebff] dark:bg-slate-900 text-purple-950 dark:text-slate-100 border-white/90 dark:border-slate-700 focus:border-indigo-500 placeholder:text-purple-900/50 dark:placeholder:text-slate-400'
                 }`}
               />
 
@@ -797,10 +835,10 @@ const HouseholdChatbot = () => {
                 whileHover={{ scale: 1.08 }}
                 whileTap={{ scale: 0.92 }}
                 onClick={toggleVoiceInput}
-                className={`p-2.5 rounded-2xl transition-all flex items-center justify-center cursor-pointer border ${
+                className={`p-2.5 shrink-0 rounded-2xl transition-all flex items-center justify-center cursor-pointer border ${
                   isListening 
-                    ? 'bg-rose-500 text-white border-rose-600 animate-bounce shadow-md shadow-rose-500/40' 
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-lime-500 hover:text-lime-600'
+                    ? 'bg-rose-500 text-white border-rose-600 animate-bounce shadow-[4px_4px_10px_rgba(244,63,94,0.4)]' 
+                    : 'bg-[#e1d2f9] dark:bg-slate-800 text-indigo-900 dark:text-indigo-300 border-white/90 dark:border-slate-700 shadow-[3px_3px_6px_rgba(160,154,170,0.45),-3px_-3px_6px_rgba(255,255,255,0.9)] dark:shadow-[3px_3px_6px_rgba(15,23,42,0.6),-2px_-2px_5px_rgba(30,41,59,0.5)]'
                 }`}
                 title={isListening ? "Listening... Click to stop" : "Speak Voice Command"}
                 aria-label="Voice Command Mic"
@@ -815,7 +853,7 @@ const HouseholdChatbot = () => {
                 whileTap={{ scale: 0.95 }}
                 type="submit"
                 disabled={!input.trim()}
-                className="p-2.5 rounded-2xl bg-[#84cc16] hover:bg-[#65a30d] text-white disabled:opacity-40 transition-all shadow-md shadow-lime-600/30 cursor-pointer flex items-center justify-center"
+                className="p-2.5 shrink-0 rounded-2xl bg-[#84cc16] hover:bg-[#65a30d] text-white disabled:opacity-40 transition-all shadow-md shadow-lime-600/30 cursor-pointer flex items-center justify-center"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
@@ -838,7 +876,7 @@ const HouseholdChatbot = () => {
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
           >
-            {/* High-Fidelity SVG AI Thought Cloud Bubble */}
+            {/* High-Fidelity SVG AI Thought Cloud Bubble (Desktop only) */}
             <AnimatePresence>
               {isHovered && (
                 <motion.div
@@ -846,7 +884,7 @@ const HouseholdChatbot = () => {
                   animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
                   exit={{ opacity: 0, scale: 0.6, x: 25, y: 25 }}
                   transition={{ type: 'spring', stiffness: 450, damping: 25 }}
-                  className="absolute bottom-16 right-10 flex flex-col items-end pointer-events-none z-50 filter drop-shadow-[0_14px_35px_rgba(0,120,255,0.45)]"
+                  className="hidden sm:flex absolute bottom-16 right-10 flex-col items-end pointer-events-none z-50 filter drop-shadow-[0_14px_35px_rgba(0,120,255,0.45)]"
                 >
                   <div className="relative w-[340px] h-[150px]">
                     {/* SVG Cloud Speech Bubble Vector */}
@@ -903,7 +941,7 @@ const HouseholdChatbot = () => {
               animate={{ y: [0, -4, 0] }}
               transition={{ y: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' } }}
               onClick={() => setIsOpen(true)}
-              className="relative flex items-center justify-center w-16 h-16 rounded-full bg-slate-950 border-2 border-primary shadow-[0_15px_40px_rgba(0,120,255,0.5)] cursor-pointer group overflow-hidden"
+              className="relative flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 shrink-0 aspect-square rounded-full bg-slate-950 border-2 border-primary shadow-[0_15px_40px_rgba(0,120,255,0.5)] cursor-pointer group overflow-hidden"
               aria-label="Open Assistant"
             >
               <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity" />
