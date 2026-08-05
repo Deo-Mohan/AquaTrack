@@ -1,155 +1,281 @@
-# AquaTrack: API Reference and Implementation Guide
+# 💧 AquaTrack — Complete API Reference & Implementation Guide
 
-This document describes the core backend API endpoints, payload models, and controller implementations for the AquaTrack Platform.
+This document provides a comprehensive, production-ready specification of all backend REST API endpoints, security authentication requirements, payload models, calculation logic, and controller implementations for the **AquaTrack Smart Water Management & Billing Platform**.
 
 ---
 
-## 1. Authentication and Onboarding
+## 🔑 Authentication & Global Headers
+
+All protected endpoints require HTTP Bearer Token authentication:
+```http
+Authorization: Bearer <JWT_TOKEN>
+Content-Type: application/json
+```
+
+---
+
+## 🌐 1. Authentication & Account Management (`/api/auth`, `/api/users`)
 
 ### `POST /api/auth/signup`
 Registers a new resident or community administrator.
-* **Payload:**
+* **Access Control**: Public
+* **Payload**:
   ```json
   {
     "username": "rahulkumar",
     "password": "Password123!",
     "email": "rahul@example.com",
-    "role": "ROLE_COMMUNITY_ADMIN",
-    "colonyName": "Qutub Minar Colony",
+    "role": "ROLE_RESIDENT",
+    "colonyName": "Green Valley Colony",
     "apartmentBlock": "Block A",
     "houseNumber": "101",
     "fullName": "Rahul Kumar",
     "mobileNumber": "9876543210",
-    "gender": "Male"
+    "whatsAppNumber": "9876543210",
+    "gender": "male"
   }
   ```
-* **Response (200 OK):**
+* **Response (200 OK)**:
   ```json
-  {
-    "message": "User registered successfully. Pending approval."
-  }
+  { "message": "User registered successfully. Pending verification approval." }
   ```
+
+---
 
 ### `POST /api/auth/login`
-Authenticates a user and starts a session.
-* **Payload:**
+Authenticates a user session and returns a JWT access token.
+* **Access Control**: Public
+* **Payload**:
+  ```json
+  { "username": "rahulkumar", "password": "Password123!" }
+  ```
+* **Response (200 OK)**:
   ```json
   {
+    "token": "eyJhbGciOiJIUzI1NiJ9...",
     "username": "rahulkumar",
-    "password": "Password123!"
+    "role": "ROLE_RESIDENT",
+    "email": "rahul@example.com",
+    "apartmentBlock": "Block A",
+    "houseNumber": "101",
+    "colonyName": "Green Valley Colony",
+    "meterId": "WM-BLK-A-101"
   }
   ```
-* **Response (200 OK):** Returns user profile details, active colony/block context, and authorization flags.
 
 ---
 
-## 2. Billing Cycles Management (`/api/billing-cycles`)
+### `PUT /api/users/profile/{username}`
+Updates user profile information (email, full name, mobile, whatsapp, gender).
+* **Access Control**: Authenticated User (`ROLE_RESIDENT`, `ROLE_COMMUNITY_ADMIN`, `ROLE_ADMIN`)
+* **Payload**:
+  ```json
+  {
+    "fullName": "Rahul Kumar",
+    "email": "rahul.updated@example.com",
+    "mobileNumber": "9876543210",
+    "whatsAppNumber": "9876543210",
+    "gender": "male"
+  }
+  ```
 
-Handles operational timeframes for batch calculations.
+---
+
+### `PUT /api/users/profile/change-password/{username}`
+Updates user account password securely.
+* **Access Control**: Authenticated User
+* **Payload**:
+  ```json
+  {
+    "currentPassword": "Password123!",
+    "newPassword": "NewSecurePassword123!"
+  }
+  ```
+
+---
+
+## 📅 2. Billing Cycles & Overrides (`/api/billing-cycles`)
 
 ### `POST /api/billing-cycles`
-Creates a new billing cycle.
-* **Payload:**
+Creates a new billing operational timeframe.
+* **Access Control**: `ROLE_COMMUNITY_ADMIN`, `ROLE_ADMIN`
+* **Payload**:
   ```json
   {
-    "cycleName": "July 2026 Cycle",
-    "startDate": "2026-07-01",
-    "endDate": "2026-07-31",
-    "apartmentId": 1,
-    "apartmentBlock": "Block A",
-    "createdByRole": "ROLE_COMMUNITY_ADMIN"
-  }
-  ```
-* **Java Implementation Snippet:**
-  ```java
-  @PostMapping
-  public ResponseEntity<BillingCycle> createCycle(@Valid @RequestBody BillingCycle cycle) {
-      cycle.setStatus("OPEN");
-      if (cycle.getCreatedByRole() == null || cycle.getCreatedByRole().trim().isEmpty()) {
-          cycle.setCreatedByRole("ROLE_COMMUNITY_ADMIN");
-      }
-      return ResponseEntity.ok(billingCycleRepository.save(cycle));
-  }
-  ```
-
-### `GET /api/billing-cycles` & `GET /api/billing-cycles/apartment/{apartmentId}`
-Fetches active billing cycles with **Super Admin override filtering** applied.
-* **Override Logic:** If a Super Admin (`ROLE_ADMIN`) creates a cycle for a specific apartment and block, any Community Admin-defined cycles for that block are automatically filtered out on the backend to prevent duplicate or conflicting cycles.
-* **Java Implementation Snippet:**
-  ```java
-  private List<BillingCycle> applyOverrides(List<BillingCycle> cycles) {
-      return cycles.stream().filter(c -> {
-          if (!"ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(c.getCreatedByRole()) && c.getCreatedByRole() != null) {
-              return true;
-          }
-          boolean hasSuperAdminOverride = cycles.stream().anyMatch(other -> 
-              "ROLE_ADMIN".equalsIgnoreCase(other.getCreatedByRole()) &&
-              other.getApartmentId().equals(c.getApartmentId()) &&
-              (
-                  (other.getApartmentBlock() == null && c.getApartmentBlock() == null) ||
-                  (other.getApartmentBlock() != null && other.getApartmentBlock().equalsIgnoreCase(c.getApartmentBlock()))
-              )
-          );
-          return !hasSuperAdminOverride;
-      }).collect(Collectors.toList());
+    "cycleName": "August 2026 Cycle",
+    "startDate": "2026-08-01",
+    "endDate": "2026-08-31",
+    "apartmentBlock": "Block A"
   }
   ```
 
 ---
 
-## 3. Water Consumption Logging (`/api/water-usage`)
+### `GET /api/billing-cycles`
+Retrieves billing cycles with **Super Admin Override logic** applied.
+* **Access Control**: Authenticated User
+* **Super Admin Override Logic**: If a Super Admin creates a cycle for a specific block, any Community Admin-defined cycles for that block are automatically overridden to prevent billing conflicts.
 
-Manages meter readings. Only Community Admins can perform logging operations.
+---
+
+### `POST /api/billing-cycles/{id}/finalize`
+Finalizes a cycle and triggers automated batch bill generation across all households.
+* **Access Control**: `ROLE_COMMUNITY_ADMIN`, `ROLE_ADMIN`
+* **Response (200 OK)**:
+  ```json
+  { "message": "Billing cycle finalized. 42 invoices generated and notifications sent." }
+  ```
+
+---
+
+## 🚰 3. Water Meter Logging & Bulk CSV (`/api/water-usage`)
 
 ### `POST /api/water-usage/log`
 Submits a meter reading log for a household.
-* **Access Control:** Both residents and Super Admins are blocked from logging water usage. Only Community Admins can log water usage for households in their assigned community/block.
-* **Payload:**
+* **Access Control**: `ROLE_COMMUNITY_ADMIN` Only (Residents & Super Admins blocked from manual logging)
+* **Payload**:
   ```json
   {
     "houseNumber": "101",
     "apartmentBlock": "Block A",
-    "consumptionLiters": 350.0,
-    "date": "2026-07-19"
-  }
-  ```
-* **Java Implementation Snippet:**
-  ```java
-  if (!"ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(callerRole)) {
-      return ResponseEntity.status(403).body("Access denied. Only Community Admins can log water usage.");
-  }
-  ```
-* **Response (200 OK):**
-  ```json
-  {
-    "message": "Water usage log submitted successfully."
+    "readingLiters": 350.0,
+    "readingDate": "2026-08-05",
+    "logType": "DAILY"
   }
   ```
 
 ---
 
-## 4. Invoicing and Payments (`/api/bills`)
+### `POST /api/water-usage/upload-csv`
+Bulk imports water usage logs from a CSV file.
+* **Access Control**: `ROLE_COMMUNITY_ADMIN`, `ROLE_ADMIN`
+* **Form Field**: `file` (Multipart CSV file)
 
-Calculates, issues, and tracks bills.
+---
 
-### `POST /api/bills/create`
-Generates a custom bill manual override.
-* **Payload:**
+## 💳 4. Invoices, Payments, & Reminders (`/api/bills`)
+
+### `GET /api/bills/user/{houseNumber}`
+Fetches billing history for a specific household.
+* **Access Control**: Authenticated Resident or Admin
+
+---
+
+### `POST /api/bills/reminders/check`
+Scans all community blocks for overdue bills and alerts Community Admins.
+* **Access Control**: `ROLE_ADMIN` (Super Admin)
+* **Response (200 OK)**:
+  ```json
+  { "message": "Global scan completed. Community admins have been alerted." }
+  ```
+
+---
+
+### `POST /api/bills/reminders/send-all`
+Dispatches automated email payment reminders to all unpaid households in a block.
+* **Access Control**: `ROLE_COMMUNITY_ADMIN`, `ROLE_ADMIN`
+* **Query Parameter**: `apartmentBlock=Block A`
+
+---
+
+### `POST /api/bills/reminders/send`
+Dispatches an individual payment notice to a specific resident.
+* **Query Parameters**: `houseNumber=101&apartmentBlock=Block A`
+
+---
+
+## 🚚 5. Bulk Water Tanker Purchase (`/api/water-purchase`)
+
+### `POST /api/water-purchase/request`
+Submits a emergency/extra bulk water tanker request.
+* **Access Control**: `ROLE_RESIDENT`, `ROLE_COMMUNITY_ADMIN`
+* **Payload**:
   ```json
   {
-    "houseNumber": "101",
+    "tankerCapacityLiters": 5000,
+    "deliveryDate": "2026-08-06",
+    "deliveryTimeSlot": "MORNING_08_11",
     "apartmentBlock": "Block A",
-    "amount": 420.50,
-    "dueDate": "2026-08-15",
-    "status": "UNPAID",
-    "billingCycleId": 1
+    "houseNumber": "101",
+    "paymentMethod": "UPI"
   }
   ```
 
-### `POST /api/billing-cycles/{id}/finalize`
-Triggers batch billing calculation across all households in the cycle's scope.
-* **Calculations Executed:**
-  1. Verifies that all households have logged readings within the cycle range.
-  2. Integrates and distributes shared area costs across block residents.
-  3. Evaluates tiered tariff rates (Base Usage vs. Excess Usage Penalty rates).
-  4. Creates database bill records and sends email notifications.
+---
+
+## 🏷️ 6. Tariff Management (`/api/tariffs`)
+
+### `GET /api/tariffs/block/{apartmentBlock}`
+Fetches active water tariff rates, base limit quotas, penalty rates, grace periods, and late fee amounts.
+* **Response (200 OK)**:
+  ```json
+  {
+    "apartmentBlock": "Block A",
+    "baseLimitLiters": 10000,
+    "baseRatePerLiter": 0.04,
+    "excessRatePerLiter": 0.08,
+    "gracePeriodDays": 5,
+    "lateFeeFixed": 150.00
+  }
+  ```
+
+---
+
+## 🎫 7. Support Ticketing & Escalations (`/api/tickets`)
+
+### `POST /api/tickets`
+Submits a new maintenance or billing support ticket.
+* **Payload**:
+  ```json
+  {
+    "subject": "Meter Reading Discrepancy",
+    "category": "METER_ISSUE",
+    "description": "My daily reading shows 800L which is higher than average.",
+    "priority": "HIGH"
+  }
+  ```
+
+---
+
+### `PUT /api/tickets/{id}/escalate`
+Escalates an unresolved ticket from Community Admin to Super Admin.
+* **Access Control**: `ROLE_COMMUNITY_ADMIN`
+
+---
+
+## 🤖 8. AI Chatbot Assistant (`/api/chatbot`)
+
+### `POST /api/chatbot/query`
+Executes RAG context assembly and queries Google Gemini 1.5 Flash.
+* **Payload**:
+  ```json
+  {
+    "query": "What is my current bill status?",
+    "username": "rahulkumar",
+    "language": "en"
+  }
+  ```
+* **Response (200 OK)**:
+  ```json
+  {
+    "answer": "Your August bill of ₹450 is currently UNPAID and due on 15th August.",
+    "intent": "BILLING_STATUS"
+  }
+  ```
+
+---
+
+## 🔔 9. PWA Push Notifications (`/api/notifications`)
+
+### `POST /api/notifications/pwa-subscription`
+Registers Web Push API credentials for PWA notifications.
+* **Payload**:
+  ```json
+  {
+    "endpoint": "https://fcm.googleapis.com/fcm/send/...",
+    "keys": {
+      "p256dh": "BIP...",
+      "auth": "3z..."
+    }
+  }
+  ```
