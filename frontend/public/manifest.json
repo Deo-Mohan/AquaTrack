@@ -1,0 +1,24 @@
+{
+  "short_name": "AquaTrack",
+  "name": "AquaTrack - Smart Water Management & Billing",
+  "description": "Enterprise & Household Smart Water Tracking, Automated Billing, Tanker Delivery Management, and P&L Analytics.",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/logo.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0f172a",
+  "theme_color": "#0284c7",
+  "display": "standalone",
+  "orientation": "any",
+  "categories": ["utilities", "productivity", "finance"]
+}

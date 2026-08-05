@@ -117,6 +117,26 @@ export default function MeterWorkstation() {
   }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('action') === 'finalize_bulk') {
+      const monthParam = parseInt(params.get('month'), 10);
+      if (monthParam >= 1 && monthParam <= 12) {
+        setSelectedBulkMonth(monthParam);
+      }
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('action') === 'finalize_bulk' && users.length > 0 && usageLogs.length > 0) {
+      const timer = setTimeout(() => {
+        handleGenerateAllBills();
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [location.search, users, usageLogs, selectedBulkMonth, selectedBulkYear, tariffSettings]);
+
+  useEffect(() => {
     if (location.state && location.state.selectedResidentId && users.length > 0) {
       const foundUser = users.find(u => u.id === location.state.selectedResidentId);
       if (foundUser) {
@@ -883,17 +903,17 @@ Are you sure you want to finalize these bills and lock the cycle?`;
       {actionStatus && (
         <motion.div
           initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-          className={`flex items-center justify-between gap-2 px-4 py-3.5 rounded-xl text-sm font-medium border ${
+          className={`flex items-center justify-between gap-2 px-4 py-3.5 rounded-xl text-sm font-bold border shadow-sm ${
             actionStatus.type === 'success'
-              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-              : 'bg-red-500/10 border-red-500/30 text-red-400'
+              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-900 dark:text-emerald-200'
+              : 'bg-red-500/15 border-red-500/40 text-red-900 dark:text-red-200'
           }`}
         >
           <div className="flex items-center gap-2">
-            {actionStatus.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
-            {actionStatus.msg}
+            {actionStatus.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" /> : <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />}
+            <span>{actionStatus.msg}</span>
           </div>
-          <button onClick={() => setActionStatus(null)} className="text-text-muted hover:text-text cursor-pointer">
+          <button onClick={() => setActionStatus(null)} className="text-text-muted hover:text-text cursor-pointer p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
             <X className="w-4 h-4" />
           </button>
         </motion.div>
@@ -1460,10 +1480,10 @@ Are you sure you want to finalize these bills and lock the cycle?`;
           exit={{ opacity: 0, y: -10 }}
           className="space-y-6"
         >
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="font-bold text-text text-lg">Billing Cycles & Periods</h3>
-              <p className="text-text-muted text-sm mt-0.5">
+              <p className="text-text-muted text-xs sm:text-sm mt-0.5">
                 Define water billing cycles per Colony community and auto-calculate household bills.
               </p>
             </div>
@@ -1481,10 +1501,10 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                 });
                 setBillingCycleModalOpen(true);
               }}
-              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-semibold transition-colors flex items-center gap-2 cursor-pointer"
+              className="px-3.5 sm:px-4 py-2 sm:py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer text-xs sm:text-sm whitespace-nowrap self-start sm:self-auto shrink-0 shadow-sm"
             >
-              <Plus className="w-4.5 h-4.5" />
-              Create Billing Cycle
+              <Plus className="w-4 h-4 shrink-0" />
+              <span>Create Billing Cycle</span>
             </button>
           </div>
 
@@ -1612,25 +1632,25 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                   : `Dispatch email notices and payment reminders to unpaid households in ${block || 'your block'}.`}
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-center sm:justify-end gap-2.5 sm:gap-3 shrink-0">
               {isSuperAdmin && (
                 <button 
                   onClick={handleScanAlertAdmins}
                   disabled={actionLoading}
-                  className="px-4 py-2.5 bg-blue-500/10 text-blue-450 hover:bg-blue-500/20 border border-blue-500/20 rounded-xl font-semibold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 text-sm"
+                  className="w-full sm:w-auto px-4 py-2.5 bg-blue-500/10 text-blue-600 dark:text-blue-300 hover:bg-blue-500/20 border border-blue-500/30 rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 text-xs sm:text-sm active:scale-98 shadow-sm"
                 >
-                  <Activity className="w-4 h-4" />
-                  Scan & Alert Admins
+                  <Activity className="w-4 h-4 shrink-0" />
+                  <span>Scan & Alert Admins</span>
                 </button>
               )}
 
               <button 
                 onClick={handleSendAllReminders}
                 disabled={actionLoading}
-                className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/10 disabled:opacity-50 text-sm"
+                className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/20 border border-white/10 disabled:opacity-50 text-xs sm:text-sm active:scale-98"
               >
-                <Send className="w-4 h-4" />
-                Send All Reminders
+                <Send className="w-4 h-4 shrink-0" />
+                <span>Send All Reminders</span>
               </button>
             </div>
           </div>

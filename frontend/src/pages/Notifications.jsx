@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, Check, Trash2, Eye, EyeOff, Mail, AlertTriangle, Info, Calendar } from 'lucide-react';
+import { Bell, Check, Trash2, Eye, EyeOff, Mail, AlertTriangle, Info, Calendar, X } from 'lucide-react';
 import api from '../api';
+
+import { groupNotificationsByDate, formatNotificationTime } from '../utils/dateGrouper';
 
 export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
@@ -107,34 +109,36 @@ export default function Notifications() {
   };
 
   const getBgColor = (type, title, isRead) => {
-    if (isRead) return 'bg-surface-light/40 dark:bg-surface-light/10 border-2 border-slate-300/80 dark:border-slate-700/80 opacity-80 hover:border-primary/60';
+    if (isRead) return 'bg-white/90 dark:bg-slate-900/90 border-2 border-slate-200 dark:border-slate-800 opacity-75 shadow-sm hover:border-primary/50';
     const sev = getSeverity(type, title);
     switch (sev) {
       case 'danger':
-        return 'bg-red-500/10 dark:bg-red-500/15 border-2 border-red-500/50 dark:border-red-500/40 shadow-sm shadow-red-500/10 hover:border-red-500';
+        return 'bg-white dark:bg-slate-900 border-2 border-red-500/60 dark:border-red-500/50 shadow-md shadow-red-500/10 hover:border-red-500';
       case 'success':
-        return 'bg-emerald-500/10 dark:bg-emerald-500/15 border-2 border-emerald-500/50 dark:border-emerald-500/40 shadow-sm shadow-emerald-500/10 hover:border-emerald-500';
+        return 'bg-white dark:bg-slate-900 border-2 border-emerald-500/60 dark:border-emerald-500/50 shadow-md shadow-emerald-500/10 hover:border-emerald-500';
       case 'billing':
-        return 'bg-indigo-500/10 dark:bg-indigo-500/15 border-2 border-indigo-500/50 dark:border-indigo-500/40 shadow-sm shadow-indigo-500/10 hover:border-indigo-500';
+        return 'bg-white dark:bg-slate-900 border-2 border-indigo-500/60 dark:border-indigo-500/50 shadow-md shadow-indigo-500/10 hover:border-indigo-500';
       default:
-        return 'bg-blue-500/10 dark:bg-blue-500/15 border-2 border-blue-500/50 dark:border-blue-500/40 shadow-sm shadow-blue-500/10 hover:border-blue-500';
+        return 'bg-white dark:bg-slate-900 border-2 border-sky-500/60 dark:border-sky-500/50 shadow-md shadow-sky-500/10 hover:border-sky-500';
     }
   };
 
   const getIconContainerClass = (type, title, isRead) => {
-    if (isRead) return 'p-2.5 rounded-xl bg-surface flex-shrink-0 mt-0.5 border border-border/70';
+    if (isRead) return 'p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 flex-shrink-0 mt-0.5 border border-slate-200 dark:border-slate-700';
     const sev = getSeverity(type, title);
     switch (sev) {
       case 'danger':
-        return 'p-2.5 rounded-xl bg-red-500/20 border border-red-500/40 flex-shrink-0 mt-0.5';
+        return 'p-2.5 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800/50 flex-shrink-0 mt-0.5';
       case 'success':
-        return 'p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex-shrink-0 mt-0.5';
+        return 'p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/50 flex-shrink-0 mt-0.5';
       case 'billing':
-        return 'p-2.5 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex-shrink-0 mt-0.5';
+        return 'p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800/50 flex-shrink-0 mt-0.5';
       default:
-        return 'p-2.5 rounded-xl bg-blue-500/20 border border-blue-500/40 flex-shrink-0 mt-0.5';
+        return 'p-2.5 rounded-xl bg-sky-50 dark:bg-sky-950/50 border border-sky-200 dark:border-sky-800/50 flex-shrink-0 mt-0.5';
     }
   };
+
+  const groupedNotifications = groupNotificationsByDate(notifications);
 
   return (
     <div className="space-y-6">
@@ -196,55 +200,72 @@ export default function Notifications() {
           <p className="text-text-muted text-sm max-w-md font-medium leading-relaxed">You're all caught up! Updates regarding bills, meter logs, and alerts will appear here.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          <AnimatePresence>
-            {notifications.map((notif, index) => (
-              <motion.div
-                key={notif.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                transition={{ delay: index * 0.05 }}
-                className={`p-4 rounded-xl border flex items-center justify-between gap-4 transition-all hover:shadow-lg ${getBgColor(notif.notificationType, notif.title, notif.isRead)}`}
-              >
-                <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <div className={getIconContainerClass(notif.notificationType, notif.title, notif.isRead)}>
-                    {getIcon(notif.notificationType, notif.title)}
-                  </div>
-                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { setSelectedNotif(notif); if (!notif.isRead) handleMarkAsRead(notif.id); }}>
-                    <div className="flex items-center gap-2">
-                      <h3 className={`text-sm truncate text-text ${!notif.isRead ? 'font-bold' : 'font-medium'}`}>
-                        {notif.title}
-                      </h3>
-                      {!notif.isRead && (
-                        <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
-                      )}
-                    </div>
-                    <p className="text-xs text-text-muted truncate mt-0.5">{notif.message}</p>
-                  </div>
-                </div>
+        <div className="space-y-6">
+          {groupedNotifications.map((group, groupIdx) => (
+            <div key={groupIdx} className="space-y-3">
+              {/* WhatsApp Style Date Section Header */}
+              <div className="sticky top-0 z-10 flex items-center gap-3 py-1">
+                <span className="px-3.5 py-1 rounded-full text-xs font-black bg-primary/15 text-primary border border-primary/30 shadow-sm backdrop-blur-md">
+                  {group.dateLabel}
+                </span>
+                <div className="flex-1 h-px bg-border/40" />
+              </div>
 
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {!notif.isRead && (
-                    <button
-                      onClick={() => handleMarkAsRead(notif.id)}
-                      title="Mark as read"
-                      className="p-1.5 hover:bg-surface rounded-lg text-text-muted hover:text-emerald-400 cursor-pointer transition-colors"
+              <div className="space-y-2.5">
+                <AnimatePresence>
+                  {group.items.map((notif, index) => (
+                    <motion.div
+                      key={notif.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      transition={{ delay: index * 0.03 }}
+                      className={`p-4 rounded-xl border flex items-center justify-between gap-4 transition-all hover:shadow-lg ${getBgColor(notif.notificationType, notif.title, notif.isRead)}`}
                     >
-                      <Check className="w-4 h-4" />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleDelete(notif.id)}
-                    title="Delete"
-                    className="p-1.5 hover:bg-surface rounded-lg text-text-muted hover:text-red-400 cursor-pointer transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className={getIconContainerClass(notif.notificationType, notif.title, notif.isRead)}>
+                          {getIcon(notif.notificationType, notif.title)}
+                        </div>
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { setSelectedNotif(notif); if (!notif.isRead) handleMarkAsRead(notif.id); }}>
+                          <div className="flex items-center gap-2">
+                            <h3 className={`text-sm truncate text-text ${!notif.isRead ? 'font-bold' : 'font-medium'}`}>
+                              {notif.title}
+                            </h3>
+                            {!notif.isRead && (
+                              <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-xs text-text-muted truncate mt-0.5">{notif.message}</p>
+                          <span className="text-[10px] text-text-muted font-bold block mt-1">
+                            {formatNotificationTime(notif.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {!notif.isRead && (
+                          <button
+                            onClick={() => handleMarkAsRead(notif.id)}
+                            title="Mark as read"
+                            className="p-1.5 hover:bg-surface rounded-lg text-text-muted hover:text-emerald-400 cursor-pointer transition-colors"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(notif.id)}
+                          title="Delete"
+                          className="p-1.5 hover:bg-surface rounded-lg text-text-muted hover:text-red-400 cursor-pointer transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -295,32 +316,99 @@ export default function Notifications() {
 
       {/* Selected notification details modal */}
       {selectedNotif && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-surface border border-border w-full max-w-md rounded-2xl p-6 shadow-2xl relative">
-            <button onClick={() => setSelectedNotif(null)} className="absolute top-4 right-4 text-text-muted hover:text-text cursor-pointer"><Trash2 className="hidden" /><Check className="hidden" />Close</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 overflow-y-auto">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0, y: 15 }} 
+            animate={{ scale: 1, opacity: 1, y: 0 }} 
+            exit={{ scale: 0.9, opacity: 0, y: 15 }}
+            className="bg-surface border border-primary/30 w-full max-w-xl rounded-3xl p-6 sm:p-8 shadow-2xl relative my-auto overflow-hidden"
+          >
+            <button 
+              onClick={() => setSelectedNotif(null)} 
+              className="absolute top-5 right-5 text-text-muted hover:text-text cursor-pointer p-1.5 rounded-xl hover:bg-surface-lighter transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
             
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2.5 rounded-lg bg-surface-lighter border border-border/50">
-                {getIcon(selectedNotif.notificationType)}
+            <div className="flex items-start gap-4 mb-6 pr-8">
+              <div className={getIconContainerClass(selectedNotif.notificationType, selectedNotif.title, false)}>
+                {getIcon(selectedNotif.notificationType, selectedNotif.title)}
               </div>
               <div>
-                <h3 className="text-lg font-bold text-text">{selectedNotif.title}</h3>
-                <span className="text-xs text-text-muted font-medium flex items-center gap-1 mt-0.5">
-                  <Calendar className="w-3.5 h-3.5" />
-                  {new Date(selectedNotif.createdAt).toLocaleString()}
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-primary/15 text-primary border border-primary/25 inline-block mb-1.5">
+                  {selectedNotif.notificationType || 'NOTIFICATION'}
+                </span>
+                <h3 className="text-xl font-extrabold text-text leading-snug">{selectedNotif.title}</h3>
+                <span className="text-xs text-text-muted font-bold flex items-center gap-1.5 mt-1">
+                  <Calendar className="w-3.5 h-3.5 text-primary" />
+                  {new Date(selectedNotif.createdAt).toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short' })}
                 </span>
               </div>
             </div>
 
-            <div className="bg-surface-lighter rounded-xl p-4 border border-border/30 text-sm text-text-muted leading-relaxed">
-              {selectedNotif.message}
+            {/* Notification Body / Summary */}
+            <div className="space-y-4">
+              <div className="bg-surface-lighter rounded-2xl p-4 sm:p-5 border border-border/50">
+                <h4 className="text-xs font-black text-primary uppercase tracking-wider mb-2">Message Details</h4>
+                <p className="text-sm text-text font-medium leading-relaxed whitespace-pre-wrap">
+                  {selectedNotif.message}
+                </p>
+              </div>
+
+              {/* Data Breakdown Cards (Parses list/key-value metrics inside bulk uploads or report notifications) */}
+              {(() => {
+                const message = selectedNotif.message || '';
+                // Check if message contains comma/colon key-value metrics like "Imported: 1, Failed: 3..."
+                if (message.includes(':')) {
+                  const items = message.split(/(?:,|\.)\s+/).filter(part => part.includes(':'));
+                  if (items.length > 0) {
+                    return (
+                      <div className="bg-surface-lighter/60 rounded-2xl p-4 border border-border/40 space-y-2.5">
+                        <h4 className="text-xs font-black text-text-muted uppercase tracking-wider">Extracted Data Summary</h4>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          {items.map((item, idx) => {
+                            const [key, ...valParts] = item.split(':');
+                            const val = valParts.join(':').trim();
+                            if (!key || !val) return null;
+                            return (
+                              <div key={idx} className="bg-surface p-3 rounded-xl border border-border/40">
+                                <span className="text-[11px] font-bold text-text-muted block uppercase tracking-wider">{key.trim()}</span>
+                                <span className="text-sm font-extrabold text-text mt-0.5 block">{val}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  }
+                }
+                return null;
+              })()}
+
+              {/* Raw Notification Metadata */}
+              <div className="rounded-2xl border border-border/40 p-4 bg-surface-lighter/30 space-y-2 text-xs">
+                <div className="flex justify-between items-center text-text-muted font-medium">
+                  <span>Notification ID</span>
+                  <span className="font-mono text-text font-bold">#{selectedNotif.id}</span>
+                </div>
+                <div className="flex justify-between items-center text-text-muted font-medium">
+                  <span>Recipient</span>
+                  <span className="font-bold text-text">{selectedNotif.recipientUsername || localStorage.getItem('username')}</span>
+                </div>
+                <div className="flex justify-between items-center text-text-muted font-medium">
+                  <span>Read Status</span>
+                  <span className={`font-black px-2.5 py-0.5 rounded-full text-[11px] ${selectedNotif.isRead ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-500/40' : 'bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-300 border border-amber-500/40'}`}>
+                    {selectedNotif.isRead ? '✓ Read' : 'Unread'}
+                  </span>
+                </div>
+              </div>
             </div>
 
             <button
               onClick={() => setSelectedNotif(null)}
-              className="mt-5 w-full py-2.5 bg-primary hover:bg-primary-dark text-white rounded-xl font-bold transition-all cursor-pointer text-sm"
+              className="mt-6 w-full py-3 bg-primary hover:bg-primary-dark text-white rounded-2xl font-bold transition-all cursor-pointer text-sm shadow-lg shadow-primary/25"
             >
-              Done
+              Close Details
             </button>
           </motion.div>
         </div>

@@ -787,6 +787,9 @@ export function generateInvoiceHTML(bill) {
     <div class="generated-note">
       This is a computer-generated invoice and is legally valid without a physical signature. &bull;
       Verify at www.aquatrack.in/verify using Invoice ID ${invoiceNumber}
+      <div style="margin-top: 6px; font-weight: 700; color: #475569; font-size: 10px;">
+        Built with ❤️ by Krishna Mohan
+      </div>
     </div>
   </div>
 

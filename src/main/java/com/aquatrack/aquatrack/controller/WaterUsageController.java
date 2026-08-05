@@ -23,6 +23,7 @@ import java.io.InputStreamReader;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/usage")
@@ -542,5 +543,92 @@ public class WaterUsageController {
     public ResponseEntity<List<WaterUsageAuditLog>> getAuditHistory() {
         LocalDateTime twentyFourHoursAgo = LocalDateTime.now().minusHours(24);
         return ResponseEntity.ok(auditLogRepository.findByActionTimeAfterOrderByActionTimeDesc(twentyFourHoursAgo));
+    }
+
+    // 11. GET: Peer Competition Leaderboard & Top 5 Efficient Households for Water Tips
+    @GetMapping("/leaderboard/{username}")
+    public ResponseEntity<?> getLeaderboardForUser(@PathVariable String username) {
+        java.util.Optional<com.aquatrack.aquatrack.model.User> optUser = userRepository.findByUsername(username);
+        if (!optUser.isPresent()) {
+            return ResponseEntity.badRequest().body("User not found");
+        }
+        com.aquatrack.aquatrack.model.User currentUser = optUser.get();
+        String block = currentUser.getApartmentBlock() != null ? currentUser.getApartmentBlock() : "The White House";
+        String myHouse = currentUser.getHouseNumber();
+
+        LocalDate now = LocalDate.now();
+        LocalDate startOfMonth = now.withDayOfMonth(1);
+
+        // Get all approved households in the same apartment block
+        List<com.aquatrack.aquatrack.model.User> blockResidents = userRepository.findByRoleAndApartmentBlock("ROLE_HOUSEHOLD_USER", block);
+        if (blockResidents.isEmpty()) {
+            blockResidents = userRepository.findByRoleAndApartmentBlock("ROLE_RESIDENT", block);
+        }
+
+        List<java.util.Map<String, Object>> leaderList = new ArrayList<>();
+        double myConsumption = 0.0;
+
+        for (com.aquatrack.aquatrack.model.User resident : blockResidents) {
+            String house = resident.getHouseNumber();
+            if (house == null || house.isBlank()) continue;
+            Double total = repository.sumConsumptionByHouseholdAndDateRange(house, startOfMonth, now);
+            double val = (total != null) ? total : 0.0;
+
+            if (house.equalsIgnoreCase(myHouse)) {
+                myConsumption = val;
+            }
+
+            java.util.Map<String, Object> item = new java.util.HashMap<>();
+            item.put("houseNumber", house);
+            item.put("name", resident.getFullName() != null ? resident.getFullName() : resident.getUsername());
+            item.put("totalLiters", val);
+            item.put("isMe", house.equalsIgnoreCase(myHouse));
+            leaderList.add(item);
+        }
+
+        // If current user is not in the list, add them
+        if (myHouse != null && leaderList.stream().noneMatch(i -> Boolean.TRUE.equals(i.get("isMe")))) {
+            Double total = repository.sumConsumptionByHouseholdAndDateRange(myHouse, startOfMonth, now);
+            myConsumption = (total != null) ? total : 0.0;
+            java.util.Map<String, Object> item = new java.util.HashMap<>();
+            item.put("houseNumber", myHouse);
+            item.put("name", currentUser.getFullName() != null ? currentUser.getFullName() : currentUser.getUsername());
+            item.put("totalLiters", myConsumption);
+            item.put("isMe", true);
+            leaderList.add(item);
+        }
+
+        // Sort ascending by totalLiters (lowest usage = most efficient = Rank 1)
+        leaderList.sort((a, b) -> Double.compare(((Number) a.get("totalLiters")).doubleValue(), ((Number) b.get("totalLiters")).doubleValue()));
+
+        int rank = 1;
+        int myRank = 1;
+        for (java.util.Map<String, Object> item : leaderList) {
+            item.put("rank", rank);
+            if (Boolean.TRUE.equals(item.get("isMe"))) {
+                myRank = rank;
+            }
+            rank++;
+        }
+
+        // Top 5 households overall in the block
+        List<java.util.Map<String, Object>> top5 = leaderList.stream().limit(5).collect(Collectors.toList());
+
+        // Neighbors who used LESS water than current user (more efficient)
+        final double finalMyConsumption = myConsumption;
+        List<java.util.Map<String, Object>> neighborsLowerThanMe = leaderList.stream()
+                .filter(i -> !Boolean.TRUE.equals(i.get("isMe")) && ((Number) i.get("totalLiters")).doubleValue() < finalMyConsumption)
+                .collect(Collectors.toList());
+
+        java.util.Map<String, Object> res = new java.util.HashMap<>();
+        res.put("myHouseNumber", myHouse);
+        res.put("myTotalLiters", myConsumption);
+        res.put("myRank", myRank);
+        res.put("totalHouseholds", leaderList.size());
+        res.put("top5Leaderboard", top5);
+        res.put("moreEfficientNeighborsCount", neighborsLowerThanMe.size());
+        res.put("moreEfficientNeighbors", neighborsLowerThanMe.stream().limit(5).collect(Collectors.toList()));
+
+        return ResponseEntity.ok(res);
     }
 }

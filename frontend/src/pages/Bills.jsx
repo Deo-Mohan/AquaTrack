@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Receipt, CheckCircle, Clock, AlertCircle, RefreshCw, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Receipt, CheckCircle, Clock, AlertCircle, RefreshCw, X, Filter, ArrowUpDown, Check, RotateCcw, ChevronDown } from 'lucide-react';
 import api from '../api';
 import '../ticket.css';
 import { printInvoice } from '../utils/invoiceGenerator';
@@ -22,6 +22,10 @@ export default function Bills() {
   const [filterStatus, setFilterStatus] = useState('all'); // all, paid, pending
   const [filterMonth, setFilterMonth] = useState('all'); // all, 1-12
   const [filterYear, setFilterYear] = useState('all'); // all, years...
+
+  // Mobile Filter Drawer States
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [mobileSortOpen, setMobileSortOpen] = useState(false);
 
   const getBillAmount = (bill) => {
     let waterAmt = bill.amount || 0;
@@ -60,6 +64,8 @@ export default function Bills() {
   const availableYears = Array.from(
     new Set(bills.map(bill => getBillYear(bill)))
   ).sort((a, b) => b - a);
+
+  const isFilterActive = filterMonth !== 'all' || filterYear !== 'all' || filterStatus !== 'all';
 
   // Filter and Sort Billing list
   const filteredAndSortedBills = bills
@@ -221,10 +227,12 @@ export default function Bills() {
           </span>
         </div>
 
-        {/* Filter & Sort Controls Row */}
-        <div className="p-6 border-b border-border bg-surface-lighter/20 grid grid-cols-1 sm:grid-cols-4 gap-4">
+        {/* DESKTOP FILTER CONTROLS (Hidden on Smartphone) */}
+        <div className="hidden sm:grid sm:grid-cols-4 gap-4 p-6 border-b border-border bg-surface-lighter/20">
           <div>
-            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1.5">Filter by Month</label>
+            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1.5 flex items-center gap-1">
+              <Filter className="w-3 h-3 text-primary" /> Filter by Month
+            </label>
             <select
               value={filterMonth}
               onChange={(e) => setFilterMonth(e.target.value)}
@@ -238,7 +246,9 @@ export default function Bills() {
           </div>
 
           <div>
-            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1.5">Filter by Year</label>
+            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1.5 flex items-center gap-1">
+              <Filter className="w-3 h-3 text-primary" /> Filter by Year
+            </label>
             <select
               value={filterYear}
               onChange={(e) => setFilterYear(e.target.value)}
@@ -252,7 +262,9 @@ export default function Bills() {
           </div>
 
           <div>
-            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1.5">Status Filter</label>
+            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1.5 flex items-center gap-1">
+              <Filter className="w-3 h-3 text-primary" /> Status Filter
+            </label>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
@@ -265,7 +277,9 @@ export default function Bills() {
           </div>
 
           <div>
-            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1.5">Sort Order</label>
+            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1.5 flex items-center gap-1">
+              <ArrowUpDown className="w-3 h-3 text-primary" /> Sort Order
+            </label>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
@@ -277,6 +291,168 @@ export default function Bills() {
               <option value="amount-asc">Lowest Amount</option>
             </select>
           </div>
+        </div>
+
+        {/* SMARTPHONE FILTER & SORT CONTROLS (Single Row with Collapsible Drawer) */}
+        <div className="sm:hidden p-3.5 border-b border-border bg-surface-lighter/30 space-y-3">
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              onClick={() => {
+                setMobileSortOpen(!mobileSortOpen);
+                setMobileFilterOpen(false);
+              }}
+              className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-extrabold transition-all active:scale-95 cursor-pointer ${
+                mobileSortOpen || sortBy !== 'date-desc'
+                  ? 'bg-primary/15 border-primary/40 text-primary shadow-sm'
+                  : 'bg-surface/90 border-border text-text'
+              }`}
+            >
+              <ArrowUpDown className="w-3.5 h-3.5 text-primary" />
+              <span>Sort</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${mobileSortOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            <button
+              onClick={() => {
+                setMobileFilterOpen(!mobileFilterOpen);
+                setMobileSortOpen(false);
+              }}
+              className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-extrabold transition-all active:scale-95 cursor-pointer relative ${
+                mobileFilterOpen || isFilterActive
+                  ? 'bg-primary/15 border-primary/40 text-primary shadow-sm'
+                  : 'bg-surface/90 border-border text-text'
+              }`}
+            >
+              <Filter className="w-3.5 h-3.5 text-primary" />
+              <span>Filter</span>
+              {isFilterActive && (
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              )}
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${mobileFilterOpen ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+
+          {/* Smartphone Sort Panel */}
+          <AnimatePresence>
+            {mobileSortOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden bg-surface p-3.5 rounded-2xl border border-primary/20 space-y-2.5 shadow-xl"
+              >
+                <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-text-muted">Sort Invoices By</span>
+                  <button onClick={() => setMobileSortOpen(false)} className="text-xs font-extrabold text-primary">Done</button>
+                </div>
+                <div className="space-y-1.5">
+                  {[
+                    { id: 'date-desc', label: '📅 Newest Due Date' },
+                    { id: 'date-asc', label: '📅 Oldest Due Date' },
+                    { id: 'amount-desc', label: '💵 Highest Amount First' },
+                    { id: 'amount-asc', label: '💵 Lowest Amount First' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => {
+                        setSortBy(opt.id);
+                        setMobileSortOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
+                        sortBy === opt.id
+                          ? 'bg-primary text-white shadow-md'
+                          : 'bg-surface-lighter/60 text-text hover:bg-surface-lighter'
+                      }`}
+                    >
+                      <span>{opt.label}</span>
+                      {sortBy === opt.id && <Check className="w-4 h-4" />}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Smartphone Filter Panel */}
+          <AnimatePresence>
+            {mobileFilterOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden bg-surface p-4 rounded-2xl border border-primary/20 space-y-3 shadow-xl"
+              >
+                <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-text-muted">Filter Utility Invoices</span>
+                  {isFilterActive && (
+                    <button
+                      onClick={() => {
+                        setFilterMonth('all');
+                        setFilterYear('all');
+                        setFilterStatus('all');
+                      }}
+                      className="text-xs font-extrabold text-rose-400 hover:text-rose-300 flex items-center gap-1"
+                    >
+                      <RotateCcw className="w-3 h-3" /> Reset All
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  {/* By Month */}
+                  <div>
+                    <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1">By Month</label>
+                    <select
+                      value={filterMonth}
+                      onChange={(e) => setFilterMonth(e.target.value)}
+                      className="w-full bg-surface-lighter border border-border rounded-xl px-3 py-2 text-xs text-text font-bold focus:outline-none focus:border-primary cursor-pointer"
+                    >
+                      <option value="all">All Months</option>
+                      {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((mName, idx) => (
+                        <option key={mName} value={idx + 1}>{mName}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* By Year */}
+                  <div>
+                    <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1">By Year</label>
+                    <select
+                      value={filterYear}
+                      onChange={(e) => setFilterYear(e.target.value)}
+                      className="w-full bg-surface-lighter border border-border rounded-xl px-3 py-2 text-xs text-text font-bold focus:outline-none focus:border-primary cursor-pointer"
+                    >
+                      <option value="all">All Years</option>
+                      {availableYears.map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* By Status */}
+                  <div>
+                    <label className="block text-[10px] font-extrabold uppercase tracking-widest text-text-muted mb-1">By Status</label>
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className="w-full bg-surface-lighter border border-border rounded-xl px-3 py-2 text-xs text-text font-bold focus:outline-none focus:border-primary cursor-pointer"
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="paid">Paid</option>
+                      <option value="pending">Pending</option>
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={() => setMobileFilterOpen(false)}
+                    className="w-full py-2.5 bg-primary hover:bg-primary-dark text-white rounded-xl font-extrabold text-xs shadow-md mt-1 cursor-pointer"
+                  >
+                    Apply Filters
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
         
         {loading ? (

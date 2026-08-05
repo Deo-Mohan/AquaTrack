@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Menu, Sun, Moon, Bell, CheckCheck, Trash2, Globe, ChevronDown } from 'lucide-react';
+import { Search, Menu, Sun, Moon, Bell, CheckCheck, Trash2, Globe, ChevronDown, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api';
+import { LANGUAGES as languages, INCLUDED_LANG_CODES } from '../utils/languages';
+import { groupNotificationsByDate, formatNotificationTime } from '../utils/dateGrouper';
 
 // Gender-based SVG avatar component
 const UserAvatar = ({ gender, role, size = 40 }) => {
@@ -85,6 +87,7 @@ export default function Header({ toggleSidebar }) {
   const username = localStorage.getItem('username') || 'Guest';
   const role = localStorage.getItem('role') || '';
   const [gender, setGender] = useState(() => localStorage.getItem('gender') || 'Male');
+  const [langSearchQuery, setLangSearchQuery] = useState('');
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -241,24 +244,7 @@ export default function Header({ toggleSidebar }) {
   // Google Translate Integration for Universal & Indian Languages
   const [currentLang, setCurrentLang] = useState(() => localStorage.getItem('selectedLang') || 'en');
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
-  const [langSearchQuery, setLangSearchQuery] = useState('');
   const langRef = useRef(null);
-
-  const languages = [
-    { code: 'en', name: 'English (Default)', flag: '🇬🇧' },
-    { code: 'hi', name: 'हिन्दी (Hindi)', flag: '🇮🇳' },
-    { code: 'bn', name: 'বাংলা (Bengali)', flag: '🇮🇳' },
-    { code: 'te', name: 'తెలుగు (Telugu)', flag: '🇮🇳' },
-    { code: 'mr', name: 'मराठी (Marathi)', flag: '🇮🇳' },
-    { code: 'ta', name: 'தமிழ் (Tamil)', flag: '🇮🇳' },
-    { code: 'ur', name: 'اردو (Urdu)', flag: '🇮🇳' },
-    { code: 'gu', name: 'ગુજરાતી (Gujarati)', flag: '🇮🇳' },
-    { code: 'kn', name: 'ಕನ್ನಡ (Kannada)', flag: '🇮🇳' },
-    { code: 'ml', name: 'മലയാളം (Malayalam)', flag: '🇮🇳' },
-    { code: 'pa', name: 'ਪੰਜਾਬੀ (Punjabi)', flag: '🇮🇳' },
-    { code: 'or', name: 'ଓଡ଼ିଆ (Odia)', flag: '🇮🇳' },
-    { code: 'as', name: 'অসমীয়া (Assamese)', flag: '🇮🇳' },
-  ];
 
   useEffect(() => {
     if (!window.googleTranslateElementInit) {
@@ -267,7 +253,7 @@ export default function Header({ toggleSidebar }) {
           new window.google.translate.TranslateElement(
             {
               pageLanguage: 'en',
-              includedLanguages: 'en,hi,bn,te,mr,ta,ur,gu,kn,ml,pa,or,as',
+              includedLanguages: INCLUDED_LANG_CODES,
               autoDisplay: false,
               layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE
             },
@@ -378,7 +364,7 @@ export default function Header({ toggleSidebar }) {
                 {/* Header & Search Bar */}
                 <div className="p-2 border-b border-border bg-surface">
                   <div className="text-[10px] uppercase tracking-wider font-extrabold text-primary mb-2 flex items-center justify-between">
-                    <span>🌐 Select Indian Language</span>
+                    <span>🌐 Select Language</span>
                     <span className="text-[9px] font-bold text-primary/90 px-1.5 py-0.5 rounded-full bg-primary/10">{languages.length} Available</span>
                   </div>
                   <div className="relative">
@@ -464,6 +450,16 @@ export default function Header({ toggleSidebar }) {
             )}
           </AnimatePresence>
         </div>
+
+        {/* PWA Download Quick Trigger Button (Hidden on smartphone screens) */}
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent('openPwaInstallModal'))}
+          className="hidden sm:flex items-center gap-1.5 p-2 sm:px-3 sm:py-2 rounded-xl bg-gradient-to-r from-cyan-500/15 via-blue-500/15 to-indigo-500/15 hover:from-cyan-500/25 hover:to-indigo-500/25 border border-cyan-500/35 text-xs font-extrabold text-cyan-600 dark:text-cyan-400 transition-all hover:scale-105 shadow-sm cursor-pointer"
+          title="Download & Install AquaTrack App"
+        >
+          <Download className="w-4 h-4 text-cyan-500 stroke-[2.5]" />
+          <span className="hidden sm:inline">App</span>
+        </button>
 
 
         <label htmlFor="header-switch" className="toggle">
@@ -570,37 +566,50 @@ export default function Header({ toggleSidebar }) {
                       <p className="text-xs mt-1">You're all caught up!</p>
                     </div>
                   ) : (
-                    notifications.map(notif => (
-                      <div
-                        key={notif.id}
-                        onClick={() => !notif.isRead && handleMarkRead(notif.id)}
-                        className={`px-5 py-3.5 border-b border-border/50 transition-colors cursor-pointer ${
-                          notif.isRead 
-                            ? 'bg-white/80 dark:bg-[#071324] hover:bg-slate-100 dark:hover:bg-[#0f2442]' 
-                            : 'bg-blue-50/90 dark:bg-[#0b1d38] hover:bg-blue-100/90 dark:hover:bg-[#122b52]'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              {!notif.isRead && (
-                                <span className="w-2 h-2 bg-primary rounded-full flex-shrink-0" />
-                              )}
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${getTypeStyle(notif.type)}`}>
-                                {getTypeLabel(notif.type)}
+                    groupNotificationsByDate(notifications).map((group, gIdx) => (
+                      <div key={gIdx}>
+                        {/* Section Header */}
+                        <div className="px-4 py-1.5 bg-surface-lighter/80 dark:bg-slate-900/80 border-y border-border/40 text-[11px] font-black text-primary uppercase tracking-wider flex items-center justify-between">
+                          <span>{group.dateLabel}</span>
+                          <span className="text-[9px] font-medium text-text-muted">{group.items.length} alert(s)</span>
+                        </div>
+                        {group.items.map(notif => (
+                          <div
+                            key={notif.id}
+                            onClick={() => {
+                              if (!notif.isRead) handleMarkRead(notif.id);
+                              setBellOpen(false);
+                              navigate('/notifications');
+                            }}
+                            className={`px-5 py-3.5 border-b border-border/40 transition-colors cursor-pointer ${
+                              notif.isRead 
+                                ? 'bg-white dark:bg-[#071324] hover:bg-slate-50 dark:hover:bg-[#0f2442]' 
+                                : 'bg-slate-50 dark:bg-[#0d223f] hover:bg-slate-100 dark:hover:bg-[#122b52] border-l-4 border-l-primary'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  {!notif.isRead && (
+                                    <span className="w-2 h-2 bg-primary rounded-full flex-shrink-0" />
+                                  )}
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${getTypeStyle(notif.type)}`}>
+                                    {getTypeLabel(notif.type)}
+                                  </span>
+                                </div>
+                                <p className={`text-sm font-medium truncate ${notif.isRead ? 'text-text-muted' : 'text-text'}`}>
+                                  {notif.title}
+                                </p>
+                                <p className="text-xs text-text-muted mt-0.5 line-clamp-2">
+                                  {notif.message}
+                                </p>
+                              </div>
+                              <span className="text-[10px] font-bold text-text-muted whitespace-nowrap flex-shrink-0 mt-1">
+                                {formatNotificationTime(notif.createdAt)}
                               </span>
                             </div>
-                            <p className={`text-sm font-medium truncate ${notif.isRead ? 'text-text-muted' : 'text-text'}`}>
-                              {notif.title}
-                            </p>
-                            <p className="text-xs text-text-muted mt-0.5 line-clamp-2">
-                              {notif.message}
-                            </p>
                           </div>
-                          <span className="text-[10px] text-text-muted whitespace-nowrap flex-shrink-0 mt-1">
-                            {timeAgo(notif.createdAt)}
-                          </span>
-                        </div>
+                        ))}
                       </div>
                     ))
                   )}

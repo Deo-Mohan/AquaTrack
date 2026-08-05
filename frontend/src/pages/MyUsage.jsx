@@ -280,13 +280,13 @@ export default function MyUsage() {
           <h1 className="text-2xl font-bold text-text">My Usage Analysis</h1>
           <p className="text-text-muted mt-1">Deep dive into your water consumption trends.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 bg-surface p-1 rounded-xl border border-border">
-            <span className="text-xs font-semibold text-text-muted pl-2">Select Month:</span>
+        <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
+          <div className="flex items-center justify-between sm:justify-start gap-2 bg-surface p-1.5 rounded-xl border border-border w-full sm:w-auto shadow-xs">
+            <span className="text-xs font-semibold text-text-muted pl-2 shrink-0">Select Month:</span>
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(parseInt(e.target.value, 10))}
-              className="notranslate bg-surface-lighter border border-border/80 rounded-lg px-2.5 py-1.5 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer font-bold"
+              className="notranslate bg-surface-lighter border border-border/80 rounded-lg px-3 py-2 sm:py-1.5 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer font-bold flex-1 sm:flex-initial"
             >
               {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((mName, idx) => (
                 <option key={mName} value={idx + 1}>{mName}</option>
@@ -295,12 +295,97 @@ export default function MyUsage() {
           </div>
 
           <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md"
-            title="Download CSV Report"
+            onClick={() => {
+              if (filteredLogs.length === 0) {
+                alert("No logs available to generate PDF statement for the selected month.");
+                return;
+              }
+              const mName = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth - 1];
+              const nowStr = new Date().toLocaleString();
+              const houseNo = localStorage.getItem('houseNumber') || 'H-101';
+              const residentName = localStorage.getItem('fullName') || localStorage.getItem('username') || 'Household Resident';
+
+              const logRowsHTML = filteredLogs.map((log, idx) => {
+                const d = new Date(log.readingDate);
+                const dailyLimitThreshold = activeLimit / 30;
+                const isOver = log.readingLiters > dailyLimitThreshold;
+                return `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td><strong>${log.readingDate}</strong></td>
+                    <td>${d.toLocaleDateString('en-US', { weekday: 'long' })}</td>
+                    <td style="font-weight:700; color:#0284c7;">${log.readingLiters.toLocaleString()} L</td>
+                    <td><span style="color:${isOver ? '#dc2626' : '#16a34a'}; font-weight:700;">${isOver ? 'Exceeded Daily Limit' : 'Within Normal Range'}</span></td>
+                  </tr>
+                `;
+              }).join('');
+
+              const printableHTML = `
+                <!DOCTYPE html>
+                <html>
+                  <head>
+                    <title>Water Consumption Statement - ${mName} ${currentYearVal}</title>
+                    <style>
+                      body { font-family: 'Segoe UI', Arial, sans-serif; padding: 25px; color: #1e293b; font-size: 12px; }
+                      .header { border-bottom: 3px solid #0284c7; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; }
+                      .title { font-size: 20px; font-weight: 800; color: #0369a1; }
+                      .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+                      .kpi-box { padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; }
+                      .kpi-title { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #64748b; }
+                      .kpi-val { font-size: 15px; font-weight: 800; margin-top: 4px; color: #0f172a; }
+                      table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                      th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
+                      th { background: #0284c7; color: white; font-size: 11px; }
+                      .footer { border-top: 1.5px solid #cbd5e1; margin-top: 24px; padding-top: 10px; text-align: center; font-size: 10px; color: #64748b; }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="header">
+                      <div>
+                        <div class="title">AquaTrack Water Usage Statement</div>
+                        <div style="font-weight:600; color:#64748b;">House #: ${houseNo} &bull; Resident: ${residentName} &bull; Cycle: ${mName} ${currentYearVal}</div>
+                      </div>
+                      <div style="text-align:right;">
+                        <div style="font-weight:700;">Personal Usage PDF Report</div>
+                        <div style="color:#64748b;">Date: ${nowStr}</div>
+                      </div>
+                    </div>
+
+                    <div class="grid">
+                      <div class="kpi-box"><div class="kpi-title">Total Consumption</div><div class="kpi-val" style="color:#0284c7;">${totalUsage.toLocaleString()} L</div></div>
+                      <div class="kpi-box"><div class="kpi-title">Monthly Safe Limit</div><div class="kpi-val">${activeLimit.toLocaleString()} L</div></div>
+                      <div class="kpi-box"><div class="kpi-title">Daily Average</div><div class="kpi-val">${dailyAverage.toLocaleString()} L</div></div>
+                      <div class="kpi-box"><div class="kpi-title">Estimated Bill Cost</div><div class="kpi-val" style="color:#16a34a;">₹${estimatedCost.toFixed(2)}</div></div>
+                    </div>
+
+                    <h3>📊 Logged Consumption Breakdown (${filteredLogs.length} Days Recorded)</h3>
+                    <table>
+                      <thead>
+                        <tr><th>#</th><th>Reading Date</th><th>Day of Week</th><th>Volume Logged</th><th>Limit Compliance Status</th></tr>
+                      </thead>
+                      <tbody>${logRowsHTML}</tbody>
+                    </table>
+
+                    <div class="footer">
+                      AquaTrack Household Water Analytics &bull; Personal Water Consumption Audit Statement
+                      <div style="margin-top: 5px; font-weight: 700; color: #475569;">Built with ❤️ by Krishna Mohan</div>
+                    </div>
+                    <script>window.onload = function() { window.print(); };</script>
+                  </body>
+                </html>
+              `;
+
+              const printWindow = window.open('', '_blank');
+              if (printWindow) {
+                printWindow.document.write(printableHTML);
+                printWindow.document.close();
+              }
+            }}
+            className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md active:scale-98"
+            title="Generate & Export PDF Statement"
           >
-            <Download className="w-3.5 h-3.5" />
-            Export CSV
+            <Download className="w-4 h-4" />
+            <span>Export PDF</span>
           </button>
         </div>
       </div>
@@ -617,7 +702,10 @@ export default function MyUsage() {
                 <Calendar className="w-4 h-4 text-emerald-400" />
                 Consumption Heatmap Grid
               </h3>
-              <span className="text-[10px] text-text-muted font-bold">Hover blocks to view details</span>
+              <span className="text-[10px] text-text-muted font-bold">
+                <span className="sm:hidden">Tap blocks to view details</span>
+                <span className="hidden sm:inline">Hover blocks to view details</span>
+              </span>
             </div>
 
             <div className="grid grid-cols-7 gap-2.5">

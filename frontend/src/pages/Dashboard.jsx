@@ -14,20 +14,23 @@ const WeeklyTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
-      <div className="bg-slate-900 border border-slate-700/80 p-3 rounded-xl shadow-2xl backdrop-blur-md text-[11px] text-slate-300 max-w-[280px]">
-        <p className="font-bold text-xs text-white mb-1.5">{data.name}</p>
+      <div 
+        className="bg-slate-900/95 border border-slate-700/90 p-2.5 rounded-xl shadow-2xl backdrop-blur-md text-[11px] text-slate-300 w-56 pointer-events-auto select-text z-50"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <p className="font-bold text-xs text-white mb-1">{data.name}</p>
         <p className="mb-2"><span className="text-slate-400">Total Usage:</span> <strong className="text-primary font-bold text-xs">{data.usage.toLocaleString()} L</strong></p>
 
         {data.items && data.items.length > 0 ? (
-          <div className="space-y-1.5 border-t border-slate-800 pt-1.5 max-h-36 overflow-y-auto custom-scrollbar">
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Logged Entries:</p>
+          <div className="space-y-1 border-t border-slate-800 pt-1.5 max-h-32 overflow-y-auto custom-scrollbar pr-1">
+            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Logged Entries ({data.items.length}):</p>
             {data.items.map((item, idx) => (
-              <div key={idx} className="bg-slate-800/40 p-1.5 rounded-lg border border-slate-700/40 flex items-center justify-between gap-3">
+              <div key={idx} className="bg-slate-800/60 p-1.5 rounded-lg border border-slate-700/50 flex items-center justify-between gap-2 hover:bg-slate-800 transition-colors">
                 <div>
                   <p className="text-white font-semibold text-xs">{item.liters.toLocaleString()} L</p>
                   <p className="text-slate-400 text-[9px]">{item.dayName}</p>
                 </div>
-                <span className="text-slate-500 text-[9px] whitespace-nowrap">{item.dateStr}</span>
+                <span className="text-slate-400 text-[9px] whitespace-nowrap">{item.dateStr}</span>
               </div>
             ))}
           </div>
@@ -434,9 +437,8 @@ export default function Dashboard() {
             <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-primary/20 via-primary/10 to-blue-500/20 border border-primary/30 flex items-center justify-center shadow-xl shadow-primary/10 backdrop-blur-md">
               <ShieldAlert className="w-10 h-10 text-primary drop-shadow-[0_0_12px_rgba(59,130,246,0.5)]" />
             </div>
-            <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-4 w-4 bg-amber-500"></span>
+            <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5">
+              <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500 border-2 border-slate-950"></span>
             </span>
           </div>
 
@@ -990,7 +992,7 @@ export default function Dashboard() {
                   {(() => {
                     if (weeklyChartType === 'area') {
                       return (
-                        <AreaChart data={weeklyUsage} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                        <AreaChart data={weeklyUsage} margin={{ top: 10, right: 30, left: -15, bottom: 0 }}>
                           <defs>
                             <linearGradient id="colorUsageWeekly" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
@@ -1000,28 +1002,39 @@ export default function Dashboard() {
                           <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                           <XAxis dataKey="name" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={40} />
                           <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                          <Tooltip content={<WeeklyTooltip />} />
+                          <Tooltip 
+                            content={<WeeklyTooltip />} 
+                            allowEscapeViewBox={{ x: true, y: true }}
+                            wrapperStyle={{ pointerEvents: 'auto', zIndex: 100 }} 
+                          />
                           <Area type="monotone" dataKey="usage" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorUsageWeekly)" />
                         </AreaChart>
                       );
                     }
                     if (weeklyChartType === 'line') {
                       return (
-                        <LineChart data={weeklyUsage} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                        <LineChart data={weeklyUsage} margin={{ top: 10, right: 30, left: -15, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                           <XAxis dataKey="name" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={40} />
                           <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                          <Tooltip content={<WeeklyTooltip />} />
+                          <Tooltip 
+                            content={<WeeklyTooltip />} 
+                            allowEscapeViewBox={{ x: true, y: true }}
+                            wrapperStyle={{ pointerEvents: 'auto', zIndex: 100 }} 
+                          />
                           <Line type="monotone" dataKey="usage" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                         </LineChart>
                       );
                     }
                     return (
-                      <BarChart data={weeklyUsage} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                        <XAxis dataKey="name" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={40} />
-                        <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                        <Tooltip cursor={{ fill: '#334155', opacity: 0.2 }} content={<WeeklyTooltip />} />
+                        <BarChart data={weeklyUsage} margin={{ top: 10, right: 30, left: -15, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                          <XAxis dataKey="name" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={40} />
+                          <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                          <Tooltip 
+                            content={<WeeklyTooltip />} 
+                            wrapperStyle={{ pointerEvents: 'auto', zIndex: 100 }} 
+                          />
                         <Bar dataKey="usage" radius={[4, 4, 0, 0]}>
                           {weeklyUsage.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
@@ -1065,15 +1078,15 @@ export default function Dashboard() {
             </p>
           </div>
           
-          <div className="flex items-center gap-2 bg-surface-lighter/50 px-3 py-1.5 rounded-xl border border-border/60">
+          <div className="flex items-center justify-between sm:justify-center gap-2 bg-surface-lighter/60 dark:bg-slate-900/60 px-3 py-2 rounded-xl border border-border/60 w-full sm:w-auto shrink-0 shadow-xs">
             <button
               onClick={() => setComparisonDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
-              className="p-1.5 hover:bg-surface rounded-lg text-text-muted hover:text-text cursor-pointer transition-all focus:outline-none"
+              className="p-2 hover:bg-surface active:scale-95 rounded-lg text-text-muted hover:text-text cursor-pointer transition-all focus:outline-none shrink-0"
               title="Previous Month"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-xs font-bold text-text whitespace-nowrap min-w-[90px] text-center">
+            <span className="text-xs sm:text-sm font-bold text-text whitespace-nowrap min-w-[110px] text-center flex-1 sm:flex-initial">
               {comparisonDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </span>
             <button
@@ -1084,7 +1097,7 @@ export default function Dashboard() {
                 }
               }}
               disabled={new Date(comparisonDate.getFullYear(), comparisonDate.getMonth() + 1, 1) > new Date()}
-              className="p-1.5 hover:bg-surface rounded-lg text-text-muted hover:text-text disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer transition-all focus:outline-none"
+              className="p-2 hover:bg-surface active:scale-95 rounded-lg text-text-muted hover:text-text disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer transition-all focus:outline-none shrink-0"
               title="Next Month"
             >
               <ChevronRight className="w-4 h-4" />

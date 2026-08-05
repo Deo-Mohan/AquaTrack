@@ -61,7 +61,7 @@ export default function Landing() {
   });
 
   // Language state & dropRef
-  const [currentLang, setCurrentLang] = useState(() => localStorage.getItem('selectedLang') || 'en');
+  const [currentLang, setCurrentLang] = useState(() => (localStorage.getItem('selectedLang') || 'en').toLowerCase());
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [langSearchQuery, setLangSearchQuery] = useState('');
   const langRef = useRef(null);
@@ -82,13 +82,34 @@ export default function Landing() {
     { code: 'as', name: 'অসমীয়া (Assamese)', flag: '🇮🇳' },
   ];
 
-  // Language display: listen to SharedHeader's localStorage changes
+  // Language display: sync in real-time from SharedHeader changes
+  // `storage` only fires in OTHER tabs, so we use a custom event + polling fallback
   useEffect(() => {
     const syncLang = () => {
-      setCurrentLang(localStorage.getItem('selectedLang') || 'en');
+      const lang = (localStorage.getItem('selectedLang') || 'en').toLowerCase();
+      setCurrentLang(lang);
     };
+
+    // Custom event dispatched by SharedHeader on same-tab language change
+    window.addEventListener('aquatrack-lang-change', syncLang);
+    // Cross-tab support via storage event
     window.addEventListener('storage', syncLang);
-    return () => { window.removeEventListener('storage', syncLang); };
+
+    // Polling fallback: check every 300ms for changes made without events
+    let lastLang = (localStorage.getItem('selectedLang') || 'en').toLowerCase();
+    const pollId = setInterval(() => {
+      const cur = (localStorage.getItem('selectedLang') || 'en').toLowerCase();
+      if (cur !== lastLang) {
+        lastLang = cur;
+        setCurrentLang(cur);
+      }
+    }, 300);
+
+    return () => {
+      window.removeEventListener('aquatrack-lang-change', syncLang);
+      window.removeEventListener('storage', syncLang);
+      clearInterval(pollId);
+    };
   }, []);
 
   const toggleTheme = () => {
@@ -173,7 +194,7 @@ export default function Landing() {
   ];
 
   return (
-    <div className="min-h-screen bg-transparent relative overflow-hidden flex flex-col items-center selection:bg-primary/30 scroll-smooth">
+    <div className="min-h-screen bg-transparent relative overflow-hidden flex flex-col items-center selection:bg-primary/30 scroll-smooth pb-20 lg:pb-0">
       {/* Hidden Google Translate container for Landing Page */}
       <div id="google_translate_element_landing" className="hidden" />
 
@@ -257,6 +278,7 @@ export default function Landing() {
               // Non-English: show full heading from local dictionary (correct word order, no overflow SVG)
               (() => {
                 const headings = {
+                  // ── Indian & South Asian ──
                   hi: ['स्मार्ट जल प्रबंधन', 'समुदायों के लिए'],
                   bn: ['স্মার্ট জল ব্যবস্থাপনা', 'সম্প্রদায়গুলির জন্য'],
                   te: ['స్మార్ట్ వాటర్ మేనేజ్‌మెంట్', 'కమ్యూనిటీల కోసం'],
@@ -269,8 +291,45 @@ export default function Landing() {
                   pa: ['ਸਮਾਰਟ ਵਾਟਰ ਮੈਨੇਜਮੈਂਟ', 'ਭਾਈਚਾਰਿਆਂ ਲਈ'],
                   or: ['ସ୍ମାର୍ଟ ଜଳ ପରିଚାଳନା', 'ସମ୍ପ୍ରଦାୟ ପାଇଁ'],
                   as: ['স্মাৰ্ট পানী ব্যৱস্থাপনা', 'সম্প্ৰদায়ৰ বাবে'],
+                  sa: ['स्मार्ट जलप्रबन्धनम्', 'समुदायेभ्यः'],
+                  ne: ['स्मार्ट पानी व्यवस्थापन', 'समुदायहरूका लागि'],
+                  si: ['ද්‍රව්‍ය ජල කළමනාකරණය', 'ප්‍රජාවන් සඳහා'],
+                  // ── European ──
+                  es: ['Gestión Inteligente del Agua', 'Para Comunidades'],
+                  fr: ["Gestion Intelligente de l'Eau", 'Pour les Communautés'],
+                  de: ['Intelligentes Wassermanagement', 'Für Gemeinschaften'],
+                  it: ["Gestione Intelligente dell'Acqua", 'Per le Comunità'],
+                  pt: ['Gestão Inteligente da Água', 'Para Comunidades'],
+                  ru: ['Умное Управление Водой', 'Для Сообществ'],
+                  nl: ['Slim Waterbeheer', 'Voor Gemeenschappen'],
+                  pl: ['Inteligentne Zarządzanie Wodą', 'Dla Społeczności'],
+                  uk: ['Розумне Управління Водою', 'Для Спільнот'],
+                  sv: ['Smart Vattenhantering', 'För Gemenskaper'],
+                  el: ['Έξυπνη Διαχείριση Νερού', 'Για Κοινότητες'],
+                  ro: ['Management Inteligent al Apei', 'Pentru Comunități'],
+                  hu: ['Okos Vízgazdálkodás', 'Közösségek Számára'],
+                  cs: ['Chytré Řízení Vody', 'Pro Komunity'],
+                  da: ['Smart Vandforvaltning', 'Til Fællesskaber'],
+                  fi: ['Älykäs Vedenhallinta', 'Yhteisöille'],
+                  no: ['Smart Vannforvaltning', 'For Samfunn'],
+                  tr: ['Akıllı Su Yönetimi', 'Topluluklar İçin'],
+                  // ── East & Southeast Asian ──
+                  'zh-cn': ['智能水资源管理', '为社区服务'],
+                  'zh-tw': ['智能水資源管理', '為社區服務'],
+                  ja: ['スマート水管理', 'コミュニティのために'],
+                  ko: ['스마트 물 관리', '커뮤니티를 위한'],
+                  vi: ['Quản Lý Nước Thông Minh', 'Cho Cộng Đồng'],
+                  th: ['การจัดการน้ำอัจฉริยะ', 'สำหรับชุมชน'],
+                  id: ['Manajemen Air Cerdas', 'Untuk Komunitas'],
+                  ms: ['Pengurusan Air Pintar', 'Untuk Komuniti'],
+                  tl: ['Matalinong Pamamahala ng Tubig', 'Para sa Komunidad'],
+                  // ── Middle Eastern & African ──
+                  ar: ['إدارة المياه الذكية', 'للمجتمعات'],
+                  fa: ['مدیریت هوشمند آب', 'برای جوامع'],
+                  he: ['ניהול מים חכם', 'לקהילות'],
+                  sw: ['Usimamizi wa Maji wa Akili', 'Kwa Jamii'],
                 };
-                const [line1, line2] = headings[currentLang] || ['Smart Water Management', 'For Communities'];
+                const [line1, line2] = headings[currentLang] || headings[currentLang?.toLowerCase()] || ['Smart Water Management', 'For Communities'];
                 return (
                   <>
                     <span className="notranslate block leading-[1.5] py-1">{line1}</span>

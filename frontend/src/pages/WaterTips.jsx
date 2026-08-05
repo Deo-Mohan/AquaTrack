@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Lightbulb, Info, Calculator, Droplets, Target, Award, Sparkles, Users, TrendingDown, DollarSign, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Lightbulb, Info, Calculator, Droplets, Target, Award, Sparkles, Users, TrendingDown, DollarSign, ShieldCheck, ArrowRight, PieChart as PieIcon, TreePine, Truck, Leaf, CloudRain } from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import api from '../api';
 
 export default function WaterTips() {
@@ -8,11 +9,12 @@ export default function WaterTips() {
   const [useAerators, setUseAerators] = useState(false);
   const [shortShowers, setShortShowers] = useState(false);
 
-  // Dynamic Peer Comparison States
+  // Dynamic Peer Comparison & Competition Leaderboard States
   const [userAvgLiters, setUserAvgLiters] = useState(450);
   const [communityAvgLiters, setCommunityAvgLiters] = useState(340);
   const [waterRate, setWaterRate] = useState(0.15); // Default ₹0.15 per Liter if tariff not set
   const [hasRealUsage, setHasRealUsage] = useState(false);
+  const [leaderboard, setLeaderboard] = useState(null);
 
   // Constants
   const baseLitersPerPerson = 135; // WHO standard liter consumption per person per day
@@ -43,6 +45,17 @@ export default function WaterTips() {
       const username = localStorage.getItem('username');
       const houseNumber = localStorage.getItem('houseNumber');
       
+      if (username) {
+        try {
+          const lbRes = await api.get(`/usage/leaderboard/${username}`);
+          if (lbRes.data) {
+            setLeaderboard(lbRes.data);
+          }
+        } catch (lbErr) {
+          console.error("Leaderboard fetch error:", lbErr);
+        }
+      }
+
       if (houseNumber) {
         // 1. Fetch user's real meter logs
         const usageRes = await api.get(`/usage/household/${houseNumber}`);
@@ -51,7 +64,6 @@ export default function WaterTips() {
           const avg = Math.round(total / usageRes.data.length);
           if (avg > 0) {
             setUserAvgLiters(avg);
-            // Top 25% efficient benchmark is typically 75% of average user consumption
             setCommunityAvgLiters(Math.round(avg * 0.75));
             setHasRealUsage(true);
           }
@@ -79,11 +91,60 @@ export default function WaterTips() {
     fetchRealBenchmarkData();
   }, [fetchRealBenchmarkData]);
 
+  // Calculate max usage in leaderboard for graph scaling
+  const maxLeaderLiters = useMemo(() => {
+    if (!leaderboard || !leaderboard.top5Leaderboard || leaderboard.top5Leaderboard.length === 0) return 500;
+    const maxVal = Math.max(...leaderboard.top5Leaderboard.map(i => i.totalLiters), leaderboard.myTotalLiters || 0);
+    return maxVal > 0 ? maxVal : 500;
+  }, [leaderboard]);
+
+  // Dynamic Pie Chart Data: Top 5 Households Breakdown
+  const { pieChartData, pieColors } = useMemo(() => {
+    if (!leaderboard || !leaderboard.top5Leaderboard || leaderboard.top5Leaderboard.length === 0) {
+      return { pieChartData: [], pieColors: [] };
+    }
+
+    const data = [];
+    const colors = [];
+    const colorPalette = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+
+    leaderboard.top5Leaderboard.forEach((item, idx) => {
+      data.push({
+        name: `House ${item.houseNumber}${item.isMe ? ' (YOU)' : item.name ? ` (${item.name})` : ''}`,
+        value: Math.round(item.totalLiters),
+        isMe: !!item.isMe
+      });
+      colors.push(item.isMe ? '#3b82f6' : colorPalette[(idx + 1) % colorPalette.length]);
+    });
+
+    return { pieChartData: data, pieColors: colors };
+  }, [leaderboard]);
+
   // Memoized potential monthly rupee savings computation (useMemo)
   const monthlyRupeeSavings = useMemo(() => {
     const monthlyLitersSaved = (userAvgLiters - communityAvgLiters) * 30;
     return Math.max(150, Math.round(monthlyLitersSaved * waterRate));
   }, [userAvgLiters, communityAvgLiters, waterRate]);
+
+  // Real-world Environmental Impact Counter
+  const ecoImpact = useMemo(() => {
+    const totalBlockSavedLiters = leaderboard && leaderboard.top5Leaderboard && leaderboard.top5Leaderboard.length > 0
+      ? leaderboard.top5Leaderboard.reduce((acc, h) => acc + Math.max(0, (userAvgLiters * 30) - h.totalLiters), 0)
+      : 12500;
+
+    // Environmental Equivalents
+    const tankersAvoided = (totalBlockSavedLiters / 10000).toFixed(1); // Standard 10k Liter Tanker
+    const treesNourished = Math.round(totalBlockSavedLiters / 15); // ~15L per tree per day
+    const co2OffsetKg = (totalBlockSavedLiters * 0.0003).toFixed(1); // Water treatment energy carbon intensity
+    const showerMinutesSaved = Math.round(totalBlockSavedLiters / 10); // ~10L/min shower
+
+    return {
+      tankersAvoided: Math.max(0.5, tankersAvoided),
+      treesNourished: Math.max(10, treesNourished),
+      co2OffsetKg: Math.max(1.2, co2OffsetKg),
+      showerMinutesSaved: Math.max(50, showerMinutesSaved)
+    };
+  }, [leaderboard, userAvgLiters]);
 
   const tips = [
     {
@@ -122,60 +183,226 @@ export default function WaterTips() {
         <p className="text-text-muted mt-1">Smart tips, community benchmark comparison, and interactive calculator to cut water waste and lower monthly bills.</p>
       </div>
 
-      {/* Community Benchmark & Comparative Savings Banner */}
-      <motion.div 
-        initial={{ opacity: 0, y: 12 }}
+      {/* Clean & Non-Redundant Block Efficiency Master Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="glass-card p-6 shadow-xl border border-border/70 relative overflow-hidden"
+        transition={{ duration: 0.35 }}
+        className="glass-card p-6 shadow-xl border border-border/70 space-y-6 relative overflow-hidden"
       >
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
-          
-          {/* Left Column: Heading & Context */}
-          <div className="space-y-2 max-w-xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black bg-primary/10 text-primary border border-primary/20">
-              <Users className="w-3.5 h-3.5" />
-              <span>Community Peer Benchmark</span>
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-border/50 pb-5">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black bg-amber-500/10 text-amber-500 border border-amber-500/20 mb-2">
+              <Award className="w-3.5 h-3.5 text-amber-400" />
+              <span>Block Water Conservation Championship</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-text tracking-tight flex items-center gap-2">
-              Top 25% Households in Your Block Use <span className="text-emerald-500 underline decoration-emerald-400/50 underline-offset-4">{communityAvgLiters} L/day</span>
+              Top 5 Most Water-Efficient Households <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-surface-lighter text-text-muted border border-border/40">This Month</span>
             </h2>
-            <p className="text-xs sm:text-sm text-text-muted leading-relaxed font-medium">
-              Over <strong className="text-text font-bold">68% of residents in your society</strong> have installed aerators and switched to 5-minute shower routines. By matching these habits, your household can save up to <strong className="text-emerald-500 font-extrabold">₹{monthlyRupeeSavings}/month</strong> on water bills!
+            <p className="text-xs text-text-muted mt-1 font-medium max-w-2xl">
+              Compare your monthly water consumption with neighbors in your block. Households that use less water rank higher and save maximum on monthly bills!
             </p>
           </div>
 
-          {/* Right Column: Comparative Metrics Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full lg:w-auto shrink-0">
-            <div className="bg-surface-lighter/60 dark:bg-surface-lighter/30 p-4 rounded-2xl border border-border/50 text-left shadow-sm">
-              <div className="flex items-center gap-1 text-[10px] uppercase font-black tracking-wider text-text-muted">
-                <TrendingDown className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Society Benchmark</span>
+          {/* Quick Summary Pill Box (Single source of truth for Rank & Savings) */}
+          {leaderboard && (
+            <div className="bg-surface-lighter/80 dark:bg-surface-lighter/40 px-4 py-3 rounded-2xl border border-border/60 flex items-center gap-4 shrink-0 shadow-sm">
+              <div className="text-center">
+                <span className="text-[10px] text-text-muted uppercase font-extrabold block">Your Rank</span>
+                <span className="text-lg font-black text-primary">#{leaderboard.myRank} <span className="text-xs text-text-muted font-normal">/ {leaderboard.totalHouseholds}</span></span>
               </div>
-              <p className="text-lg font-black text-text mt-1">{communityAvgLiters} <span className="text-xs font-semibold text-text-muted">L/day</span></p>
-              <span className="text-[9px] font-bold text-emerald-500">Top 25% efficient standard</span>
+              <div className="h-8 w-px bg-border/60" />
+              <div className="text-center">
+                <span className="text-[10px] text-text-muted uppercase font-extrabold block">Your Usage</span>
+                <span className="text-lg font-black text-emerald-500">{Math.round(leaderboard.myTotalLiters)} L</span>
+              </div>
+              <div className="h-8 w-px bg-border/60" />
+              <div className="text-center">
+                <span className="text-[10px] text-text-muted uppercase font-extrabold block">Est. Bill Savings</span>
+                <span className="text-lg font-black text-amber-500">₹{monthlyRupeeSavings}</span>
+              </div>
             </div>
+          )}
+        </div>
 
-            <div className="bg-surface-lighter/60 dark:bg-surface-lighter/30 p-4 rounded-2xl border border-border/50 text-left shadow-sm">
-              <div className="flex items-center gap-1 text-[10px] uppercase font-black tracking-wider text-text-muted">
-                <DollarSign className="w-3.5 h-3.5 text-amber-500" />
-                <span>Est. Bill Savings</span>
-              </div>
-              <p className="text-lg font-black text-emerald-500 mt-1">₹{monthlyRupeeSavings} <span className="text-xs font-semibold text-text-muted">/mo</span></p>
-              <span className="text-[9px] font-bold text-text-muted">Calculated using active tariff</span>
+        {/* Top 5 Leaderboard Bars */}
+        {leaderboard && leaderboard.top5Leaderboard && leaderboard.top5Leaderboard.length > 0 ? (
+          <div className="space-y-3.5">
+            {leaderboard.top5Leaderboard.map((household, idx) => {
+              const percentage = Math.max(12, Math.min(100, (household.totalLiters / maxLeaderLiters) * 100));
+              const isMe = household.isMe;
+
+              return (
+                <div key={idx} className={`p-3.5 rounded-2xl border transition-all ${isMe ? 'bg-primary/10 border-primary/50 shadow-md ring-1 ring-primary/30' : 'bg-surface-lighter/50 dark:bg-surface-lighter/20 border-border/40 hover:border-border'}`}>
+                  <div className="flex items-center justify-between text-xs font-bold text-text mb-2">
+                    <div className="flex items-center gap-2.5">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${
+                        idx === 0 ? 'bg-amber-400 text-slate-900 shadow-md shadow-amber-400/20' :
+                        idx === 1 ? 'bg-slate-300 text-slate-900' :
+                        idx === 2 ? 'bg-amber-700 text-white' : 'bg-surface border border-border text-text-muted'
+                      }`}>
+                        #{household.rank}
+                      </span>
+                      <span className="font-extrabold text-sm text-text">
+                        House {household.houseNumber} <span className="text-xs font-medium text-text-muted">({household.name})</span>
+                      </span>
+                      {isMe && (
+                        <span className="px-2 py-0.5 rounded-md bg-primary text-white text-[10px] font-black uppercase tracking-wider shadow-sm">
+                          YOU
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-black text-sm text-emerald-500">
+                        {Math.round(household.totalLiters)} Liters
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Graphical Bar */}
+                  <div className="w-full h-3 bg-surface rounded-full overflow-hidden border border-border/30 relative">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${percentage}%` }}
+                      transition={{ duration: 0.8, delay: idx * 0.1 }}
+                      className={`h-full rounded-full ${
+                        isMe ? 'bg-gradient-to-r from-primary to-emerald-400 shadow-lg' :
+                        idx === 0 ? 'bg-gradient-to-r from-emerald-500 to-teal-400' :
+                        'bg-gradient-to-r from-sky-400 to-blue-500'
+                      }`}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-8 text-center text-text-muted text-sm font-medium">
+            Loading neighborhood leaderboard competition...
+          </div>
+        )}
+
+        {/* Dynamic Recharts Pie Chart Breakdown */}
+        {pieChartData && pieChartData.length > 1 && (
+          <div className="border-t border-border/50 pt-5">
+            <div className="flex items-center gap-2 mb-3">
+              <PieIcon className="w-4 h-4 text-primary" />
+              <h3 className="font-extrabold text-text text-sm">Consumption Share Breakdown (Top 5 Leaderboard)</h3>
             </div>
-
-            <div className="col-span-2 sm:col-span-1 bg-surface-lighter/60 dark:bg-surface-lighter/30 p-4 rounded-2xl border border-border/50 text-left shadow-sm flex flex-col justify-between">
-              <div className="flex items-center gap-1 text-[10px] uppercase font-black tracking-wider text-text-muted">
-                <ShieldCheck className="w-3.5 h-3.5 text-primary" />
-                <span>Adoption</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+              <div className="h-[220px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={78}
+                      paddingAngle={4}
+                      dataKey="value"
+                    >
+                      {pieChartData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={pieColors[index % pieColors.length]}
+                          stroke={entry.isMe ? '#2563eb' : '#0f172a'}
+                          strokeWidth={entry.isMe ? 3 : 1}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-slate-900 border border-slate-700 p-2.5 rounded-xl shadow-xl text-xs space-y-1">
+                              <p className="font-extrabold text-white">{data.name}</p>
+                              <p className="font-bold text-emerald-400">{data.value} Liters</p>
+                              {data.isMe && <span className="text-[10px] bg-primary px-2 py-0.5 rounded text-white font-black">YOUR HOUSEHOLD</span>}
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-              <p className="text-lg font-black text-primary mt-1">68%</p>
-              <span className="text-[9px] font-bold text-text-muted">Neighbors participating</span>
+
+              {/* Legend List */}
+              <div className="space-y-2 text-xs font-medium">
+                {pieChartData.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-surface-lighter/60 border border-border/40">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: pieColors[idx % pieColors.length] }} />
+                      <span className={`truncate ${item.isMe ? 'font-black text-primary text-sm' : 'text-text font-semibold'}`}>{item.name}</span>
+                    </div>
+                    <span className="font-black text-text shrink-0">{item.value} L</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
+        )}
 
+        {/* Real-World Environmental Impact Counter Grid */}
+        <div className="border-t border-border/50 pt-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Leaf className="w-4 h-4 text-emerald-500" />
+            <h3 className="font-extrabold text-text text-sm">Real-World Environmental Impact (Block Savings)</h3>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col justify-between">
+              <div className="flex items-center justify-between text-emerald-500 mb-1">
+                <Truck className="w-4 h-4" />
+                <span className="text-[10px] uppercase font-black tracking-wider">Tankers Saved</span>
+              </div>
+              <p className="text-lg font-black text-text">{ecoImpact.tankersAvoided} <span className="text-xs text-text-muted font-normal">Trucks</span></p>
+              <span className="text-[9px] font-bold text-emerald-500">10,000L Delivery Tankers</span>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex flex-col justify-between">
+              <div className="flex items-center justify-between text-teal-500 mb-1">
+                <TreePine className="w-4 h-4" />
+                <span className="text-[10px] uppercase font-black tracking-wider">Trees Nourished</span>
+              </div>
+              <p className="text-lg font-black text-text">{ecoImpact.treesNourished} <span className="text-xs text-text-muted font-normal">Trees</span></p>
+              <span className="text-[9px] font-bold text-teal-500">Daily Plant Water Needs</span>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex flex-col justify-between">
+              <div className="flex items-center justify-between text-blue-500 mb-1">
+                <CloudRain className="w-4 h-4" />
+                <span className="text-[10px] uppercase font-black tracking-wider">CO₂ Offset</span>
+              </div>
+              <p className="text-lg font-black text-text">{ecoImpact.co2OffsetKg} <span className="text-xs text-text-muted font-normal">kg</span></p>
+              <span className="text-[9px] font-bold text-blue-500">Pumping & Energy Offset</span>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex flex-col justify-between">
+              <div className="flex items-center justify-between text-purple-500 mb-1">
+                <Droplets className="w-4 h-4" />
+                <span className="text-[10px] uppercase font-black tracking-wider">Shower Time</span>
+              </div>
+              <p className="text-lg font-black text-text">{ecoImpact.showerMinutesSaved} <span className="text-xs text-text-muted font-normal">Mins</span></p>
+              <span className="text-[9px] font-bold text-purple-500">Equivalent Saved Time</span>
+            </div>
+          </div>
         </div>
+
+        {/* Motivational Banner */}
+        {leaderboard && leaderboard.moreEfficientNeighborsCount > 0 && (
+          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs sm:text-sm font-semibold text-amber-500 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 shrink-0 text-amber-400" />
+              <span>
+                <strong>{leaderboard.moreEfficientNeighborsCount} neighbor(s)</strong> in your block used less water than your household this month. Follow the tips below to surpass them on the leaderboard! 🏆
+              </span>
+            </div>
+          </div>
+        )}
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

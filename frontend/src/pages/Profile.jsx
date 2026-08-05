@@ -536,7 +536,7 @@ export default function Profile() {
             </div>
 
             {profileData.role === 'Admin' && (
-              <>
+              <div className="hidden sm:block">
                 <h3 className="font-semibold text-text mt-8 mb-6 border-b border-border pb-4 flex items-center gap-2">
                   <Shield className="w-5 h-5 text-primary" /> Administrative Authority & System Info
                 </h3>
@@ -591,7 +591,7 @@ export default function Profile() {
                     </div>
                   </div>
                 </div>
-              </>
+              </div>
             )}
 
             {profileData.role === 'Community Admin' && (

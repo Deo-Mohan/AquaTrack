@@ -49,4 +49,12 @@ public interface WaterUsageRepository extends JpaRepository<WaterUsageLog, Long>
 
     // Get latest reading for a household
     WaterUsageLog findTopByHouseNumberOrderByReadingDateDesc(String houseNumber);
+
+    // Sum total consumption for all households in an apartment block
+    @Query("SELECT COALESCE(SUM(w.readingLiters), 0) FROM WaterUsageLog w WHERE w.apartmentBlock = :block")
+    Double sumTotalConsumptionByBlock(@Param("block") String block);
+
+    // Find top water consumers for an apartment block
+    @Query("SELECT w.houseNumber, SUM(w.readingLiters) FROM WaterUsageLog w WHERE w.apartmentBlock = :block GROUP BY w.houseNumber ORDER BY SUM(w.readingLiters) DESC")
+    List<Object[]> findTopConsumersByBlock(@Param("block") String block);
 }

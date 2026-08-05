@@ -1,22 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Globe, ChevronDown, Search, CheckCheck } from 'lucide-react';
-
-const languages = [
-  { code: 'en', name: 'English', flag: '🇬🇧' },
-  { code: 'hi', name: 'हिंदी (Hindi)', flag: '🇮🇳' },
-  { code: 'mr', name: 'मराठी (Marathi)', flag: '🇮🇳' },
-  { code: 'ta', name: 'தமிழ் (Tamil)', flag: '🇮🇳' },
-  { code: 'te', name: 'తెలుగు (Telugu)', flag: '🇮🇳' },
-  { code: 'kn', name: 'கன்னட (Kannada)', flag: '🇮🇳' },
-  { code: 'gu', name: 'ગુજરાતી (Gujarati)', flag: '🇮🇳' },
-  { code: 'bn', name: 'বাংলা (Bengali)', flag: '🇮🇳' },
-  { code: 'ml', name: 'മലയാളം (Malayalam)', flag: '🇮🇳' },
-  { code: 'pa', name: 'ਪੰਜਾਬੀ (Punjabi)', flag: '🇮🇳' },
-  { code: 'or', name: 'ଓଡ଼ିଆ (Odia)', flag: '🇮🇳' },
-  { code: 'ur', name: 'اردو (Urdu)', flag: '🇮🇳' }
-];
+import { Globe, ChevronDown, Search, CheckCheck, Home, Zap, Info, Mail } from 'lucide-react';
+import { LANGUAGES as languages, INCLUDED_LANG_CODES } from '../utils/languages';
 
 export default function SharedHeader({ activeTab = 'home' }) {
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
@@ -26,7 +12,7 @@ export default function SharedHeader({ activeTab = 'home' }) {
 
     // First visit: auto-detect browser language
     const browserLang = (navigator.language || navigator.userLanguage || 'en').split('-')[0].toLowerCase();
-    const supportedLangs = ['hi','bn','te','mr','ta','ur','gu','kn','ml','pa','or','as'];
+    const supportedLangs = languages.map(l => l.code);
     if (supportedLangs.includes(browserLang)) {
       localStorage.setItem('selectedLang', browserLang);
       return browserLang.toUpperCase();
@@ -60,7 +46,7 @@ export default function SharedHeader({ activeTab = 'home' }) {
       window.googleTranslateElementInitLanding = () => {
         if (window.google && window.google.translate) {
           new window.google.translate.TranslateElement(
-            { pageLanguage: 'en', includedLanguages: 'en,hi,bn,te,mr,ta,ur,gu,kn,ml,pa,or,as', autoDisplay: false },
+            { pageLanguage: 'en', includedLanguages: INCLUDED_LANG_CODES, autoDisplay: false },
             'google_translate_element_landing'
           );
         }
@@ -126,11 +112,14 @@ export default function SharedHeader({ activeTab = 'home' }) {
     setLangDropdownOpen(false);
     setLangSearchQuery('');
 
-    // 2. Set cookies for GT to read
+    // 2. Fire a custom event so same-tab components (e.g. Landing heading) update instantly
+    window.dispatchEvent(new CustomEvent('aquatrack-lang-change', { detail: { lang: langCode } }));
+
+    // 3. Set cookies for GT to read
     document.cookie = `googtrans=/en/${langCode}; path=/; domain=${window.location.hostname}`;
     document.cookie = `googtrans=/en/${langCode}; path=/;`;
 
-    // 3. GT script is already loaded (preloaded on mount) — just dispatch to combo
+    // 4. GT script is already loaded (preloaded on mount) — just dispatch to combo
     ensureGoogleTranslate().then(() => applyLangToCombo(langCode));
   };
 
@@ -146,7 +135,15 @@ export default function SharedHeader({ activeTab = 'home' }) {
 
 
 
+  const navTabs = [
+    { id: 'home',     label: 'Home',     path: '/',         icon: Home,  sectionId: 'hero' },
+    { id: 'features', label: 'Features', path: '/features', icon: Zap },
+    { id: 'about',   label: 'About',    path: '/about',    icon: Info },
+    { id: 'contact', label: 'Contact',  path: '/contact',  icon: Mail },
+  ];
+
   return (
+    <>
     <header className="sticky top-0 w-full px-4 sm:px-8 py-3.5 z-50 backdrop-blur-2xl bg-surface/40 dark:bg-surface/30 border-b border-primary/20 shadow-[0_8px_32px_0_rgba(0,120,255,0.08)] transition-all">
       <div id="google_translate_element_landing" className="hidden"></div>
       <motion.div 
@@ -172,7 +169,7 @@ export default function SharedHeader({ activeTab = 'home' }) {
             { id: 'home', label: 'Home', path: '/', sectionId: 'hero' },
             { id: 'features', label: 'Features', path: '/features' },
             { id: 'about', label: 'About', path: '/about' },
-            { id: 'contact', label: 'Contact', path: '/contact', sectionId: 'contact' }
+            { id: 'contact', label: 'Contact', path: '/contact' }
           ].map((tab) => {
             const isActive = activeTab === tab.id;
             const handleNavClick = (e) => {
@@ -342,5 +339,42 @@ export default function SharedHeader({ activeTab = 'home' }) {
         </div>
       </motion.div>
     </header>
+
+      {/* ── Mobile Bottom Nav Bar (lg:hidden) ── */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around px-2 py-2 bg-surface/80 backdrop-blur-2xl border-t border-primary/20 shadow-[0_-8px_32px_rgba(0,120,255,0.10)]">
+        {navTabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          const Icon = tab.icon;
+          const handleClick = (e) => {
+            if (window.location.pathname === '/' && tab.sectionId) {
+              const el = document.getElementById(tab.sectionId);
+              if (el) { e.preventDefault(); el.scrollIntoView({ behavior: 'smooth' }); }
+            }
+          };
+          return (
+            <Link
+              key={tab.id}
+              to={tab.path}
+              onClick={handleClick}
+              className={`relative flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all select-none ${
+                isActive ? 'text-primary' : 'text-text/50 hover:text-text'
+              }`}
+            >
+              <Icon className={`w-5 h-5 transition-transform ${isActive ? 'scale-110' : ''}`} />
+              <span className={`text-[10px] font-bold tracking-wide ${isActive ? 'text-primary' : 'text-text-muted'}`}>
+                {tab.label}
+              </span>
+              {isActive && (
+                <motion.div
+                  layoutId="mobileNavActive"
+                  className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 shadow-[0_0_8px_rgba(0,120,255,0.8)]"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+            </Link>
+          );
+        })}
+      </nav>
+    </>
   );
 }

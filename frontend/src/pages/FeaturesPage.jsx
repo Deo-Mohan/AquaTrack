@@ -59,7 +59,7 @@ export default function FeaturesPage() {
     {
       icon: Sparkles,
       title: "AI Household Assistant & Voice TTS",
-      description: "Integrated smart chatbot that speaks 13 Indian regional languages with dynamic gender voice synthesis to help residents analyze bills.",
+      description: "Integrated smart chatbot that speaks 45+ Indian regional & global foreign languages with dynamic gender voice synthesis to help residents analyze bills.",
       tag: "AI Tech",
       accent: "from-amber-400 to-orange-500",
       glowColor: "rgba(245, 158, 11, 0.25)",

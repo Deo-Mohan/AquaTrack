@@ -129,7 +129,7 @@ export default function AboutPage() {
               </div>
               <h3 className="text-xl font-bold text-text mb-3">Inclusive AI</h3>
               <p className="text-sm text-text/75 leading-relaxed font-medium">
-                Multi-language support for 13 Indian regional languages powered by sweet-voice Text-To-Speech (TTS) to assist every resident seamlessly.
+                Multi-language support for 45+ Indian regional & global foreign languages powered by sweet-voice Text-To-Speech (TTS) to assist every resident seamlessly.
               </p>
             </div>
           </motion.div>
@@ -162,12 +162,12 @@ export default function AboutPage() {
             <div className="flex flex-col md:flex-row items-center md:items-start gap-8 md:gap-10 relative z-10">
               {/* Creator Avatar with Ring Glow & Creator Badge */}
               <div className="flex-shrink-0 relative group/avatar">
-                <div className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-3xl p-[3px] bg-gradient-to-tr from-blue-500 via-primary to-cyan-400 shadow-2xl shadow-primary/40 transition-transform duration-300 group-hover/avatar:scale-105">
+                <div className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full p-[3px] bg-gradient-to-tr from-blue-500 via-primary to-cyan-400 shadow-2xl shadow-primary/40 transition-transform duration-300 group-hover/avatar:scale-105">
                   {/* Glowing Pulse Ring */}
-                  <div className="absolute -inset-1 rounded-3xl bg-gradient-to-tr from-blue-600 via-cyan-400 to-indigo-500 blur-md opacity-60 group-hover/avatar:opacity-100 transition-opacity animate-pulse" />
+                  <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-blue-600 via-cyan-400 to-indigo-500 blur-md opacity-60 group-hover/avatar:opacity-100 transition-opacity animate-pulse" />
                   
                   {/* Avatar Container */}
-                  <div className="w-full h-full bg-surface-lighter rounded-[21px] overflow-hidden relative z-10 border border-white/20">
+                  <div className="w-full h-full bg-surface-lighter rounded-full overflow-hidden relative z-10 border border-white/20">
                     <img 
                       src="/male_03.svg" 
                       alt="Krishna Mohan Kumar - Lead Developer" 

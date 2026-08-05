@@ -1,19 +1,25 @@
 # 💧 AquaTrack — Smart Water Management & Billing Platform
 
-AquaTrack is a premium, full-stack smart water management, analytics, and automated billing platform designed for residential societies, apartments, and colonies. It empowers residents to monitor consumption, view and print watermarked invoices, resolve leaks, and enables admins to distribute bulk purchase costs, manage residents, approve verification documents, and track system anomalies.
+AquaTrack is a premium, full-stack smart water management, analytics, PWA, and automated billing platform designed for residential societies, apartments, and colonies. It empowers residents to monitor consumption, view and print watermarked invoices, resolve leaks, and enables admins to distribute bulk purchase costs, manage residents, approve verification documents, and track system anomalies.
 
 ---
 
 ## 🚀 Key Features
 
-### 👤 Household Resident Dashboard
+### 📲 Progressive Web App (PWA) & Mobile Installation
+* **Native-Like Installation**: Standalone installable app experience across Android, iOS, Windows, and macOS with service worker caching (`sw.js`) and dynamic app manifest (`manifest.json`).
+* **Device-Aware PWA Guide**: Responsive, theme-matching (Light/Dark mode) installation prompt with dynamic instructions customized for Smartphones, Tablets, and Desktops.
+
+### 👤 Household Resident Dashboard & Gamified Leaderboard
 * **Real-time Consumption**: Interactive charts showing daily and monthly consumption history.
+* **Gamified Peer Competition**: Top 5 block leaderboard, proportional consumption share analysis, and real-time environmental impact metrics (CO2 offset, trees nourished, tanker equivalents).
 * **Smart Water Conservation**: Interactive faucet visualization demonstrating water saving tips.
 * **Watermarked Invoices**: Detailed, professional-grade billing invoices with official seals, prints, and downloads.
 * **Notification Panel**: Real-time alerts for leaks, overconsumption, new bills, and verification updates.
-* **Forgot Password Flow**: Secure recovery pipeline without external dependency.
 
-### 🏢 Community Admin Dashboard
+### 🏢 Community Admin & Super Admin Workstation
+* **Community Water Distribution Graph**: Centrally-aligned, mobile-optimized analytics card featuring 1-tap pill selectors for **Colony View** vs **Building View**, colony filtering, and **Bar**, **Line**, & **Area** chart toggles.
+* **Payment Reminder Control Panel**: Responsive mobile-optimized action controls for *Scan & Alert Admins* and *Send All Reminders* with high-contrast alert status banners.
 * **Resident Directory**: Smart search and filtering of all apartments and households.
 * **Automated Billing Engine**: Generation of monthly billing cycles with consumption-based distribution.
 * **Anomalies & Leak Detection**: Intelligent flagging of abnormal usage spikes.
@@ -23,6 +29,7 @@ AquaTrack is a premium, full-stack smart water management, analytics, and automa
 ### 🤖 AI Household Assistant & Smart Chatbot
 * **AquaTrack AI Assistant**: Intelligent RAG & Google Gemini 1.5 Flash powered assistant for instant household query resolution.
 * **Natural Multi-lingual Querying**: Responds to bill calculations, consumption stats, tariff rates, and support ticket statuses in Hindi, English, and regional languages.
+* **Acoustic Personalization & TTS**: High-fidelity Text-to-Speech (TTS) integration with natural acoustic parameters.
 * **Smart Actions**: One-click deep-link action buttons for payments, invoice downloads, usage analysis, and extra water purchases.
 
 ### 🛠️ Role-Differentiated Support & Resolution Center
@@ -37,8 +44,8 @@ AquaTrack is a premium, full-stack smart water management, analytics, and automa
 * **Matched Search Highlighting**: Dynamic blue-highlighted matching text in search results for resident names, house numbers, meter IDs, and apartment blocks.
 
 ### 🎨 Accessible UI & High-Contrast Liquid Glass Aesthetic
+* **Responsive Light/Dark Themes**: Fully synchronized theme system supporting instant light and dark mode switching across all pages, charts, modals, and PWA prompts.
 * **High-Contrast Typography**: Cohesive rich-brown and high-contrast earth-tone styling for status indicators, unbilled water logs, and warnings.
-* **Glassmorphic Notification Cards**: Multi-layered backdrop blur (`backdrop-blur-[40px]`) and saturation for clean, readable notifications.
 * **Multi-Language Protection**: Enforced `notranslate` tags across language selector controls ensuring proper native display of languages.
 
 ---
@@ -56,10 +63,11 @@ AquaTrack is a premium, full-stack smart water management, analytics, and automa
 
 | Domain | Technology | Description |
 | :--- | :--- | :--- |
-| **Frontend** | React 18, Vite, Tailwind CSS, Framer Motion, Lucide Icons | Premium glassmorphic responsive UI |
+| **Frontend** | React 18, Vite, Tailwind CSS, Framer Motion, Lucide Icons, Recharts | Premium glassmorphic responsive PWA UI |
 | **Backend** | Spring Boot, Spring Security, JWT | RESTful API and core business engine |
 | **Database** | MySQL | Persistent relational database storage |
 | **AI Integration** | Google Gemini 1.5 Flash API & RAG Engine | Intelligent household water assistant |
+| **PWA Capabilities** | Web App Manifest, Service Worker, Install Prompt | Cross-platform offline installable application |
 | **Payment Gateway** | Razorpay | Online UPI, Credit/Debit card payments |
 | **Build Tools** | Maven, NPM | Package and dependency managers |
 
@@ -72,6 +80,7 @@ aquatrack/
 ├── src/                    # Spring Boot backend source code
 ├── pom.xml                 # Maven dependencies & configuration
 ├── frontend/               # React + Vite frontend workspace
+│   ├── public/             # PWA assets, manifest.json, sw.js
 │   ├── src/                # React pages, components, & custom hooks
 │   ├── package.json        # NPM packages & build scripts
 │   └── vite.config.js      # Vite dev server configuration

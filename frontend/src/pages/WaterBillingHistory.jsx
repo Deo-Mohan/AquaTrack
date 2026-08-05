@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Droplet, Receipt, Trash2, Edit2, CheckCircle2, Clock,
-  Search, X, ChevronDown, ChevronUp, Loader2, AlertCircle, QrCode, Calendar
+  Search, X, ChevronDown, ChevronUp, Loader2, AlertCircle, QrCode, Calendar, FileText, Download, Printer
 } from 'lucide-react';
 import api from '../api';
 import MicSearchBox from '../components/MicSearchBox';
@@ -34,6 +34,13 @@ export default function WaterBillingHistory() {
   const [payQrModalBill, setPayQrModalBill] = useState(null); // Bill to collect via QR
   const [editingLog, setEditingLog] = useState(null); // Log to edit
   const [editLoading, setEditLoading] = useState(false);
+
+  // PDF Modal & Date Filtering States
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [pdfDateMode, setPdfDateMode]   = useState('RANGE'); // 'ALL' | 'RANGE' | 'MONTH'
+  const [pdfStartDate, setPdfStartDate] = useState('');
+  const [pdfEndDate, setPdfEndDate]     = useState('');
+  const [pdfMonth, setPdfMonth]         = useState(''); // format YYYY-MM
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -232,6 +239,191 @@ export default function WaterBillingHistory() {
     return 'text-text-muted bg-surface-lighter border-border';
   };
 
+  // ── PDF Report Generator ──────────────────────────────────────────
+  const downloadPDFReport = () => {
+    const isUsage = activeTab === 'usage';
+    let targetLogs  = [...filteredLogs];
+    let targetBills = [...filteredBills];
+    let filterDescription = 'All Historical Records';
+
+    // Apply PDF Date Filtering
+    if (pdfDateMode === 'RANGE') {
+      if (pdfStartDate) {
+        const start = new Date(pdfStartDate);
+        targetLogs  = targetLogs.filter(l => l.readingDate && new Date(l.readingDate) >= start);
+        targetBills = targetBills.filter(b => (b.generatedDate || b.createdAt) && new Date(b.generatedDate || b.createdAt) >= start);
+      }
+      if (pdfEndDate) {
+        const end = new Date(pdfEndDate);
+        end.setHours(23, 59, 59, 999);
+        targetLogs  = targetLogs.filter(l => l.readingDate && new Date(l.readingDate) <= end);
+        targetBills = targetBills.filter(b => (b.generatedDate || b.createdAt) && new Date(b.generatedDate || b.createdAt) <= end);
+      }
+      filterDescription = `Custom Range: ${pdfStartDate || 'Beginning'} to ${pdfEndDate || 'Today'}`;
+    } else if (pdfDateMode === 'MONTH' && pdfMonth) {
+      const [mYear, mNum] = pdfMonth.split('-').map(Number);
+      targetLogs  = targetLogs.filter(l => {
+        if (!l.readingDate) return false;
+        const d = new Date(l.readingDate);
+        return d.getFullYear() === mYear && (d.getMonth() + 1) === mNum;
+      });
+      targetBills = targetBills.filter(b => {
+        const dateStr = b.generatedDate || b.createdAt;
+        if (!dateStr) return false;
+        const d = new Date(dateStr);
+        return d.getFullYear() === mYear && (d.getMonth() + 1) === mNum;
+      });
+      const monthObj = new Date(mYear, mNum - 1, 1);
+      filterDescription = `Specific Month: ${monthObj.toLocaleString('default', { month: 'long', year: 'numeric' })}`;
+    }
+
+    const reportTitle = isUsage ? 'Water Usage Audit Report' : 'Billing Records Financial Report';
+    const blockText = block ? `Block: ${block}` : 'All Apartment Blocks';
+    const timestamp = new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'medium' });
+    const userRoleText = isSuperAdmin ? 'Super Admin' : 'Community Admin';
+
+    let tableRowsHTML = '';
+
+    if (isUsage) {
+      if (targetLogs.length === 0) {
+        tableRowsHTML = `<tr><td colspan="${isSuperAdmin ? 7 : 6}" style="text-align: center; padding: 24px; color: #94a3b8; font-style: italic;">No usage records found for the selected date range.</td></tr>`;
+      } else {
+        tableRowsHTML = targetLogs.map((log, idx) => `
+          <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">${getUserName(log.houseNumber, log.apartmentBlock)}</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0;">${log.houseNumber}</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0;">${log.apartmentBlock}</td>
+            ${isSuperAdmin ? `<td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0;">${getAdminForBlock(log.apartmentBlock)}</td>` : ''}
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0284c7;">${log.readingLiters} L</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-weight: 700; color: #475569;">${log.logType || 'DAILY'}</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0;">${log.readingDate ? new Date(log.readingDate).toLocaleDateString('en-IN') : '—'}</td>
+          </tr>
+        `).join('');
+      }
+    } else {
+      if (targetBills.length === 0) {
+        tableRowsHTML = `<tr><td colspan="${isSuperAdmin ? 8 : 7}" style="text-align: center; padding: 24px; color: #94a3b8; font-style: italic;">No billing records found for the selected date range.</td></tr>`;
+      } else {
+        tableRowsHTML = targetBills.map((bill, idx) => {
+          const isPaid = bill.status === 'PAID';
+          const statusColor = isPaid ? '#15803d' : bill.status === 'OVERDUE' ? '#b91c1c' : '#b45309';
+          return `
+            <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+              <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">${getUserName(bill.houseNumber, bill.apartmentBlock)}</td>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0;">${bill.houseNumber}</td>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0;">${bill.apartmentBlock}</td>
+              ${isSuperAdmin ? `<td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0;">${getAdminForBlock(bill.apartmentBlock)}</td>` : ''}
+              <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #059669;">₹${bill.amount}</td>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 800; color: ${statusColor};">${bill.status}</td>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0;">${bill.dueDate ? new Date(bill.dueDate).toLocaleDateString('en-IN') : '—'}</td>
+              <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0;">${bill.generatedDate ? new Date(bill.generatedDate).toLocaleDateString('en-IN') : '—'}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+
+    const totalStatsHTML = isUsage ? `
+      <div style="display: flex; gap: 20px; margin-bottom: 24px;">
+        <div style="flex: 1; padding: 14px; background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px;">
+          <span style="font-size: 11px; color: #0369a1; text-transform: uppercase; font-weight: 700; display: block;">Total Logs Analyzed</span>
+          <strong style="font-size: 20px; color: #0284c7;">${targetLogs.length} Records</strong>
+        </div>
+        <div style="flex: 1; padding: 14px; background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px;">
+          <span style="font-size: 11px; color: #047857; text-transform: uppercase; font-weight: 700; display: block;">Cumulative Water Usage</span>
+          <strong style="font-size: 20px; color: #059669;">${targetLogs.reduce((s, l) => s + (l.readingLiters || 0), 0).toLocaleString('en-IN')} Liters</strong>
+        </div>
+      </div>
+    ` : `
+      <div style="display: flex; gap: 16px; margin-bottom: 24px;">
+        <div style="flex: 1; padding: 14px; background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px;">
+          <span style="font-size: 11px; color: #0369a1; text-transform: uppercase; font-weight: 700; display: block;">Total Bills</span>
+          <strong style="font-size: 20px; color: #0284c7;">${targetBills.length} Bills</strong>
+        </div>
+        <div style="flex: 1; padding: 14px; background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px;">
+          <span style="font-size: 11px; color: #047857; text-transform: uppercase; font-weight: 700; display: block;">Paid Amount</span>
+          <strong style="font-size: 20px; color: #059669;">₹${targetBills.filter(b => b.status === 'PAID').reduce((s, b) => s + (b.amount || 0), 0).toLocaleString('en-IN')}</strong>
+        </div>
+        <div style="flex: 1; padding: 14px; background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 12px;">
+          <span style="font-size: 11px; color: #b91c1c; text-transform: uppercase; font-weight: 700; display: block;">Pending / Unpaid</span>
+          <strong style="font-size: 20px; color: #dc2626;">₹${targetBills.filter(b => b.status !== 'PAID').reduce((s, b) => s + (b.amount || 0), 0).toLocaleString('en-IN')}</strong>
+        </div>
+      </div>
+    `;
+
+    const printableHTML = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${reportTitle}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+            body { font-family: 'Inter', sans-serif; color: #0f172a; padding: 32px; margin: 0; background: #ffffff; }
+            .header-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0284c7; padding-bottom: 16px; margin-bottom: 24px; }
+            .logo-title { font-size: 24px; font-weight: 900; color: #0284c7; letter-spacing: -0.5px; }
+            .meta-text { font-size: 12px; color: #64748b; margin-top: 4px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+            th { background-color: #0f172a; color: #ffffff; text-align: left; padding: 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+            .footer { margin-top: 40px; border-top: 1px solid #e2e8f0; pt: 16px; font-size: 11px; color: #94a3b8; text-align: center; }
+            @media print {
+              body { padding: 0; }
+              @page { size: A4 landscape; margin: 15mm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header-bar">
+            <div>
+              <div class="logo-title">💧 AquaTrack Management System</div>
+              <div style="font-size: 16px; font-weight: 700; color: #334155; margin-top: 4px;">${reportTitle}</div>
+              <div class="meta-text">${blockText} · ${filterDescription} · Generated by ${userRoleText} (${localStorage.getItem('username') || 'Admin'})</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Generated Date</div>
+              <div style="font-size: 13px; font-weight: 700; color: #0f172a;">${timestamp}</div>
+            </div>
+          </div>
+
+          ${totalStatsHTML}
+
+          <table>
+            <thead>
+              <tr>
+                <th>Resident</th>
+                <th>House #</th>
+                <th>Block</th>
+                ${isSuperAdmin ? '<th>Community Admin</th>' : ''}
+                ${isUsage ? '<th>Reading (Liters)</th><th>Log Type</th><th>Reading Date</th>' : '<th>Amount</th><th>Status</th><th>Due Date</th><th>Generated Date</th>'}
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRowsHTML}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            AquaTrack Water & Infrastructure Monitoring Platform — Official System Audit PDF Document (${filterDescription})
+            <div style="margin-top: 5px; font-size: 10px; font-weight: 700; color: #475569;">
+              Built with ❤️ by Krishna Mohan
+            </div>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    setShowPdfModal(false);
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printableHTML);
+      printWindow.document.close();
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -258,28 +450,40 @@ export default function WaterBillingHistory() {
       </AnimatePresence>
 
       {/* ── Tab Switcher ─────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 bg-surface-lighter border border-border p-1 rounded-xl w-full sm:w-fit">
-        {[
-          { id: 'usage',   label: 'Water Usage Logs', shortLabel: 'Usage Logs', icon: Droplet,  count: filteredLogs.length },
-          { id: 'billing', label: 'Billing Records', shortLabel: 'Billing',   icon: Receipt,  count: filteredBills.length },
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-              activeTab === tab.id
-                ? 'bg-surface text-text shadow-sm border border-border'
-                : 'text-text-muted hover:text-text'
-            }`}
-          >
-            <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-            <span className="hidden sm:inline">{tab.label}</span>
-            <span className="sm:hidden">{tab.shortLabel}</span>
-            <span className="text-[10px] sm:text-[11px] font-bold px-1.5 py-0.2 rounded-full shrink-0 ${
-              activeTab === tab.id ? 'bg-primary/15 text-primary' : 'bg-surface-lighter text-text-muted'
-            }">{tab.count}</span>
-          </button>
-        ))}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-1 bg-surface-lighter border border-border p-1 rounded-xl w-full sm:w-fit">
+          {[
+            { id: 'usage',   label: 'Water Usage Logs', shortLabel: 'Usage Logs', icon: Droplet,  count: filteredLogs.length },
+            { id: 'billing', label: 'Billing Records', shortLabel: 'Billing',   icon: Receipt,  count: filteredBills.length },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                activeTab === tab.id
+                  ? 'bg-surface text-text shadow-sm border border-border'
+                  : 'text-text-muted hover:text-text'
+              }`}
+            >
+              <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="sm:hidden">{tab.shortLabel}</span>
+              <span className="text-[10px] sm:text-[11px] font-bold px-1.5 py-0.2 rounded-full shrink-0 ${
+                activeTab === tab.id ? 'bg-primary/15 text-primary' : 'bg-surface-lighter text-text-muted'
+              }">{tab.count}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* PDF Download Button (Opens Date Filter Modal) */}
+        <button
+          onClick={() => setShowPdfModal(true)}
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-emerald-500/20 transition-all cursor-pointer border border-emerald-400/40"
+          title={`Export PDF report with date options for ${activeTab === 'usage' ? 'Water Usage Logs' : 'Billing Records'}`}
+        >
+          <FileText className="w-4 h-4 shrink-0" />
+          <span>Download {activeTab === 'usage' ? 'Water Logs' : 'Billing'} PDF</span>
+        </button>
       </div>
 
       {/* ── Toolbar ──────────────────────────────────────────────── */}
@@ -625,6 +829,145 @@ export default function WaterBillingHistory() {
                 </button>
               </div>
             </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* PDF Date & Month Range Options Modal */}
+      {showPdfModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <motion.div
+            initial={{ scale: 0.92, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.92, opacity: 0 }}
+            className="bg-surface border border-border w-full max-w-md rounded-2xl p-6 shadow-2xl relative"
+          >
+            <button
+              onClick={() => setShowPdfModal(false)}
+              className="absolute top-4 right-4 text-text hover:text-text cursor-pointer p-1.5 rounded-lg hover:bg-surface-lighter transition-colors"
+            >
+              <X className="w-5 h-5 text-text" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0 border border-emerald-500/30">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-text">Export PDF Report</h3>
+                <p className="text-xs font-semibold text-text-muted">
+                  {activeTab === 'usage' ? 'Water Usage Logs' : 'Billing Records'} Report Options
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Date Filter Mode Switcher */}
+              <div>
+                <label className="text-xs font-bold text-text uppercase tracking-wider mb-2 block">
+                  Select Date Range Filter
+                </label>
+                <div className="grid grid-cols-3 gap-1.5 bg-surface-lighter p-1.5 rounded-xl border border-border text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setPdfDateMode('ALL')}
+                    className={`py-2 px-1 rounded-lg transition-all cursor-pointer ${
+                      pdfDateMode === 'ALL'
+                        ? 'bg-emerald-600 text-white shadow-md font-black'
+                        : 'text-text hover:text-text hover:bg-surface'
+                    }`}
+                  >
+                    All Records
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPdfDateMode('RANGE')}
+                    className={`py-2 px-1 rounded-lg transition-all cursor-pointer ${
+                      pdfDateMode === 'RANGE'
+                        ? 'bg-emerald-600 text-white shadow-md font-black'
+                        : 'text-text hover:text-text hover:bg-surface'
+                    }`}
+                  >
+                    Date Range
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPdfDateMode('MONTH')}
+                    className={`py-2 px-1 rounded-lg transition-all cursor-pointer ${
+                      pdfDateMode === 'MONTH'
+                        ? 'bg-emerald-600 text-white shadow-md font-black'
+                        : 'text-text hover:text-text hover:bg-surface'
+                    }`}
+                  >
+                    Specific Month
+                  </button>
+                </div>
+              </div>
+
+              {/* Mode 1: Custom Date Range (From - To) */}
+              {pdfDateMode === 'RANGE' && (
+                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="space-y-3 bg-surface-lighter p-4 rounded-xl border border-border">
+                  <div>
+                    <label className="text-xs font-bold text-text mb-1 block">From Date</label>
+                    <input
+                      type="date"
+                      value={pdfStartDate}
+                      onChange={e => setPdfStartDate(e.target.value)}
+                      className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-text font-semibold focus:outline-none focus:border-emerald-500 cursor-pointer"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-text mb-1 block">To Date</label>
+                    <input
+                      type="date"
+                      value={pdfEndDate}
+                      onChange={e => setPdfEndDate(e.target.value)}
+                      className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-text font-semibold focus:outline-none focus:border-emerald-500 cursor-pointer"
+                    />
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Mode 2: Specific Month Selector */}
+              {pdfDateMode === 'MONTH' && (
+                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="bg-surface-lighter p-4 rounded-xl border border-border">
+                  <label className="text-xs font-bold text-text mb-1 block">Select Month & Year</label>
+                  <input
+                    type="month"
+                    value={pdfMonth}
+                    onChange={e => setPdfMonth(e.target.value)}
+                    className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-text font-semibold focus:outline-none focus:border-emerald-500 cursor-pointer"
+                  />
+                </motion.div>
+              )}
+
+              {/* Mode 3: All Records note */}
+              {pdfDateMode === 'ALL' && (
+                <div className="bg-emerald-500/15 border border-emerald-500/40 p-3.5 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 font-bold flex items-start gap-2">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-black">ℹ️</span>
+                  <span>The exported PDF will include all available history records matching current search criteria.</span>
+                </div>
+              )}
+
+              {/* Download Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-2.5 justify-center sm:justify-end pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowPdfModal(false)}
+                  className="w-full sm:w-auto px-4 py-2.5 bg-surface-lighter border border-border text-text hover:bg-surface rounded-xl text-xs font-bold transition-colors cursor-pointer text-center"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadPDFReport}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all shadow-lg shadow-emerald-600/25 cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  Generate & Download PDF
+                </button>
+              </div>
+            </div>
           </motion.div>
         </div>
       )}

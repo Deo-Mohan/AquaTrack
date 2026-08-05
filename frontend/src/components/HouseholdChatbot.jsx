@@ -2,6 +2,550 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api';
+import { getBcp47Locale } from '../utils/languages';
+
+const WaterLogFormWidget = ({ parsedLiters, onLogged }) => {
+  const [residents, setResidents] = useState([]);
+  const [loadingResidents, setLoadingResidents] = useState(true);
+  const [search, setSearch] = useState('');
+  const [selectedResident, setSelectedResident] = useState(null);
+  const [readingDate, setReadingDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [readingLiters, setReadingLiters] = useState(parsedLiters ? String(parsedLiters) : '');
+  const [logType, setLogType] = useState('MONTHLY');
+  const [submitting, setSubmitting] = useState(false);
+  const [successMsg, setSuccessMsg] = useState(null);
+  const [errorMsg, setErrorMsg] = useState(null);
+
+  const block = localStorage.getItem('apartmentBlock') || 'Block A';
+  const callerRole = localStorage.getItem('role') || 'ROLE_COMMUNITY_ADMIN';
+
+  useEffect(() => {
+    const fetchResidents = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        }
+        const res = await api.get(`/admin/users?callerRole=${callerRole}&callerBlock=${encodeURIComponent(block)}`);
+        if (res.data && Array.isArray(res.data)) {
+          setResidents(res.data);
+          if (res.data.length > 0) {
+            setSelectedResident(res.data[0]);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching residents for chatbot widget:", err);
+      } finally {
+        setLoadingResidents(false);
+      }
+    };
+    fetchResidents();
+  }, [block, callerRole]);
+
+  const filteredResidents = residents.filter(r => {
+    const term = search.toLowerCase();
+    const house = (r.houseNumber || '').toLowerCase();
+    const name = (r.fullName || r.username || '').toLowerCase();
+    return house.includes(term) || name.includes(term);
+  });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedResident) {
+      setErrorMsg("Please select a household resident.");
+      return;
+    }
+    if (!readingLiters || isNaN(readingLiters) || parseFloat(readingLiters) < 0) {
+      setErrorMsg("Please enter a valid water reading in liters.");
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMsg(null);
+
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      }
+
+      await api.post(`/usage/log?callerRole=${callerRole}`, {
+        houseNumber: selectedResident.houseNumber,
+        apartmentBlock: selectedResident.apartmentBlock || block,
+        readingDate: readingDate,
+        readingLiters: parseFloat(readingLiters),
+        logType: logType,
+        source: 'MANUAL'
+      });
+
+      setSuccessMsg({
+        house: selectedResident.houseNumber,
+        name: selectedResident.fullName || selectedResident.username,
+        liters: readingLiters,
+        date: readingDate,
+        logType: logType
+      });
+      if (onLogged) onLogged();
+    } catch (err) {
+      const errorText = err.response?.data?.message || err.response?.data || "Failed to log water reading. Please check if billing month is already locked.";
+      setErrorMsg(typeof errorText === 'string' ? errorText : "Failed to log water reading.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (successMsg) {
+    return (
+      <div className="mt-3 p-4 rounded-2xl bg-emerald-500/10 dark:bg-emerald-950/40 border-2 border-emerald-500/40 text-emerald-900 dark:text-emerald-200 shadow-md animate-fade-in">
+        <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-extrabold text-sm mb-2">
+          <span>✅</span>
+          <span>Water Meter Reading Successfully Logged!</span>
+        </div>
+        <div className="text-xs space-y-1 bg-white/60 dark:bg-slate-900/60 p-2.5 rounded-xl border border-emerald-500/20 font-medium">
+          <p>• <strong>Household:</strong> {successMsg.house} ({successMsg.name})</p>
+          <p>• <strong>Volume Logged:</strong> <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{successMsg.liters} Liters</strong> ({successMsg.logType})</p>
+          <p>• <strong>Reading Date:</strong> {successMsg.date}</p>
+          <p>• <strong>Status:</strong> Saved to Database & Resident Notified 🔔</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 p-3.5 rounded-2xl bg-gradient-to-br from-indigo-50/90 to-purple-50/90 dark:from-slate-900/90 dark:to-indigo-950/90 border-2 border-indigo-300 dark:border-indigo-700/60 shadow-lg text-slate-800 dark:text-slate-100 text-xs select-text">
+      <div className="flex items-center gap-1.5 font-extrabold text-indigo-950 dark:text-indigo-200 text-xs mb-2.5">
+        <span className="text-base">💧</span>
+        <span>Quick In-Chat Meter Log Workstation</span>
+      </div>
+
+      {errorMsg && (
+        <div className="mb-2 p-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-[11px] font-semibold">
+          ⚠️ {errorMsg}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-2.5">
+        {/* Step 1: Resident Search & Select */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-[11px] font-bold text-indigo-900 dark:text-indigo-300">
+              1. Search & Select Resident:
+            </label>
+            <span className="text-[10px] text-slate-500 font-semibold">
+              Showing {filteredResidents.length} of {residents.length}
+            </span>
+          </div>
+
+          <div className="relative mb-1.5">
+            <input
+              type="text"
+              placeholder="🔍 Search by Name, House No, Meter ID (e.g. MTR-113)..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs shadow-xs"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1.5 text-xs text-slate-400 hover:text-slate-600 font-bold"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {loadingResidents ? (
+            <p className="text-[10px] text-slate-500 animate-pulse italic">Loading block residents...</p>
+          ) : filteredResidents.length > 0 ? (
+            <div className="max-h-36 overflow-y-auto space-y-1 bg-white/80 dark:bg-slate-800/80 p-1.5 rounded-xl border border-indigo-100 dark:border-indigo-800 shadow-inner custom-scrollbar">
+              {filteredResidents.map((res) => {
+                const isSelected = selectedResident?.id === res.id;
+                const meterIdDisplay = res.meterId || res.meterNo || res.waterMeterId || `MTR-${res.id || 100}`;
+                return (
+                  <button
+                    key={res.id || res.username}
+                    type="button"
+                    onClick={() => setSelectedResident(res)}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg transition-all flex items-center justify-between text-[11px] cursor-pointer ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white font-bold shadow-xs'
+                        : 'hover:bg-indigo-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200'
+                    }`}
+                  >
+                    <div className="flex flex-col">
+                      <span>🏠 <strong>House #{res.houseNumber || '???'}</strong> — {res.fullName || res.username}</span>
+                      <span className={`text-[9px] ${isSelected ? 'text-indigo-200' : 'text-slate-400 dark:text-slate-400'}`}>
+                        Meter ID: {meterIdDisplay} {res.apartmentBlock ? `• ${res.apartmentBlock}` : ''}
+                      </span>
+                    </div>
+                    {isSelected && <span className="font-extrabold text-sm">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[10px] text-amber-700 dark:text-amber-300 font-semibold">
+              ⚠️ No matching resident found for "{search}". Try searching by Meter ID (e.g. MTR-113) or House Number.
+            </div>
+          )}
+        </div>
+
+        {/* Step 2: Log Type, Reading Date & Volume */}
+        <div>
+          <label className="block text-[11px] font-bold text-indigo-900 dark:text-indigo-300 mb-1">
+            2. Log Frequency / Type:
+          </label>
+          <div className="grid grid-cols-3 gap-1 mb-2">
+            {[
+              { id: 'DAILY', label: '📅 Daily' },
+              { id: 'WEEKLY', label: '📊 Weekly' },
+              { id: 'MONTHLY', label: '🗓️ Monthly' }
+            ].map(type => (
+              <button
+                key={type.id}
+                type="button"
+                onClick={() => setLogType(type.id)}
+                className={`py-1 px-1.5 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer border ${
+                  logType === type.id
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-indigo-200 dark:border-indigo-700 hover:bg-indigo-50'
+                }`}
+              >
+                {type.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[11px] font-bold text-indigo-900 dark:text-indigo-300 mb-1">
+                3. Reading Date:
+              </label>
+              <input
+                type="date"
+                value={readingDate}
+                onChange={(e) => setReadingDate(e.target.value)}
+                className="w-full px-2 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-semibold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-indigo-900 dark:text-indigo-300 mb-1">
+                4. Water Log (Liters):
+              </label>
+              <input
+                type="number"
+                placeholder="e.g. 250"
+                value={readingLiters}
+                onChange={(e) => setReadingLiters(e.target.value)}
+                className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-extrabold text-indigo-600 dark:text-indigo-400"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Step 3: Submit Action Button */}
+        {(() => {
+          const parsedVal = parseFloat(readingLiters);
+          const isValidLiters = !isNaN(parsedVal) && parsedVal > 0;
+          const isDisabled = submitting || !selectedResident || !isValidLiters;
+
+          return (
+            <button
+              type="submit"
+              disabled={isDisabled}
+              className={`w-full py-2 px-3 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center gap-1.5 shadow-md ${
+                isDisabled
+                  ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed opacity-60'
+                  : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-cyan-500/20 active:scale-98 cursor-pointer'
+              }`}
+            >
+              {submitting ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  <span>Logging Reading...</span>
+                </>
+              ) : !isValidLiters ? (
+                <span>⚠️ Enter Liters (&gt; 0) to Enable Logging</span>
+              ) : (
+                <span>💧 Log {readingLiters} Liters for House #{selectedResident?.houseNumber}</span>
+              )}
+            </button>
+          );
+        })()}
+      </form>
+    </div>
+  );
+};
+
+const ReportGeneratorWidget = () => {
+  const [reportType, setReportType] = useState('PNL'); // 'PNL' | 'BILLING' | 'OUTFLOW'
+  const [month, setMonth] = useState(() => {
+    const d = new Date();
+    const m = ['January','February','March','April','May','June','July','August','September','October','November','December'][d.getMonth()];
+    return `${m} ${d.getFullYear()}`;
+  });
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const block = localStorage.getItem('apartmentBlock') || 'Block A';
+  const callerRole = localStorage.getItem('role') || 'ROLE_COMMUNITY_ADMIN';
+  const adminName = localStorage.getItem('fullName') || localStorage.getItem('username') || 'Community Admin';
+
+  const handleGenerateReport = async (e) => {
+    e.preventDefault();
+    setGenerating(true);
+    setSuccess(false);
+
+    try {
+      const token = localStorage.getItem('token');
+      if (token) api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+      let printableHTML = '';
+      const nowStr = new Date().toLocaleString();
+
+      if (reportType === 'PNL') {
+        const [purchaseRes, usageRes] = await Promise.allSettled([
+          api.get(`/bulk-purchases?adminUsername=${localStorage.getItem('username') || ''}&billingMonth=${encodeURIComponent(month)}`),
+          api.get(`/usage/block-summary?apartmentBlock=${encodeURIComponent(block)}&callerRole=${callerRole}&billingMonth=${encodeURIComponent(month)}`)
+        ]);
+
+        const purchases = (purchaseRes.status === 'fulfilled' && purchaseRes.value.data) ? purchaseRes.value.data : [];
+        const usageData = (usageRes.status === 'fulfilled' && usageRes.value.data) ? usageRes.value.data : {};
+
+        const totalInflowCost = purchases.reduce((sum, item) => sum + (Number(item.totalCost) || 0), 0);
+        const totalPurchasedVolume = purchases.reduce((sum, item) => sum + (Number(item.purchasedVolumeLiters) || 0), 0);
+        const totalResidentConsumption = Number(usageData.totalVolumeLiters || 0);
+        const totalInflowRevenue = Number(usageData.totalBilledAmount || 0);
+        const netPnlVal = totalInflowRevenue - totalInflowCost;
+        const isProf = netPnlVal >= 0;
+
+        const purchaseRowsHTML = purchases.length > 0 ? purchases.map(p => `
+          <tr>
+            <td>${p.purchaseDate || '—'}</td>
+            <td><strong>${p.sourceType || 'TANKER'}</strong></td>
+            <td>${p.vendorName || 'N/A'}</td>
+            <td style="font-weight:700;">${(p.purchasedVolumeLiters || 0).toLocaleString()} L</td>
+            <td>₹${Number(p.unitRatePerLiter || 0).toFixed(4)}</td>
+            <td style="font-weight:700; color:#0284c7;">₹${Number(p.totalCost || 0).toFixed(2)}</td>
+            <td>${p.notes || '—'}</td>
+          </tr>
+        `).join('') : `<tr><td colspan="7" style="text-align:center; color:#64748b; padding:12px;">No water purchases logged for ${month}</td></tr>`;
+
+        printableHTML = `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Water Purchase & P&L Statement - ${month}</title>
+              <style>
+                body { font-family: 'Segoe UI', Arial, sans-serif; padding: 25px; color: #1e293b; font-size: 12px; }
+                .header { border-bottom: 3px solid #0284c7; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; }
+                .title { font-size: 20px; font-weight: 800; color: #0369a1; }
+                .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+                .kpi-box { padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
+                .kpi-title { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #64748b; }
+                .kpi-val { font-size: 16px; font-weight: 800; margin-top: 4px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
+                th { background: #0284c7; color: white; font-size: 11px; }
+                .footer { border-top: 1.5px solid #cbd5e1; margin-top: 24px; padding-top: 10px; text-align: center; font-size: 10px; color: #64748b; }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <div>
+                  <div class="title">AquaTrack Water Acquisition & P&L Report</div>
+                  <div style="font-[600]; color:#64748b;">Community Block: ${block} &bull; Period: ${month}</div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-weight:700;">Generated via Buddy AI</div>
+                  <div style="color:#64748b;">Date: ${nowStr}</div>
+                </div>
+              </div>
+              <div class="grid">
+                <div class="kpi-box" style="background:#f0f9ff;"><div class="kpi-title">Purchased Volume</div><div class="kpi-val" style="color:#0284c7;">${totalPurchasedVolume.toLocaleString()} L</div></div>
+                <div class="kpi-box" style="background:#fff1f2;"><div class="kpi-title">Acquisition Cost</div><div class="kpi-val" style="color:#e11d48;">₹${totalInflowCost.toFixed(2)}</div></div>
+                <div class="kpi-box" style="background:#f0fdf4;"><div class="kpi-title">Resident Billed</div><div class="kpi-val" style="color:#16a34a;">₹${totalInflowRevenue.toFixed(2)}</div></div>
+                <div class="kpi-box" style="background:${isProf ? '#ecfdf5' : '#fef2f2'};"><div class="kpi-title">Net P&L Result</div><div class="kpi-val" style="color:${isProf ? '#059669' : '#dc2626'};">${isProf ? '+' : ''}₹${netPnlVal.toFixed(2)}</div></div>
+              </div>
+              <h3>📦 Itemized Water Purchase Log (${month})</h3>
+              <table>
+                <thead>
+                  <tr><th>Date</th><th>Source</th><th>Vendor</th><th>Volume (L)</th><th>Rate (₹/L)</th><th>Cost (₹)</th><th>Notes</th></tr>
+                </thead>
+                <tbody>${purchaseRowsHTML}</tbody>
+              </table>
+              <div class="footer">
+                AquaTrack Water & Infrastructure System — Official Monthly Water Acquisition & Financial P&L Audit Statement
+                <div style="margin-top: 5px; font-weight: 700; color: #475569;">Built with ❤️ by Krishna Mohan</div>
+              </div>
+              <script>window.onload = function() { window.print(); };</script>
+            </body>
+          </html>
+        `;
+      } else {
+        const res = await api.get(`/admin/users?callerRole=${callerRole}&callerBlock=${encodeURIComponent(block)}`);
+        const residents = (res.data && Array.isArray(res.data)) ? res.data : [];
+
+        const tableRows = residents.map((r, idx) => `
+          <tr>
+            <td>${idx + 1}</td>
+            <td><strong>${r.fullName || r.username}</strong></td>
+            <td>${r.houseNumber || 'H-???'}</td>
+            <td>${block}</td>
+            <td>AQ-USR-${String(r.id || idx + 1).padStart(6, '0')}</td>
+            <td>${r.phoneNumber || 'N/A'}</td>
+            <td><span style="color:#16a34a; font-weight:700;">ACTIVE</span></td>
+          </tr>
+        `).join('');
+
+        printableHTML = `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>System Audit & Household Directory - ${block}</title>
+              <style>
+                body { font-family: 'Segoe UI', Arial, sans-serif; padding: 25px; color: #1e293b; font-size: 12px; }
+                .header { border-bottom: 3px solid #2563eb; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; }
+                .title { font-size: 20px; font-weight: 800; color: #1d4ed8; }
+                table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+                th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
+                th { background: #1e3a8a; color: white; font-size: 11px; }
+                .footer { border-top: 1.5px solid #cbd5e1; margin-top: 24px; padding-top: 10px; text-align: center; font-size: 10px; color: #64748b; }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <div>
+                  <div class="title">AquaTrack System Audit & Resident Directory</div>
+                  <div style="font-weight:600; color:#64748b;">Community Block: ${block} &bull; Generated by Admin: ${adminName}</div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-weight:700;">Official System Statement</div>
+                  <div style="color:#64748b;">Date: ${nowStr}</div>
+                </div>
+              </div>
+              <h3>👥 Registered Households Audit Log (${residents.length} Households)</h3>
+              <table>
+                <thead>
+                  <tr><th>#</th><th>Resident Name</th><th>House #</th><th>Block</th><th>Consumer ID</th><th>Contact</th><th>Status</th></tr>
+                </thead>
+                <tbody>${tableRows}</tbody>
+              </table>
+              <div class="footer">
+                AquaTrack Water & Infrastructure Monitoring Platform — Official System Audit PDF Document
+                <div style="margin-top: 5px; font-weight: 700; color: #475569;">Built with ❤️ by Krishna Mohan</div>
+              </div>
+              <script>window.onload = function() { window.print(); };</script>
+            </body>
+          </html>
+        `;
+      }
+
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(printableHTML);
+        printWindow.document.close();
+      }
+      setSuccess(true);
+    } catch (err) {
+      console.error("Report PDF generation error:", err);
+      alert("Failed to compile system audit PDF statement.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 p-3.5 rounded-2xl bg-gradient-to-br from-cyan-50/90 to-blue-50/90 dark:from-slate-900/90 dark:to-cyan-950/90 border-2 border-cyan-300 dark:border-cyan-700/60 shadow-lg text-slate-800 dark:text-slate-100 text-xs select-text">
+      <div className="flex items-center gap-1.5 font-extrabold text-cyan-950 dark:text-cyan-200 text-xs mb-2.5">
+        <span className="text-base">📄</span>
+        <span>AI Admin Report PDF Generator</span>
+      </div>
+
+      {success && (
+        <div className="mb-2 p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold flex items-center gap-1">
+          <span>✅ PDF Report compiled & printable window launched!</span>
+        </div>
+      )}
+
+      <form onSubmit={handleGenerateReport} className="space-y-2.5">
+        <div>
+          <label className="block text-[11px] font-bold text-cyan-900 dark:text-cyan-300 mb-1">
+            1. Select Report PDF Type:
+          </label>
+          <div className="grid grid-cols-2 gap-1 mb-2">
+            {[
+              { id: 'PNL', label: '📊 Water Purchase P&L' },
+              { id: 'AUDIT', label: '👥 Resident Audit Log' }
+            ].map(t => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setReportType(t.id)}
+                className={`py-1.5 px-2 rounded-xl text-[10px] font-extrabold transition-all cursor-pointer border ${
+                  reportType === t.id
+                    ? 'bg-cyan-600 text-white border-cyan-600 shadow-xs'
+                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-cyan-200 dark:border-cyan-700 hover:bg-cyan-50'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {reportType === 'PNL' ? (
+          <div>
+            <label className="block text-[11px] font-bold text-cyan-900 dark:text-cyan-300 mb-1">
+              2. Select Target Billing Month:
+            </label>
+            <select
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-cyan-200 dark:border-cyan-700 text-xs font-bold text-cyan-700 dark:text-cyan-300 focus:outline-none cursor-pointer"
+            >
+              {(() => {
+                const yr = new Date().getFullYear();
+                return ['January','February','March','April','May','June','July','August','September','October','November','December'].map(m => (
+                  <option key={m} value={`${m} ${yr}`}>{m} {yr}</option>
+                ));
+              })()}
+            </select>
+          </div>
+        ) : (
+          <div className="text-[11px] text-slate-500 italic bg-white/60 dark:bg-slate-800/60 p-2 rounded-xl border border-cyan-100 dark:border-cyan-900">
+            Generates live resident roster audit log with house identifiers & consumer codes for {block}.
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={generating}
+          className={`w-full py-2 px-3 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer ${
+            generating
+              ? 'bg-slate-400 text-white cursor-not-allowed opacity-60'
+              : 'bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white shadow-emerald-500/20 active:scale-98'
+          }`}
+        >
+          {generating ? (
+            <>
+              <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              <span>Compiling PDF Report...</span>
+            </>
+          ) : (
+            <>
+              <span>📥 Generate & Print {reportType === 'PNL' ? 'P&L Statement' : 'Audit Log'} PDF</span>
+            </>
+          )}
+        </button>
+      </form>
+    </div>
+  );
+};
 
 const HouseholdChatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -80,25 +624,7 @@ const HouseholdChatbot = () => {
     return () => window.removeEventListener('languageChange', handleLangChange);
   }, []);
 
-  // Map 2-letter codes to standard SpeechSynthesis BCP 47 locale codes
-  const getBcp47Locale = (code) => {
-    const map = {
-      'en': 'en-US',
-      'hi': 'hi-IN',
-      'bn': 'bn-IN',
-      'te': 'te-IN',
-      'mr': 'mr-IN',
-      'ta': 'ta-IN',
-      'ur': 'ur-PK',
-      'gu': 'gu-IN',
-      'kn': 'kn-IN',
-      'ml': 'ml-IN',
-      'pa': 'pa-IN',
-      'or': 'or-IN',
-      'as': 'as-IN'
-    };
-    return map[code] || 'en-US';
-  };
+
 
   // Web Speech API TTS helper with Language Matching & Gender Voice Inversion
   const speakText = (text, msgId) => {
@@ -119,28 +645,46 @@ const HouseholdChatbot = () => {
     const bcp47Locale = getBcp47Locale(activeLang);
     utterance.lang = bcp47Locale;
 
-    // Retrieve user gender from localStorage (or fallback based on profile)
+    // Retrieve user gender from localStorage
     const userGender = (localStorage.getItem('gender') || 'male').toLowerCase();
-    // Rule: If user is Male -> target Female voice (sweet pitch 1.15). If Female -> target Male voice (pitch 0.9)
     const targetGender = userGender === 'male' ? 'female' : 'male';
-    utterance.pitch = userGender === 'male' ? 1.15 : 0.9;
-    utterance.rate = 0.95;
+
+    // Siri-like Acoustic Modulation:
+    // Crisp pitch (1.05 for female Siri, 0.95 for male Siri), slightly elevated rate (1.05 for quick, natural cadence)
+    utterance.pitch = targetGender === 'female' ? 1.05 : 0.95;
+    utterance.rate = 1.05;
 
     const voices = window.speechSynthesis.getVoices();
     
-    // Voice Selection Strategy:
-    // 1. Find voice matching locale (e.g. 'hi-IN', 'ta-IN') & target gender
-    // 2. Fallback to locale matching voice
-    // 3. Fallback to language code prefix (e.g. 'hi', 'ta') matching voice
+    // Voice Selection Strategy (Siri-like Natural Acoustic Priority with Indian locale fallback):
+    // 1. Target official Siri/Samantha/Karen/Rishi/Veena natural voices
+    // 2. Target Indian voices with crisp acoustics (en-IN / hi-IN)
     let chosenVoice = voices.find(v => {
-      const matchLang = v.lang.toLowerCase().includes(activeLang.toLowerCase()) || v.lang.toLowerCase().includes(bcp47Locale.toLowerCase());
       const nameLower = v.name.toLowerCase();
-      const matchGender = targetGender === 'female' 
-        ? (nameLower.includes('female') || nameLower.includes('zira') || nameLower.includes('samantha') || nameLower.includes('victoria') || nameLower.includes('natural'))
-        : (nameLower.includes('male') || nameLower.includes('david') || nameLower.includes('george') || nameLower.includes('alex'));
-      return matchLang && matchGender;
+      return nameLower.includes('siri') || nameLower.includes('samantha') || nameLower.includes('natural') || nameLower.includes('karen') || nameLower.includes('rishi');
     });
 
+    if (!chosenVoice) {
+      chosenVoice = voices.find(v => {
+        const isIndianVoice = v.lang.toLowerCase().includes('in') || v.name.toLowerCase().includes('india') || v.name.toLowerCase().includes('indian');
+        const matchLang = v.lang.toLowerCase().includes(activeLang.toLowerCase()) || v.lang.toLowerCase().includes(bcp47Locale.toLowerCase());
+        const nameLower = v.name.toLowerCase();
+        const matchGender = targetGender === 'female' 
+          ? (nameLower.includes('female') || nameLower.includes('veena') || nameLower.includes('heera') || nameLower.includes('neerja') || nameLower.includes('zira') || nameLower.includes('natural'))
+          : (nameLower.includes('male') || nameLower.includes('prabhat') || nameLower.includes('rishi') || nameLower.includes('david') || nameLower.includes('alex'));
+        return isIndianVoice && matchLang && matchGender;
+      });
+    }
+
+    // Fallback 1: Any Indian voice matching language or English (en-IN)
+    if (!chosenVoice) {
+      chosenVoice = voices.find(v => 
+        (v.lang.toLowerCase().includes('en-in') || v.lang.toLowerCase().includes('hi-in') || v.name.toLowerCase().includes('india')) &&
+        (bcp47Locale.startsWith('en') || bcp47Locale.startsWith('hi'))
+      );
+    }
+
+    // Fallback 2: Any voice matching locale or active language
     if (!chosenVoice) {
       chosenVoice = voices.find(v => v.lang.toLowerCase().includes(bcp47Locale.toLowerCase()) || v.lang.toLowerCase().includes(activeLang.toLowerCase()));
     }
@@ -175,6 +719,61 @@ const HouseholdChatbot = () => {
     }
   };
   
+  // Width Resizing logic (Expands Leftward by updating position.x)
+  const [chatWidth, setChatWidth] = useState(430);
+  const [isResizingWidth, setIsResizingWidth] = useState(false);
+  const resizeStartRef = useRef({ startX: 0, startWidth: 430, startPosX: 0 });
+
+  const handleResizeMouseDown = (e) => {
+    if (e.cancelable && !e.touches) {
+      e.preventDefault();
+    }
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+
+    let curX = position.x;
+    if (!hasCustomPosition && windowRef.current) {
+      const rect = windowRef.current.getBoundingClientRect();
+      curX = rect.left;
+      setPosition({ x: rect.left, y: rect.top });
+      setHasCustomPosition(true);
+    }
+
+    resizeStartRef.current = { startX: clientX, startWidth: chatWidth, startPosX: curX };
+    setIsResizingWidth(true);
+  };
+
+  useEffect(() => {
+    const handleMove = (e) => {
+      if (isResizingWidth) {
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const deltaX = resizeStartRef.current.startX - clientX;
+        const newWidth = Math.max(320, Math.min(850, resizeStartRef.current.startWidth + deltaX));
+        
+        // Calculate new X position to anchor right border
+        const widthDiff = newWidth - resizeStartRef.current.startWidth;
+        const newX = resizeStartRef.current.startPosX - widthDiff;
+
+        setChatWidth(newWidth);
+        setPosition(prev => ({ ...prev, x: newX }));
+      }
+    };
+    const handleEnd = () => {
+      if (isResizingWidth) setIsResizingWidth(false);
+    };
+
+    if (isResizingWidth) {
+      window.addEventListener('mousemove', handleMove);
+      window.addEventListener('mouseup', handleEnd);
+      window.addEventListener('touchmove', handleMove, { passive: true });
+      window.addEventListener('touchend', handleEnd);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleEnd);
+    };
+  }, [isResizingWidth]);
   // Position state - defaulted to bottom-right fixed positioning
   const [position, setPosition] = useState({ x: 0, y: 0 }); 
   const [hasCustomPosition, setHasCustomPosition] = useState(false);
@@ -192,9 +791,17 @@ const HouseholdChatbot = () => {
   const houseNo = localStorage.getItem('houseNumber') || localStorage.getItem('houseNo') || 'H-101';
   const role = localStorage.getItem('role') || 'ROLE_HOUSEHOLD_USER';
 
-  // Strictly enforce Household User restriction: Do not render chatbot for Community Admins or Super Admins
-  if (role === 'ROLE_COMMUNITY_ADMIN' || role === 'ROLE_ADMIN') {
-    return null;
+  // Role-based Chatbot Persona configuration (Title is always Buddy, emoji varies by role)
+  let personaTitle = 'Buddy';
+  let personaSubtitle = 'Your AI Water Assistant';
+  let personaEmoji = '👤';
+
+  if (role === 'ROLE_ADMIN') {
+    personaSubtitle = 'System Executive Assistant';
+    personaEmoji = '👑';
+  } else if (role === 'ROLE_COMMUNITY_ADMIN') {
+    personaSubtitle = 'Community Water Manager';
+    personaEmoji = '🛡️';
   }
 
   const [dbData, setDbData] = useState({
@@ -209,7 +816,9 @@ const HouseholdChatbot = () => {
   const handleMouseDown = (e) => {
     if (isMaximized) return;
     if (e.target.closest('button') || e.target.closest('input')) return;
-    e.preventDefault();
+
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
     let initialX = position.x;
     let initialY = position.y;
@@ -223,8 +832,8 @@ const HouseholdChatbot = () => {
     }
 
     dragStartRef.current = {
-      mouseX: e.clientX,
-      mouseY: e.clientY,
+      mouseX: clientX,
+      mouseY: clientY,
       windowX: initialX,
       windowY: initialY
     };
@@ -233,16 +842,19 @@ const HouseholdChatbot = () => {
   };
 
   useEffect(() => {
-    const handleMouseMove = (e) => {
+    const handleMove = (e) => {
       if (!isDragging) return;
+
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
       
       if (animFrameIdRef.current) {
         cancelAnimationFrame(animFrameIdRef.current);
       }
 
       animFrameIdRef.current = requestAnimationFrame(() => {
-        const deltaX = e.clientX - dragStartRef.current.mouseX;
-        const deltaY = e.clientY - dragStartRef.current.mouseY;
+        const deltaX = clientX - dragStartRef.current.mouseX;
+        const deltaY = clientY - dragStartRef.current.mouseY;
 
         const windowWidth = windowRef.current ? windowRef.current.offsetWidth : 400;
         const windowHeight = windowRef.current ? windowRef.current.offsetHeight : 550;
@@ -254,7 +866,7 @@ const HouseholdChatbot = () => {
       });
     };
 
-    const handleMouseUp = () => {
+    const handleEnd = () => {
       if (isDragging) {
         if (animFrameIdRef.current) {
           cancelAnimationFrame(animFrameIdRef.current);
@@ -264,16 +876,20 @@ const HouseholdChatbot = () => {
     };
 
     if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove, { passive: true });
-      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('mousemove', handleMove);
+      window.addEventListener('mouseup', handleEnd);
+      window.addEventListener('touchmove', handleMove, { passive: true });
+      window.addEventListener('touchend', handleEnd);
     }
 
     return () => {
       if (animFrameIdRef.current) {
         cancelAnimationFrame(animFrameIdRef.current);
       }
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleEnd);
     };
   }, [isDragging]);
 
@@ -330,13 +946,20 @@ const HouseholdChatbot = () => {
   // Clear/Reset chat conversation history
   const handleClearChat = () => {
     stopSpeaking();
-    let welcomeText = `Hello **${displayName}**! 👋 I'm **Buddy**, your AI assistant for House **${houseNo}**.\n\n`;
-    if (dbData.recentBill) {
-      const amt = dbData.recentBill.amount ? dbData.recentBill.amount.toFixed(2) : '0.00';
-      const status = dbData.recentBill.status || 'UNPAID';
-      welcomeText += `• **Latest Bill**: ₹${amt} (${status})\n`;
+    let welcomeText = '';
+    if (role === 'ROLE_ADMIN') {
+      welcomeText = `Greetings **${displayName}**! 👑 Welcome to **Buddy** (Executive Assistant).\n\nHow can I assist you with platform revenue metrics, community admin oversight, or escalated tickets today?`;
+    } else if (role === 'ROLE_COMMUNITY_ADMIN') {
+      welcomeText = `Hello **${displayName}**! 🛡️ Welcome to **Buddy** (Community Water Manager).\n\nHow can I assist you with meter workstation uploads, block unpaid dues, tariff settings, or resident support tickets today?`;
+    } else {
+      welcomeText = `Hello **${displayName}**! 👤 I'm **Buddy**, your AI assistant for House **${houseNo}**.\n\n`;
+      if (dbData.recentBill) {
+        const amt = dbData.recentBill.amount ? dbData.recentBill.amount.toFixed(2) : '0.00';
+        const status = dbData.recentBill.status || 'UNPAID';
+        welcomeText += `• **Latest Bill**: ₹${amt} (${status})\n`;
+      }
+      welcomeText += `How can I assist you with your water usage, billing, or support tickets today?`;
     }
-    welcomeText += `How can I assist you with your water usage, billing, or support tickets today?`;
 
     setMessages([
       {
@@ -354,9 +977,33 @@ const HouseholdChatbot = () => {
     if (messages.length === 0) {
       handleClearChat();
     }
-  }, [displayName, houseNo, dbData.recentBill]);
+  }, [displayName, houseNo, dbData.recentBill, role]);
 
   function getContextualPills(path) {
+    if (role === 'ROLE_ADMIN') {
+      return [
+        'Generate executive system PDF report',
+        'What is total platform revenue & pending collection?',
+        'Show all escalated support tickets for Super Admin',
+        'How many total communities and admins are registered?',
+        'What are the current global system tariff defaults?'
+      ];
+    } else if (role === 'ROLE_COMMUNITY_ADMIN') {
+      return [
+        '📄 Generate P&L and audit PDF report',
+        '💧 Add new water meter reading for household',
+        '💰 What is the total unpaid collection in my block?',
+        '📂 How to upload bulk CSV meter readings?',
+        '🏠 Which households have unpaid bills in my block?',
+        '⚙️ How to update base limit & late fee penalty?',
+        '🎧 Show open resident support tickets for my block',
+        '📩 How to send registration invites to new residents?',
+        '📊 How is monthly profit & loss calculated?',
+        '🔐 How to lock or unlock monthly resident billing cycle?',
+        '🏷️ What is the current base tier tariff rate per KL?'
+      ];
+    }
+
     switch (path) {
       case '/bills':
       case '/invoices':
@@ -417,22 +1064,36 @@ const HouseholdChatbot = () => {
   }
 
   function getContextualActions(path) {
-    if (path === '/bills') {
+    if (role === 'ROLE_ADMIN') {
       return [
-        { label: '💡 Water Saving Tips', action: 'nav', path: '/tips', type: 'secondary' },
-        { label: '🎧 Support Desk', action: 'nav', path: '/support', type: 'secondary' }
+        { label: '📊 Executive Dashboard', action: 'nav', path: '/admin-dashboard', type: 'primary' },
+        { label: '🏛️ Escalated Tickets', action: 'nav', path: '/super-admin-tickets', type: 'secondary' },
+        { label: '👥 User Directory', action: 'nav', path: '/user-directory', type: 'secondary' }
       ];
-    } else if (path === '/tips') {
+    } else if (role === 'ROLE_COMMUNITY_ADMIN') {
       return [
-        { label: '💳 Pay Water Bill', action: 'nav', path: '/bills', type: 'primary' },
-        { label: '📊 View Usage History', action: 'nav', path: '/usage', type: 'secondary' }
+        { label: '📊 Meter Workstation', action: 'nav', path: '/meter-workstation', type: 'primary' },
+        { label: '📋 Tariff Settings', action: 'nav', path: '/tariff-settings', type: 'secondary' },
+        { label: '🛠️ Ticket Management', action: 'nav', path: '/support-ticket-management', type: 'danger' }
       ];
     } else {
-      return [
-        { label: '💳 Pay Water Bill', action: 'nav', path: '/bills', type: 'primary' },
-        { label: '🌊 Water Tips', action: 'nav', path: '/tips', type: 'secondary' },
-        { label: '🛠️ Report Issue', action: 'nav', path: '/support', type: 'danger' }
-      ];
+      if (path === '/bills') {
+        return [
+          { label: '💡 Water Saving Tips', action: 'nav', path: '/tips', type: 'secondary' },
+          { label: '🎧 Support Desk', action: 'nav', path: '/support', type: 'secondary' }
+        ];
+      } else if (path === '/tips') {
+        return [
+          { label: '💳 Pay Water Bill', action: 'nav', path: '/bills', type: 'primary' },
+          { label: '📊 View Usage History', action: 'nav', path: '/usage', type: 'secondary' }
+        ];
+      } else {
+        return [
+          { label: '💳 Pay Water Bill', action: 'nav', path: '/bills', type: 'primary' },
+          { label: '🌊 Water Tips', action: 'nav', path: '/tips', type: 'secondary' },
+          { label: '🛠️ Report Issue', action: 'nav', path: '/support', type: 'danger' }
+        ];
+      }
     }
   }
 
@@ -448,19 +1109,334 @@ const HouseholdChatbot = () => {
     setInput('');
     setIsTyping(true);
 
+    const lower = queryText.toLowerCase().trim();
+
+    // 1. Immediate Custom Action Handling
+    if ((lower.includes('pdf') || lower.includes('report') || lower.includes('download report') || lower.includes('print report') || lower.includes('export pdf') || lower.includes('pnl')) &&
+        (role === 'ROLE_COMMUNITY_ADMIN' || role === 'ROLE_ADMIN')) {
+      const botMsgId = Date.now() + 1;
+      const botMsg = {
+        id: botMsgId,
+        sender: 'bot',
+        text: "Certainly! I have compiled the official PDF report generator for your administrative block. 📄✨\n\nPlease select the PDF report type and target month below:",
+        widget: "REPORT_GENERATOR",
+        actions: getContextualActions(location.pathname),
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages((prev) => [...prev, botMsg]);
+      setIsTyping(false);
+      speakText(botMsg.text, botMsgId);
+      return;
+    }
+
+    const monthAliases = [
+      { month: 1, name: 'January', keys: ['january', 'jan', 'janauary', 'januery', 'janiary', 'janvar'] },
+      { month: 2, name: 'February', keys: ['february', 'feb', 'febuary', 'febrary', 'februery'] },
+      { month: 3, name: 'March', keys: ['march', 'mar', 'marh', 'marchh', 'murch'] },
+      { month: 4, name: 'April', keys: ['april', 'apr', 'april', 'apil', 'aprel'] },
+      { month: 5, name: 'May', keys: ['may', 'mai', 'mey'] },
+      { month: 6, name: 'June', keys: ['june', 'jun', 'june', 'junee', 'junei'] },
+      { month: 7, name: 'July', keys: ['july', 'jul', 'jully', 'julyy'] },
+      { month: 8, name: 'August', keys: ['august', 'aug', 'agust', 'augst', 'augustt'] },
+      { month: 9, name: 'September', keys: ['september', 'sep', 'sept', 'septmber', 'septemberr'] },
+      { month: 10, name: 'October', keys: ['october', 'oct', 'octber', 'octobre'] },
+      { month: 11, name: 'November', keys: ['november', 'nov', 'novmber', 'novemberr'] },
+      { month: 12, name: 'December', keys: ['december', 'dec', 'decmber', 'decembre'] }
+    ];
+
+    // Levenshtein distance for fuzzy typo tolerance
+    const getLevenshteinDistance = (a, b) => {
+      const matrix = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+      for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+      for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+      for (let i = 1; i <= a.length; i++) {
+        for (let j = 1; j <= b.length; j++) {
+          const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j - 1] + cost
+          );
+        }
+      }
+      return matrix[a.length][b.length];
+    };
+
+    let standaloneMonth = null;
+    let standaloneMonthName = "";
+
+    // 1. Exact / Substring Matching for Months
+    for (const item of monthAliases) {
+      const match = item.keys.some(k => lower.includes(k) || getLevenshteinDistance(lower.split(' ')[0], k) <= 2);
+      if (match) {
+        standaloneMonth = item.month;
+        standaloneMonthName = item.name;
+        break;
+      }
+    }
+
+    const lastBotMsg = messages.filter(m => m.sender === 'bot').slice(-1)[0]?.text || "";
+    const isFollowUpToBillingQuestion = lastBotMsg.includes('billing month') || lastBotMsg.includes('finalize bills');
+
+    const isFinalizeIntent = (
+      lower.includes('finalize') || lower.includes('finalise') || lower.includes('finaliz') ||
+      lower.includes('generate') || lower.includes('bulk bill') || lower.includes('bulk billing') ||
+      lower.includes('create bill') || lower.includes('bill') || lower.includes('billing')
+    );
+
+    if (role === 'ROLE_COMMUNITY_ADMIN' && (
+        (isFollowUpToBillingQuestion && standaloneMonth) ||
+        (isFinalizeIntent && (lower.includes('bill') || lower.includes('bills') || lower.includes('billing') || lower.includes('cycle') || isFollowUpToBillingQuestion))
+    )) {
+      
+      let foundMonth = standaloneMonth;
+      let foundMonthName = standaloneMonthName;
+      
+      if (!foundMonth) {
+        for (const item of monthAliases) {
+          if (item.keys.some(k => lower.includes(k))) {
+            foundMonth = item.month;
+            foundMonthName = item.name;
+            break;
+          }
+        }
+      }
+
+      const botMsgId = Date.now() + 1;
+      let respText = "";
+      let respActions = [];
+
+      if (foundMonth) {
+        // Calculate pending bills for target month
+        const targetMonth = foundMonth;
+        const currentYear = new Date().getFullYear();
+        
+        const userBlock = localStorage.getItem('apartmentBlock') || localStorage.getItem('block') || '';
+        let blockLogs = [];
+        let blockBills = [];
+        let blockUsers = [];
+        try {
+          const logUrl = role === 'ROLE_ADMIN' || !userBlock ? '/usage/all' : `/usage/block/${userBlock}`;
+          const billUrl = role === 'ROLE_ADMIN' || !userBlock ? '/bills/all' : `/bills/block/${userBlock}`;
+
+          const [logRes, billRes, userRes] = await Promise.all([
+            api.get(logUrl),
+            api.get(billUrl),
+            api.get('/admin/users', { params: { callerRole: role, callerBlock: userBlock } })
+          ]);
+          blockLogs = logRes.data || [];
+          blockBills = billRes.data || [];
+          blockUsers = userRes.data || [];
+
+          if (blockLogs.length === 0) {
+            const fallbackLogs = await api.get('/usage/all');
+            blockLogs = fallbackLogs.data || [];
+          }
+          if (blockBills.length === 0) {
+            const fallbackBills = await api.get('/bills/all');
+            blockBills = fallbackBills.data || [];
+          }
+        } catch (e) {
+          console.warn("Error fetching logs for chatbot check:", e);
+        }
+
+        const residentsList = blockUsers.filter(u => u.role === 'ROLE_RESIDENT' || u.role === 'ROLE_HOUSEHOLD_USER');
+
+        let pendingCount = 0;
+        for (const u of (residentsList.length > 0 ? residentsList : Object.values(blockLogs.reduce((acc, l) => ({ ...acc, [l.houseNumber]: { houseNumber: l.houseNumber } }), {})))) {
+          const targetMonthLogs = blockLogs.filter(l => {
+            if (l.houseNumber !== u.houseNumber) return false;
+            if (!l.readingDate) return false;
+            const parts = l.readingDate.split('-');
+            if (parts.length < 2) return false;
+            return parseInt(parts[0], 10) === currentYear && parseInt(parts[1], 10) === targetMonth;
+          });
+
+          if (targetMonthLogs.length === 0) continue;
+
+          const alreadyBilled = blockBills.some(b => {
+            if (b.houseNumber !== u.houseNumber) return false;
+            const dateStr = b.generatedDate || b.createdAt;
+            if (!dateStr) return false;
+            const parts = dateStr.split('-');
+            if (parts.length < 2) return false;
+            return parseInt(parts[0], 10) === currentYear && parseInt(parts[1], 10) === targetMonth;
+          });
+
+          if (!alreadyBilled) {
+            const totalL = targetMonthLogs.reduce((s, l) => s + (l.readingLiters || 0), 0);
+            if (totalL > 0) pendingCount++;
+          }
+        }
+
+        if (pendingCount === 0) {
+          respText = `There are **no pending unbilled logs** or bills present for **${foundMonthName} ${currentYear}**. All household logs are up to date! ✅`;
+          respActions = [
+            { label: '📊 View Meter Workstation', action: 'nav', path: '/meter-workstation', type: 'secondary' }
+          ];
+        } else {
+          respText = `Found **${pendingCount} pending resident bill${pendingCount > 1 ? 's' : ''}** ready to be finalized for **${foundMonthName} ${currentYear}**! ⚡\n\nClick the button below to open the **Bulk Billing Preview** window with full calculation breakdowns:`;
+          respActions = [
+            { label: `⚡ Finalize ${pendingCount} Bill${pendingCount > 1 ? 's' : ''} for ${foundMonthName}`, action: 'nav', path: `/meter-workstation?action=finalize_bulk&month=${foundMonth}`, type: 'primary' }
+          ];
+        }
+      } else {
+        respText = "Which **billing month** would you like to finalize bills for? Please specify or select a month below: 📅";
+        respActions = [
+          { label: 'January Bills', action: 'nav', path: '/meter-workstation?action=finalize_bulk&month=1', type: 'primary' },
+          { label: 'February Bills', action: 'nav', path: '/meter-workstation?action=finalize_bulk&month=2', type: 'secondary' },
+          { label: 'March Bills', action: 'nav', path: '/meter-workstation?action=finalize_bulk&month=3', type: 'secondary' },
+          { label: 'April Bills', action: 'nav', path: '/meter-workstation?action=finalize_bulk&month=4', type: 'secondary' }
+        ];
+      }
+
+      const botMsg = {
+        id: botMsgId,
+        sender: 'bot',
+        text: respText,
+        actions: respActions,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages((prev) => [...prev, botMsg]);
+      setIsTyping(false);
+      speakText(respText, botMsgId);
+      return;
+    }
+
+    // Client-Side Intent Interceptor for immediate & accurate response
+    let clientBotResponseText = null;
+    let clientBotActions = null;
+    let clientBotWidget = null;
+    let clientBotParsedLiters = null;
+
+    // Extensive Typo Dictionaries & Fuzzy Intent Interceptor
+    const identityKeys = ['who am i', 'whi i am', 'who i am', 'whu i am', 'tell about me', 'tell me about me', 'tell me about myself', 'tell about myself', 'about me', 'abt me', 'my profile', 'my details', 'my info', 'my informaton', 'who am i'];
+    const usageKeys = ['usage', 'useage', 'usag', 'usge', 'log', 'logs', 'water log', 'water logs', 'loog', 'loogs', 'reading', 'readings', 'readng', 'consumption', 'consumtion', 'consumpion', 'history', 'hitory', 'histry'];
+    const billKeys = ['bill', 'bills', 'bil', 'bils', 'billing', 'biling', 'biiling', 'pay', 'payment', 'paymnt', 'tariff', 'tarif', 'cost', 'amount', 'unpaid', 'due', 'dues', 'pending'];
+    const leakKeys = ['leak', 'leek', 'pipe', 'pip', 'issue', 'isuue', 'support', 'suport', 'ticket', 'tikit', 'tckit', 'damage', 'breakage'];
+    const tipKeys = ['tip', 'tips', 'save', 'saving', 'savng', 'reduce', 'reduse', 'excess', 'exces'];
+
+    const matchesAnyKey = (keys) => keys.some(k => lower.includes(k) || getLevenshteinDistance(lower.split(' ')[0], k) <= 2);
+
+    if (matchesAnyKey(identityKeys)) {
+      const userBlock = localStorage.getItem('apartmentBlock') || localStorage.getItem('block') || 'Block A';
+      const userEmail = localStorage.getItem('email') || 'Registered Resident';
+      const roleTitle = role === 'ROLE_ADMIN' ? 'System Administrator' : role === 'ROLE_COMMUNITY_ADMIN' ? 'Community Water Manager' : 'Household Resident';
+      
+      clientBotResponseText = `Here are your profile details, **${displayName}**! 👤✨\n\n` +
+        `• **Name**: ${displayName}\n` +
+        `• **Role**: ${roleTitle}\n` +
+        `• **House Number**: ${houseNo}\n` +
+        `• **Apartment Block**: ${userBlock}\n` +
+        `• **Contact Email**: ${userEmail}\n\n` +
+        `You are registered on the **AquaTrack** smart water network! How can I assist you with your account today?`;
+      clientBotActions = [
+        { label: '📊 Usage Analytics', action: 'nav', path: '/usage', type: 'primary' },
+        { label: '💳 My Bills', action: 'nav', path: '/bills', type: 'secondary' }
+      ];
+    } else if (matchesAnyKey(usageKeys)) {
+      let monthNotice = standaloneMonthName ? ` for **${standaloneMonthName}**` : '';
+      clientBotResponseText = `Here is your requested water usage information${monthNotice} for House **${houseNo}**! 📊\n\n` +
+        `• **Recent Status**: Active daily telemetry logging\n` +
+        `• **Total Recorded Usage**: ${dbData.totalConsumption != null ? `${dbData.totalConsumption} Liters` : 'Fetched live from smart meter'}\n\n` +
+        `You can view your detailed daily chart, breakdown graphs, and peak hours under Usage Analytics.`;
+      clientBotActions = [
+        { label: '📊 Open Usage Analytics', action: 'nav', path: '/usage', type: 'primary' },
+        { label: '💳 View Bills History', action: 'nav', path: '/bills', type: 'secondary' }
+      ];
+    } else if (matchesAnyKey(billKeys)) {
+      let monthNotice = standaloneMonthName ? ` for **${standaloneMonthName}**` : '';
+      let billInfo = dbData.recentBill 
+        ? `Your bill details${monthNotice} for House **${houseNo}**: Amount: **₹${dbData.recentBill.amount?.toFixed(2)}** (Status: **${dbData.recentBill.status}**).`
+        : `For House **${houseNo}**${monthNotice}, your water consumption up to standard limit is billed at base tariff rate, with excess billed at tier rate.`;
+      clientBotResponseText = `${billInfo}\n\nYou can view complete month-wise billing history and make instant payments on the Billing page! 💳`;
+      clientBotActions = [
+        { label: '💳 Pay / View Bills', action: 'nav', path: '/bills', type: 'primary' },
+        { label: '📊 Usage Breakdown', action: 'nav', path: '/usage', type: 'secondary' }
+      ];
+    } else if (matchesAnyKey(leakKeys)) {
+      clientBotResponseText = `Hi **${displayName}**, if you notice an urgent leak or water supply issue in House **${houseNo}**:\n\n1. Turn off main stop-cock valve if necessary.\n2. Raise a high-priority ticket on the Support Desk for community maintenance.`;
+      clientBotActions = [
+        { label: '🛠️ Report Issue', action: 'nav', path: '/support', type: 'danger' },
+        { label: '🌊 Water Tips', action: 'nav', path: '/tips', type: 'secondary' }
+      ];
+    } else if (matchesAnyKey(tipKeys)) {
+      clientBotResponseText = `Here are actionable ways to lower your monthly bill:\n\n• **Aerators**: Fit faucet aerators to save up to 30% water.\n• **Flush Leaks**: Check toilet tank flappers for hidden trickles.\n• **Track Usage**: Check daily graphs under My Usage.`;
+      clientBotActions = [
+        { label: '🌊 Water Tips', action: 'nav', path: '/tips', type: 'primary' },
+        { label: '💳 Bills History', action: 'nav', path: '/bills', type: 'secondary' }
+      ];
+    }
+
+    // Client Cache & Rate-Limit Strategy (Zero unnecessary API / DB calls)
+    if (!window._chatbotQueryCache) {
+      window._chatbotQueryCache = new Map();
+    }
+    const cachedResponse = window._chatbotQueryCache.get(lower);
+    if (cachedResponse) {
+      const botMsgId = Date.now() + 1;
+      const botMsg = {
+        id: botMsgId,
+        sender: 'bot',
+        text: cachedResponse.text,
+        widget: cachedResponse.widget || null,
+        parsedLiters: cachedResponse.parsedLiters || null,
+        actions: cachedResponse.actions || getContextualActions(location.pathname),
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages((prev) => [...prev, botMsg]);
+      setIsTyping(false);
+      speakText(cachedResponse.text, botMsgId);
+      return;
+    }
+
+    if (clientBotResponseText) {
+      // Store in memory cache to save future roundtrips
+      window._chatbotQueryCache.set(lower, {
+        text: clientBotResponseText,
+        actions: clientBotActions || getContextualActions(location.pathname)
+      });
+
+      const botMsgId = Date.now() + 1;
+      const botMsg = {
+        id: botMsgId,
+        sender: 'bot',
+        text: clientBotResponseText,
+        widget: clientBotWidget,
+        parsedLiters: clientBotParsedLiters,
+        actions: clientBotActions || getContextualActions(location.pathname),
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages((prev) => [...prev, botMsg]);
+      setIsTyping(false);
+      speakText(clientBotResponseText, botMsgId);
+      return;
+    }
+
     try {
       const res = await api.post('/chatbot/query', {
         query: queryText,
         houseNumber: houseNo,
+        username: localStorage.getItem('username') || '',
+        role: role,
         activePage: location.pathname
       });
 
       if (res.data && res.data.answer) {
+        window._chatbotQueryCache.set(lower, {
+          text: res.data.answer,
+          widget: res.data.widget || null,
+          parsedLiters: res.data.parsedLiters || null,
+          actions: res.data.actions || getContextualActions(location.pathname)
+        });
+
         const botMsgId = Date.now() + 1;
         const botMsg = {
           id: botMsgId,
           sender: 'bot',
           text: res.data.answer,
+          widget: res.data.widget || null,
+          parsedLiters: res.data.parsedLiters || null,
           actions: res.data.actions || getContextualActions(location.pathname),
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
@@ -476,11 +1452,51 @@ const HouseholdChatbot = () => {
     setTimeout(() => {
       let botResponseText = "";
       let botActions = [];
+      let botWidget = null;
+      let botParsedLiters = null;
       const lower = queryText.toLowerCase().trim();
 
-      if (lower.startsWith('hi') || lower.startsWith('hello') || lower.startsWith('hey') || lower.startsWith('good morning')) {
+      if (role === 'ROLE_COMMUNITY_ADMIN' && 
+          (lower.includes('add') || lower.includes('log') || lower.includes('entry') || lower.includes('record')) && 
+          (lower.includes('water') || lower.includes('reading') || lower.includes('liter') || lower.includes('meter') || lower.includes('log'))) {
+        
+        let parsed = null;
+        const match = queryText.match(/(\d+(\.\d+)?)/);
+        if (match) parsed = parseFloat(match[1]);
+
+        botResponseText = "Certainly! It is my absolute pleasure to assist you with adding a new water log directly right here. 😊\n\nPlease select the household resident and verify the log details below:";
+        botWidget = "WATER_LOG_FORM";
+        botParsedLiters = parsed;
+        botActions = getContextualActions(location.pathname);
+      } else if (lower.startsWith('hi') || lower.startsWith('hello') || lower.startsWith('hey') || lower.startsWith('good morning')) {
         botResponseText = `Hello **${displayName}**! 👋 Welcome. How can I assist you with your water bills, usage, or maintenance tickets for House **${houseNo}** today?`;
         botActions = getContextualActions(location.pathname);
+      } else if (
+        lower.includes('who am i') || 
+        lower.includes('tell about me') || 
+        lower.includes('tell me about me') || 
+        lower.includes('tell me about myself') || 
+        lower.includes('tell about myself') || 
+        lower.includes('about me') || 
+        lower.includes('my profile') || 
+        lower.includes('my details') || 
+        lower.includes('my info')
+      ) {
+        const userBlock = localStorage.getItem('apartmentBlock') || localStorage.getItem('block') || 'Block A';
+        const userEmail = localStorage.getItem('email') || 'Registered Resident';
+        const roleTitle = role === 'ROLE_ADMIN' ? 'System Administrator' : role === 'ROLE_COMMUNITY_ADMIN' ? 'Community Water Manager' : 'Household Resident';
+        
+        botResponseText = `Here are your profile details, **${displayName}**! 👤✨\n\n` +
+          `• **Name**: ${displayName}\n` +
+          `• **Role**: ${roleTitle}\n` +
+          `• **House Number**: ${houseNo}\n` +
+          `• **Apartment Block**: ${userBlock}\n` +
+          `• **Contact Email**: ${userEmail}\n\n` +
+          `You are registered on the **AquaTrack** smart water network! How can I assist you with your account today?`;
+        botActions = [
+          { label: '📊 Usage Analytics', action: 'nav', path: '/usage', type: 'primary' },
+          { label: '💳 My Bills', action: 'nav', path: '/bills', type: 'secondary' }
+        ];
       } else if (lower.includes('who are you') || lower.includes('your name')) {
         botResponseText = `I'm **Buddy**, your AI assistant! ⚡\n\nI can help you track daily water usage, view & pay monthly bills, report leaks, and discover water-saving tips.`;
         botActions = getContextualActions(location.pathname);
@@ -490,17 +1506,28 @@ const HouseholdChatbot = () => {
       } else if (lower.includes('thank') || lower.includes('thanks')) {
         botResponseText = `You're very welcome! 😊 Feel free to ask if you need anything else.`;
         botActions = getContextualActions(location.pathname);
-      } else if (lower.includes('bill') || lower.includes('pay') || lower.includes('tariff') || lower.includes('cost')) {
-        let billInfo = dbData.recentBill 
-          ? `Your current bill for **${houseNo}** is **₹${dbData.recentBill.amount?.toFixed(2)}** (Status: **${dbData.recentBill.status}**).`
-          : `For house **${houseNo}**, usage up to standard limit is billed at base tariff rate, while excess usage incurs Tier 2 tariff.`;
-        botResponseText = `${billInfo}\n\nYou can view your itemized billing statement or pay instantly via online gateway.`;
+      } else if (lower.includes('log') || lower.includes('usage') || lower.includes('consumption') || lower.includes('reading') || lower.includes('history')) {
+        let monthNotice = standaloneMonthName ? ` for **${standaloneMonthName}**` : '';
+        botResponseText = `Here is your requested water usage information${monthNotice} for House **${houseNo}**! 📊\n\n` +
+          `• **Recent Status**: Active daily telemetry logging\n` +
+          `• **Total Recorded Usage**: ${dbData.totalConsumption != null ? `${dbData.totalConsumption} Liters` : 'Fetched live from smart meter'}\n\n` +
+          `You can view your detailed daily chart, breakdown graphs, and peak hours under Usage Analytics.`;
         botActions = [
-          { label: '💳 Pay Bill', action: 'nav', path: '/bills', type: 'primary' },
-          { label: '📊 Water Usage', action: 'nav', path: '/usage', type: 'secondary' }
+          { label: '📊 Open Usage Analytics', action: 'nav', path: '/usage', type: 'primary' },
+          { label: '💳 View Bills History', action: 'nav', path: '/bills', type: 'secondary' }
+        ];
+      } else if (lower.includes('bill') || lower.includes('pay') || lower.includes('tariff') || lower.includes('cost') || lower.includes('amount') || lower.includes('unpaid')) {
+        let monthNotice = standaloneMonthName ? ` for **${standaloneMonthName}**` : '';
+        let billInfo = dbData.recentBill 
+          ? `Your bill details${monthNotice} for House **${houseNo}**: Amount: **₹${dbData.recentBill.amount?.toFixed(2)}** (Status: **${dbData.recentBill.status}**).`
+          : `For House **${houseNo}**${monthNotice}, your water consumption up to standard limit is billed at base tariff rate, with excess billed at tier rate.`;
+        botResponseText = `${billInfo}\n\nYou can view complete month-wise billing history and make instant payments on the Billing page! 💳`;
+        botActions = [
+          { label: '💳 Pay / View Bills', action: 'nav', path: '/bills', type: 'primary' },
+          { label: '📊 Usage Breakdown', action: 'nav', path: '/usage', type: 'secondary' }
         ];
       } else if (lower.includes('leak') || lower.includes('pipe') || lower.includes('issue') || lower.includes('support') || lower.includes('ticket')) {
-        botResponseText = `Hi **${displayName}**, if you notice an urgent leak or water supply issue in house **${houseNo}**:\n\n1. Turn off main stop-cock valve.\n2. Raise a high-priority ticket on the Support Desk.`;
+        botResponseText = `Hi **${displayName}**, if you notice an urgent leak or water supply issue in House **${houseNo}**:\n\n1. Turn off main stop-cock valve if necessary.\n2. Raise a high-priority ticket on the Support Desk for community maintenance.`;
         botActions = [
           { label: '🛠️ Report Issue', action: 'nav', path: '/support', type: 'danger' },
           { label: '🌊 Water Tips', action: 'nav', path: '/tips', type: 'secondary' }
@@ -512,31 +1539,49 @@ const HouseholdChatbot = () => {
           { label: '💳 Bills History', action: 'nav', path: '/bills', type: 'secondary' }
         ];
       } else {
-        botResponseText = `I'm **Buddy**, tuned specifically for your household water services! 💧\n\nI can help you with your **water bills, usage analytics, leakage reports, and conservation tips** for House **${houseNo}**.`;
+        // Polite fallback for off-topic or irrelevant questions
+        botResponseText = `I appreciate your question, **${displayName}**! 😊\n\nWhile I am specialized specifically as your **AquaTrack Water Assistant** for House **${houseNo}**, I'd be glad to help you with:\n\n` +
+          `• 📊 **Water Usage Logs & History** (e.g. *"my water logs of January"*)\n` +
+          `• 💳 **Current & Past Monthly Bills** (e.g. *"my current bill"* or *"bills for February"*)\n` +
+          `• 🛠️ **Reporting Pipe Leaks & Support Tickets**\n` +
+          `• 💧 **Water Consumption Limits & Conservation Tips**\n\n` +
+          `How can I assist you with your water account today?`;
         botActions = getContextualActions(location.pathname);
       }
 
+      const botMsgId = Date.now() + 1;
       setMessages((prev) => [
         ...prev,
         {
-          id: Date.now() + 1,
+          id: botMsgId,
           sender: 'bot',
           text: botResponseText,
+          widget: botWidget,
+          parsedLiters: botParsedLiters,
           actions: botActions,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
       setIsTyping(false);
+      speakText(botResponseText, botMsgId);
     }, 600);
   };
 
+  // Request Debouncing & Double-Submit Lock Guard
+  const isProcessingRef = useRef(false);
+
   const handleSend = (e) => {
     e.preventDefault();
-    if (!input.trim()) return;
-    processUserQuery(input);
+    if (!input.trim() || isTyping || isProcessingRef.current) return;
+    
+    isProcessingRef.current = true;
+    processUserQuery(input).finally(() => {
+      isProcessingRef.current = false;
+    });
   };
 
   const handleActionClick = (act) => {
+    if (isProcessingRef.current) return;
     if (act.action === 'nav' && act.path) {
       navigate(act.path);
     }
@@ -569,19 +1614,31 @@ const HouseholdChatbot = () => {
               isMaximized
                 ? { inset: '20px', position: 'fixed', zIndex: 9999, width: 'calc(100vw - 40px)', height: 'calc(100vh - 40px)' }
                 : hasCustomPosition
-                ? { left: `${position.x}px`, top: `${position.y}px`, position: 'fixed', zIndex: 9999 }
-                : { right: '24px', bottom: '90px', position: 'fixed', zIndex: 9999 }
+                ? { left: `${position.x}px`, top: `${position.y}px`, position: 'fixed', zIndex: 9999, width: `${chatWidth}px` }
+                : { right: '24px', bottom: '90px', position: 'fixed', zIndex: 9999, width: `${chatWidth}px` }
             }
             className={`${
-              isMaximized ? '' : 'w-[390px] sm:w-[430px] max-w-[calc(100vw-24px)] h-[540px] sm:h-[600px] max-h-[85vh]'
-            } rounded-3xl bg-surface/95 backdrop-blur-2xl border-2 border-primary/40 shadow-[0_20px_50px_rgba(0,120,255,0.25)] flex flex-col overflow-hidden text-text select-none ${
-              isDragging ? 'transition-none ring-4 ring-primary/60' : 'transition-all duration-300'
+              isMaximized ? '' : 'h-[540px] sm:h-[600px] max-h-[85vh] max-w-[calc(100vw-24px)]'
+            } rounded-3xl bg-surface/95 backdrop-blur-2xl border-2 border-primary/40 shadow-[0_20px_50px_rgba(0,120,255,0.25)] flex flex-col overflow-hidden text-text select-none relative ${
+              isDragging || isResizingWidth || hasCustomPosition ? 'transition-none' : 'transition-all duration-300'
             }`}
           >
+            {/* Left Edge Resize Handle (Mouse & Touch Enabled) */}
+            {!isMaximized && (
+              <div
+                onMouseDown={handleResizeMouseDown}
+                onTouchStart={handleResizeMouseDown}
+                className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-primary/30 z-50 flex items-center justify-center group touch-none"
+                title="Drag or swipe to resize chatbot width"
+              >
+                <div className="w-1 h-8 rounded-full bg-slate-400/40 dark:bg-slate-500/40 group-hover:bg-primary transition-all"></div>
+              </div>
+            )}
             {/* Header: Adaptable Neumorphic Banner */}
             <div
               onMouseDown={handleMouseDown}
-              className="px-5 py-4 bg-gradient-to-r from-[#c4b5fd] via-[#b8a5fe] to-[#a78bfa] dark:from-slate-900 dark:via-indigo-950 dark:to-slate-900 border-b-2 border-white/80 dark:border-indigo-900/40 flex items-center justify-between cursor-grab active:cursor-grabbing z-20 shadow-[0_4px_12px_rgba(109,40,217,0.15)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.5)]"
+              onTouchStart={handleMouseDown}
+              className="px-5 py-4 bg-gradient-to-r from-[#c4b5fd] via-[#b8a5fe] to-[#a78bfa] dark:from-slate-900 dark:via-indigo-950 dark:to-slate-900 border-b-2 border-white/80 dark:border-indigo-900/40 flex items-center justify-between cursor-grab active:cursor-grabbing z-20 shadow-[0_4px_12px_rgba(109,40,217,0.15)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.5)] touch-none"
             >
               <div className="flex items-center space-x-3 pointer-events-none">
                 <div className="w-11 h-11 shrink-0 aspect-square rounded-full overflow-hidden border-2 border-white dark:border-indigo-500/50 shadow-[3px_3px_8px_rgba(109,40,217,0.25),-2px_-2px_6px_rgba(255,255,255,0.9)] dark:shadow-[0_0_12px_rgba(99,102,241,0.4)] flex items-center justify-center bg-slate-950 relative">
@@ -593,9 +1650,9 @@ const HouseholdChatbot = () => {
                 </div>
                 <div>
                   <h3 className="text-base font-extrabold tracking-tight text-purple-950 dark:text-indigo-100 flex items-center gap-1.5 drop-shadow-xs">
-                    Buddy <span className="text-cyan-500 dark:text-cyan-400 animate-pulse">💧</span>
+                    {personaTitle} <span className="text-cyan-500 dark:text-cyan-400 animate-pulse">{personaEmoji}</span>
                   </h3>
-                  <p className="text-[11px] text-purple-900/80 dark:text-indigo-300/80 font-bold">Your AI Water Assistant</p>
+                  <p className="text-[11px] text-purple-900/80 dark:text-indigo-300/80 font-bold">{personaSubtitle}</p>
                 </div>
               </div>
 
@@ -715,6 +1772,23 @@ const HouseholdChatbot = () => {
                   >
                     {renderMessageContent(msg.text)}
 
+                    {/* Interactive In-Chat Water Log Widget for Community Admins */}
+                    {msg.widget === "WATER_LOG_FORM" && (
+                      <WaterLogFormWidget
+                        parsedLiters={msg.parsedLiters}
+                        onLogged={() => {
+                          setTimeout(() => {
+                            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                          }, 100);
+                        }}
+                      />
+                    )}
+
+                    {/* Interactive In-Chat Report PDF Generator Widget */}
+                    {msg.widget === "REPORT_GENERATOR" && (
+                      <ReportGeneratorWidget />
+                    )}
+
                     {/* Styled Action Pill Buttons */}
                     {msg.actions && msg.actions.length > 0 && (
                       <div className={`mt-3 pt-2.5 border-t border-purple-300/40 dark:border-slate-800 flex flex-wrap gap-2 ${isMaximized ? 'mt-4 pt-3.5 gap-3' : ''}`}>
@@ -799,10 +1873,13 @@ const HouseholdChatbot = () => {
               {getContextualPills(location.pathname).map((pill, idx) => (
                 <motion.button
                   key={idx}
-                  whileHover={{ scale: 1.04 }}
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => processUserQuery(pill)}
-                  className={`font-bold rounded-full bg-[#f3ebff] dark:bg-slate-800 border border-white/90 dark:border-slate-700 text-purple-950 dark:text-purple-200 transition-all flex-shrink-0 cursor-pointer shadow-[3px_3px_6px_rgba(147,112,219,0.35),-3px_-3px_6px_rgba(255,255,255,0.9)] dark:shadow-[3px_3px_6px_rgba(0,0,0,0.5),-2px_-2px_5px_rgba(255,255,255,0.05)] active:shadow-[inset_2px_2px_4px_rgba(147,112,219,0.4),inset_-2px_-2px_4px_rgba(255,255,255,0.9)] ${
+                  disabled={isTyping}
+                  whileHover={isTyping ? {} : { scale: 1.04 }}
+                  whileTap={isTyping ? {} : { scale: 0.96 }}
+                  onClick={() => !isTyping && processUserQuery(pill)}
+                  className={`font-bold rounded-full bg-[#f3ebff] dark:bg-slate-800 border border-white/90 dark:border-slate-700 text-purple-950 dark:text-purple-200 transition-all flex-shrink-0 shadow-[3px_3px_6px_rgba(147,112,219,0.35),-3px_-3px_6px_rgba(255,255,255,0.9)] dark:shadow-[3px_3px_6px_rgba(0,0,0,0.5),-2px_-2px_5px_rgba(255,255,255,0.05)] active:shadow-[inset_2px_2px_4px_rgba(147,112,219,0.4),inset_-2px_-2px_4px_rgba(255,255,255,0.9)] ${
+                    isTyping ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'cursor-pointer'
+                  } ${
                     isMaximized ? 'text-xs md:text-sm px-4 py-2' : 'text-[10px] px-3 py-1.5'
                   }`}
                 >
@@ -818,8 +1895,9 @@ const HouseholdChatbot = () => {
               <input
                 type="text"
                 value={input}
+                disabled={isTyping}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={isListening ? "Listening..." : "Ask Buddy a question..."}
+                placeholder={isListening ? "Listening..." : isTyping ? "Buddy is thinking..." : "Ask Buddy a question..."}
                 className={`flex-1 min-w-0 rounded-2xl border-2 transition-all focus:outline-none shadow-[inset_4px_4px_8px_rgba(147,112,219,0.35),inset_-4px_-4px_8px_rgba(255,255,255,0.9)] dark:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.6)] ${
                   isMaximized ? 'text-sm md:text-base px-5 py-3.5 rounded-3xl' : 'text-xs px-3 py-2 sm:px-4 sm:py-2.5'
                 } ${
@@ -832,10 +1910,13 @@ const HouseholdChatbot = () => {
               {/* Voice Command Microphone Button */}
               <motion.button
                 type="button"
-                whileHover={{ scale: 1.08 }}
-                whileTap={{ scale: 0.92 }}
+                disabled={isTyping}
+                whileHover={isTyping ? {} : { scale: 1.08 }}
+                whileTap={isTyping ? {} : { scale: 0.92 }}
                 onClick={toggleVoiceInput}
-                className={`p-2.5 shrink-0 rounded-2xl transition-all flex items-center justify-center cursor-pointer border ${
+                className={`p-2.5 shrink-0 rounded-2xl transition-all flex items-center justify-center border ${
+                  isTyping ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                } ${
                   isListening 
                     ? 'bg-rose-500 text-white border-rose-600 animate-bounce shadow-[4px_4px_10px_rgba(244,63,94,0.4)]' 
                     : 'bg-[#e1d2f9] dark:bg-slate-800 text-indigo-900 dark:text-indigo-300 border-white/90 dark:border-slate-700 shadow-[3px_3px_6px_rgba(160,154,170,0.45),-3px_-3px_6px_rgba(255,255,255,0.9)] dark:shadow-[3px_3px_6px_rgba(15,23,42,0.6),-2px_-2px_5px_rgba(30,41,59,0.5)]'

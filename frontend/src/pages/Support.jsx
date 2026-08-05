@@ -73,9 +73,13 @@ export default function Support() {
 
   const markTicketAsRead = (ticket) => {
     if (!ticket || !ticket.id) return;
-    const replyCount = ticket.replies ? ticket.replies.length : 0;
+    const replyCount = Array.isArray(ticket.replies) ? ticket.replies.length : (ticket.replyCount || 0);
+    const key = String(ticket.id);
     setReadTicketCounts(prev => {
-      const updated = { ...prev, [ticket.id]: replyCount };
+      const existing = prev[key];
+      const previousCount = typeof existing === 'object' ? (existing.count ?? 0) : (existing ?? 0);
+      const maxCount = Math.max(previousCount, replyCount);
+      const updated = { ...prev, [key]: { count: maxCount, visited: true } };
       const userKey = username ? `aquatrack_read_reply_counts_${username}` : 'aquatrack_read_reply_counts';
       try {
         localStorage.setItem(userKey, JSON.stringify(updated));
@@ -84,6 +88,20 @@ export default function Support() {
       }
       return updated;
     });
+  };
+
+  const getUnreadCount = (ticket, isSelected) => {
+    if (isSelected) return 0;
+    const key = String(ticket.id);
+    const readData = readTicketCounts[key] ?? readTicketCounts[ticket.id];
+    const totalReplies = Array.isArray(ticket.replies) ? ticket.replies.length : (ticket.replyCount || 0);
+
+    if (readData === undefined) {
+      return totalReplies > 0 ? totalReplies : 1;
+    }
+
+    const savedCount = typeof readData === 'object' ? (readData.count ?? 0) : readData;
+    return Math.max(0, totalReplies - savedCount);
   };
 
   const isResident = role === 'ROLE_RESIDENT';
@@ -171,6 +189,13 @@ export default function Support() {
       return () => clearInterval(interval);
     }
   }, [fetchTickets, username]);
+
+  // Auto-mark selected ticket as read whenever it updates or receives new replies
+  useEffect(() => {
+    if (selectedTicket && selectedTicket.id) {
+      markTicketAsRead(selectedTicket);
+    }
+  }, [selectedTicket?.id, selectedTicket?.replies?.length]);
 
   const handleMailTo = (email) => {
     window.location.href = `mailto:${email}`;
@@ -265,15 +290,15 @@ export default function Support() {
 
   const getStatusBadge = (ticket) => {
     if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
-      return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"><CheckCircle2 className="w-3.5 h-3.5" /> Resolved</span>;
+      return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shrink-0 whitespace-nowrap"><CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" /> Resolved</span>;
     }
     if (ticket.escalatedToSuperAdmin || ticket.status === 'ESCALATED_TO_SUPER_ADMIN') {
-      return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30 animate-pulse"><ShieldAlert className="w-3.5 h-3.5" /> Sent to Super Admin</span>;
+      return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30 animate-pulse shrink-0 whitespace-nowrap"><ShieldAlert className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" /> Sent to Super Admin</span>;
     }
     if (ticket.status === 'IN_PROGRESS') {
-      return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30"><Clock className="w-3.5 h-3.5" /> In Progress</span>;
+      return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 shrink-0 whitespace-nowrap"><Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" /> In Progress</span>;
     }
-    return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/30"><HelpCircle className="w-3.5 h-3.5" /> Open</span>;
+    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/30 shrink-0 whitespace-nowrap"><HelpCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" /> Open</span>;
   };
 
   const getPriorityBadge = (priority) => {
@@ -320,9 +345,9 @@ export default function Support() {
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.96 }}
               onClick={() => setShowCreateModal(true)}
-              className="bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white py-2.5 px-5 rounded-2xl font-extrabold text-xs inline-flex items-center gap-2.5 shadow-xl shadow-blue-500/30 border border-white/20 transition-all cursor-pointer"
+              className="w-full sm:w-auto bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white py-2.5 px-5 rounded-2xl font-extrabold text-xs flex items-center justify-center gap-2.5 shadow-xl shadow-blue-500/30 border border-white/20 transition-all cursor-pointer"
             >
-              <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
+              <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0">
                 <Plus className="w-3.5 h-3.5 text-white stroke-[3]" />
               </div>
               <span className="tracking-wide">{isResident ? 'Report Issue' : 'Raise Issue'}</span>
@@ -393,16 +418,7 @@ export default function Support() {
                   <div className="flex flex-col gap-2.5 w-full items-center overflow-y-auto max-h-[420px] scrollbar-none py-1">
                     {filteredTickets.map((ticket) => {
                       const isSelected = selectedTicket && selectedTicket.id === ticket.id;
-                      const totalReplies = ticket.replies ? ticket.replies.length : 0;
-                      const lastReadCount = readTicketCounts[ticket.id];
-                      let unreadReplies = 0;
-                      if (isSelected) {
-                        unreadReplies = 0;
-                      } else if (lastReadCount === undefined) {
-                        unreadReplies = totalReplies > 0 ? totalReplies : 1;
-                      } else {
-                        unreadReplies = Math.max(0, totalReplies - lastReadCount);
-                      }
+                      const unreadReplies = getUnreadCount(ticket, isSelected);
 
                       return (
                         <button
@@ -420,9 +436,8 @@ export default function Support() {
                           </span>
 
                           {unreadReplies > 0 && (
-                            <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500 border-2 border-white dark:border-slate-900"></span>
+                            <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center">
+                              <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500 border-2 border-white dark:border-slate-900 shadow-sm"></span>
                             </span>
                           )}
                         </button>
@@ -504,21 +519,7 @@ export default function Support() {
                     <div className="flex flex-col gap-3 max-h-[420px] overflow-y-auto px-1.5 py-1 custom-scrollbar">
                       {filteredTickets.map((ticket) => {
                         const isSelected = selectedTicket && selectedTicket.id === ticket.id;
-                        const totalReplies = ticket.replies ? ticket.replies.length : 0;
-                        const lastReadCount = readTicketCounts[ticket.id];
-                        
-                        // WhatsApp style:
-                        // 1. If currently selected/open -> 0 unread
-                        // 2. If never opened (lastReadCount === undefined) -> unread = totalReplies (or 1 if no replies yet)
-                        // 3. If previously read -> unread = Math.max(0, totalReplies - lastReadCount)
-                        let unreadReplies = 0;
-                        if (isSelected) {
-                          unreadReplies = 0;
-                        } else if (lastReadCount === undefined) {
-                          unreadReplies = totalReplies > 0 ? totalReplies : 1;
-                        } else {
-                          unreadReplies = Math.max(0, totalReplies - lastReadCount);
-                        }
+                        const unreadReplies = getUnreadCount(ticket, isSelected);
 
                         return (
                           <motion.div
@@ -535,17 +536,17 @@ export default function Support() {
                               <div className="absolute top-0 right-0 w-1.5 h-full bg-purple-600 rounded-r-xl" />
                             )}
                             
-                            <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] font-mono font-extrabold text-primary">#{ticket.ticketNumber}</span>
+                            <div className="flex items-center justify-between gap-1.5 mb-1.5 flex-wrap">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[10px] font-mono font-extrabold text-primary shrink-0">#{ticket.ticketNumber}</span>
                                 {ticket.screenshotUrl && (
-                                  <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center gap-0.5" title="Has Screenshot Attachment">
-                                    <Image className="w-2.5 h-2.5" />
+                                  <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center gap-0.5 shrink-0 whitespace-nowrap" title="Has Screenshot Attachment">
+                                    <Image className="w-2.5 h-2.5 shrink-0" />
                                     Image
                                   </span>
                                 )}
                                 {!isSelected && unreadReplies > 0 && (
-                                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-rose-500 text-white animate-bounce shadow-sm shadow-rose-500/30 flex items-center gap-0.5" title={`${unreadReplies} new message${unreadReplies > 1 ? 's' : ''}`}>
+                                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-rose-500 text-white shadow-sm shadow-rose-500/30 flex items-center gap-0.5 shrink-0 whitespace-nowrap" title={`${unreadReplies} new message${unreadReplies > 1 ? 's' : ''}`}>
                                     {unreadReplies} new
                                   </span>
                                 )}
@@ -1097,20 +1098,20 @@ export default function Support() {
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+                <div className="flex flex-col sm:flex-row justify-center sm:justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
-                    className="px-5 py-2.5 rounded-xl text-xs font-black text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 transition-all cursor-pointer"
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-black text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 transition-all cursor-pointer text-center"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={creatingTicket}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-blue-500/25 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
+                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                   >
-                    {creatingTicket ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    {creatingTicket ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : <Send className="w-4 h-4 shrink-0" />}
                     <span>{isResident ? 'Submit Report' : 'Escalate to Super Admin'}</span>
                   </button>
                 </div>

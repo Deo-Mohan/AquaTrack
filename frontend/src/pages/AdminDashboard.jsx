@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Home, Droplet, AlertCircle, Server, Settings, Database, Activity, 
   Plus, Trash2, Edit, Send, Receipt, Search, FileText, CheckCircle2, X, Info, Loader2, ShieldAlert,
-  Building2, MapPin, Upload, Download, Mail, Zap, BarChart3, Lightbulb, Coins
+  Building2, MapPin, Upload, Download, Mail, Zap, BarChart3, Lightbulb, Coins, Truck
 } from 'lucide-react';
 
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -39,24 +39,24 @@ const CustomTooltip = ({ active, payload }) => {
     const data = payload[0].payload;
     const isHousehold = data.houseNumber !== undefined;
     return (
-      <div className="bg-slate-900 border border-slate-700 p-4 rounded-xl shadow-2xl backdrop-blur-md text-xs text-slate-300">
+      <div className="bg-surface border border-border p-4 rounded-xl shadow-2xl backdrop-blur-md text-xs text-text border-primary/20">
         {isHousehold ? (
           <div className="space-y-1.5">
-            <p className="font-bold text-sm text-white flex items-center gap-1.5">
+            <p className="font-bold text-sm text-text flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse inline-block" />
               Flat {data.houseNumber}
             </p>
-            <p><span className="text-slate-400 font-medium">Resident:</span> <strong className="text-primary font-semibold">{data.residentName}</strong></p>
-            <p><span className="text-slate-400 font-medium">Total Usage:</span> <strong className="text-emerald-400 font-bold">{data.usage} Liters</strong></p>
-            <p><span className="text-slate-400 font-medium">Last Logged:</span> <span className="text-slate-200">{data.lastReadingDate || 'N/A'}</span></p>
+            <p><span className="text-text-muted font-medium">Resident:</span> <strong className="text-primary font-semibold">{data.residentName}</strong></p>
+            <p><span className="text-text-muted font-medium">Total Usage:</span> <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{data.usage} Liters</strong></p>
+            <p><span className="text-text-muted font-medium">Last Logged:</span> <span className="text-text">{data.lastReadingDate || 'N/A'}</span></p>
           </div>
         ) : (
           <div className="space-y-1">
-            <p className="font-bold text-sm text-white flex items-center gap-1.5">
+            <p className="font-bold text-sm text-text flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
               {data.name}
             </p>
-            <p><span className="text-slate-400 font-medium">Total Usage:</span> <strong className="text-blue-400 font-bold">{data.usage} Liters</strong></p>
+            <p><span className="text-text-muted font-medium">Total Usage:</span> <strong className="text-blue-600 dark:text-blue-400 font-bold">{data.usage} Liters</strong></p>
           </div>
         )}
       </div>
@@ -118,6 +118,29 @@ export default function AdminDashboard() {
       return [];
     }
   });
+
+  const [waterPurchasedStats, setWaterPurchasedStats] = useState({ thisMonthLiters: 0, overallLiters: 0 });
+
+  const fetchWaterPurchasedStats = async () => {
+    try {
+      const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const [currRes, allRes] = await Promise.allSettled([
+        api.get(`/bulk-purchases?callerUsername=${adminUsername}&billingMonth=${encodeURIComponent(currentMonth)}`),
+        api.get(`/bulk-purchases?callerUsername=${adminUsername}`)
+      ]);
+      let currLiters = 0;
+      let overallLiters = 0;
+      if (currRes.status === 'fulfilled' && Array.isArray(currRes.value?.data)) {
+        currLiters = currRes.value.data.reduce((acc, item) => acc + (item.volumeLiters || 0), 0);
+      }
+      if (allRes.status === 'fulfilled' && Array.isArray(allRes.value?.data)) {
+        overallLiters = allRes.value.data.reduce((acc, item) => acc + (item.volumeLiters || 0), 0);
+      }
+      setWaterPurchasedStats({ thisMonthLiters: currLiters, overallLiters });
+    } catch (err) {
+      console.error("Error fetching water purchase stats:", err);
+    }
+  };
 
   const handleDismissAlert = (id) => {
     setDismissedAlerts(prev => {
@@ -622,6 +645,7 @@ export default function AdminDashboard() {
     fetchPendingVerifications();
     if (isSuperAdmin) fetchColonies();
     fetchCommunityAdminRate();
+    fetchWaterPurchasedStats();
   }, [isSuperAdmin, block]);
 
 
@@ -1642,7 +1666,7 @@ export default function AdminDashboard() {
     document.body.removeChild(link);
   };
 
-  const StatCard = ({ title, value, icon: Icon, svgSrc, color, delay, onClick }) => (
+  const StatCard = ({ title, value, subtitle, icon: Icon, svgSrc, color, delay, onClick }) => (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -1650,23 +1674,85 @@ export default function AdminDashboard() {
       onClick={onClick}
       className={`glass-card p-6 relative overflow-hidden group transition-all duration-300 ${onClick ? 'cursor-pointer hover:scale-[1.02] hover:bg-surface-lighter/25 hover:border-primary/30 border-border/65' : ''}`}
     >
-      <div className="flex justify-between items-start">
+      <div className="flex justify-between items-center h-full">
         <div>
           <p className="text-text-muted text-sm font-medium mb-1">{title}</p>
           <h3 className="text-3xl font-bold text-text tracking-tight">{value}</h3>
+          {subtitle && (
+            <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+              <span>{subtitle}</span>
+            </p>
+          )}
         </div>
-        {svgSrc ? (
+        {Icon === Truck ? (
+          <div className="relative flex flex-col items-center justify-center p-1 my-auto">
+            {/* Shaking Truck Icon */}
+            <motion.div
+              animate={{
+                y: [0, -1.5, 0.8, -0.8, 0],
+                rotate: [0, -0.6, 0.6, -0.3, 0]
+              }}
+              transition={{
+                repeat: Infinity,
+                duration: 1.2,
+                ease: "easeInOut"
+              }}
+              className="z-10"
+            >
+              <Truck className="w-8 h-8 text-blue-500 dark:text-blue-400 drop-shadow-sm" />
+            </motion.div>
+
+            {/* Infinitely Moving Road Dashed Line Below Truck */}
+            <div className="w-12 h-1 overflow-hidden relative -mt-1 opacity-80">
+              <motion.div
+                className="w-[200%] h-full border-b-2 border-dashed border-blue-500/80 dark:border-blue-400/80"
+                animate={{ x: [0, -24] }}
+                transition={{
+                  repeat: Infinity,
+                  duration: 0.9,
+                  ease: "linear"
+                }}
+              />
+            </div>
+          </div>
+        ) : svgSrc ? (
           <motion.img 
             src={svgSrc} 
             alt={title} 
-            className="w-16 h-16 sm:w-20 sm:h-20 object-contain group-hover:scale-110 transition-transform duration-300 -mt-2 -mr-2"
+            className="w-16 h-16 sm:w-20 sm:h-20 object-contain group-hover:scale-110 transition-transform duration-300 my-auto"
             animate={{ y: [0, -4, 0] }}
             transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
           />
         ) : (
-          <div className={`p-3 rounded-xl bg-${color}-500/10 text-${color}-400 group-hover:scale-110 transition-transform duration-300`}>
-            <Icon className="w-6 h-6" />
-          </div>
+          Icon === Settings ? (
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
+              className={`p-2 text-${color}-400 group-hover:scale-110 transition-transform duration-300 my-auto`}
+            >
+              <Icon className="w-8 h-8 drop-shadow-sm" />
+            </motion.div>
+          ) : Icon === Home ? (
+            <motion.div
+              animate={{ y: [0, -3.5, 0] }}
+              transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
+              className={`p-2 text-${color}-400 group-hover:scale-110 transition-transform duration-300 my-auto`}
+            >
+              <Icon className="w-8 h-8 drop-shadow-sm" />
+            </motion.div>
+          ) : Icon === Users ? (
+            <motion.div
+              animate={{ scale: [1, 1.12, 1] }}
+              transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+              className={`p-2 text-${color}-400 group-hover:scale-110 transition-transform duration-300 my-auto`}
+            >
+              <Icon className="w-8 h-8 drop-shadow-sm" />
+            </motion.div>
+          ) : (
+            <div className={`p-3.5 rounded-xl bg-${color}-500/10 text-${color}-400 group-hover:scale-105 transition-transform duration-300 border border-${color}-500/20 my-auto`}>
+              {Icon && <Icon className="w-6 h-6" />}
+            </div>
+          )
         )}
       </div>
       <div className={`absolute -right-10 -bottom-10 w-32 h-32 bg-${color}-500/5 rounded-full blur-2xl`} />
@@ -1944,10 +2030,19 @@ export default function AdminDashboard() {
                 <StatCard title="Total Platform Users" value={stats ? `${stats.totalUsers}` : '...'} icon={Settings} color="pink" delay={0.4} />
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard title="Money to be Collected" value={stats && stats.pendingCollections !== undefined ? `₹${(stats.pendingCollections || 0).toLocaleString()}` : '₹0'} svgSrc="/coin.gif" color="amber" delay={0.1} />
                 <StatCard title="Registered Residents" value={stats ? `${stats.totalResidents}` : '...'} svgSrc="/colleague.svg" color="emerald" delay={0.2} onClick={() => setActiveTab('users')} />
                 <StatCard title={`Total Block Usage (${new Date().toLocaleString('default', { month: 'long' })})`} value={stats ? `${stats.totalUsageThisMonth} Liters` : '...'} svgSrc="/empty_state_meter_reading.svg" color="purple" delay={0.3} onClick={() => navigate('/water-billing-history')} />
+                <StatCard
+                  title={`Water Purchased (${new Date().toLocaleString('default', { month: 'long' })})`}
+                  value={`${(waterPurchasedStats.thisMonthLiters || 0).toLocaleString()} Liters`}
+                  subtitle={`Overall Purchased: ${(waterPurchasedStats.overallLiters || 0).toLocaleString()} L`}
+                  icon={Truck}
+                  color="blue"
+                  delay={0.4}
+                  onClick={() => navigate('/water-purchase')}
+                />
               </div>
             )}
 
@@ -1960,63 +2055,70 @@ export default function AdminDashboard() {
             )}
 
             {/* Graphs & Alerts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="glass-card p-6 lg:col-span-2 min-h-[350px]">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                  <div>
-                    <h3 className="font-semibold text-text">
+             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="glass-card p-3.5 sm:p-6 lg:col-span-2 min-h-[350px]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+                  <div className="text-center sm:text-left">
+                    <h3 className="font-bold text-sm sm:text-base text-text flex items-center justify-center sm:justify-start gap-2">
+                      <Droplet className="w-4 h-4 text-cyan-500 shrink-0" />
                       {isSuperAdmin ? 'Community Water Distribution (Liters)' : 'Top Consumer Households'}
                     </h3>
                   </div>
-                  <div className="flex flex-wrap items-center gap-3">
+
+                  <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2.5 w-full sm:w-auto">
                     {isSuperAdmin && (
                       <>
-                        {/* Scope Toggle Tabs */}
-                        <div className="bg-surface-lighter p-0.5 rounded-lg border border-border flex items-center">
+                        {/* Scope Toggle Pills */}
+                        <div className="bg-surface-lighter/90 p-1 rounded-full border border-border flex items-center shadow-sm shrink-0">
                           <button
                             onClick={() => { setChartScope('colony'); setSelectedColonyFilter('all'); }}
-                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                               chartScope === 'colony'
-                                ? 'bg-primary text-white shadow-sm'
+                                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md'
                                 : 'text-text-muted hover:text-text'
                             }`}
                           >
-                            Colony View
+                            <Home className="w-3.5 h-3.5" />
+                            <span>Colony View</span>
                           </button>
                           <button
                             onClick={() => setChartScope('building')}
-                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                               chartScope === 'building'
-                                ? 'bg-primary text-white shadow-sm'
+                                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md'
                                 : 'text-text-muted hover:text-text'
                             }`}
                           >
-                            Building View
+                            <Building2 className="w-3.5 h-3.5" />
+                            <span>Building View</span>
                           </button>
                         </div>
 
-                        {/* Colony Filter (Only in Building View) */}
+                        {/* Colony Filter Pill (Only in Building View) */}
                         {chartScope === 'building' && (
-                          <select
-                            value={selectedColonyFilter}
-                            onChange={(e) => setSelectedColonyFilter(e.target.value)}
-                            className="bg-surface-lighter border border-border rounded-lg px-2.5 py-1 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer max-w-[150px]"
-                          >
-                            <option value="all">All Colonies</option>
-                            {apartments.map(apt => (
-                              <option key={apt.id} value={apt.name}>{apt.name}</option>
-                            ))}
-                          </select>
+                          <div className="relative shrink-0">
+                            <select
+                              value={selectedColonyFilter}
+                              onChange={(e) => setSelectedColonyFilter(e.target.value)}
+                              className="bg-surface-lighter/90 border border-border rounded-full px-3 py-1 text-xs font-semibold text-text focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer shadow-sm appearance-none pr-7 max-w-[140px] sm:max-w-[160px] truncate"
+                            >
+                              <option value="all">All Colonies</option>
+                              {apartments.map(apt => (
+                                <option key={apt.id} value={apt.name}>{apt.name}</option>
+                              ))}
+                            </select>
+                            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted text-[10px]">▼</div>
+                          </div>
                         )}
                       </>
                     )}
 
                     {!isSuperAdmin && (
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <select
                           value={selectedChartMonth}
                           onChange={(e) => setSelectedChartMonth(parseInt(e.target.value, 10))}
-                          className="bg-surface-lighter border border-border rounded-lg px-2.5 py-1 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer"
+                          className="bg-surface-lighter border border-border rounded-full px-3 py-1 text-xs font-semibold text-text focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer shadow-sm"
                         >
                           {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((mon, idx) => (
                             <option key={mon} value={idx + 1}>{mon}</option>
@@ -2025,7 +2127,7 @@ export default function AdminDashboard() {
                         <select
                           value={selectedChartYear}
                           onChange={(e) => setSelectedChartYear(parseInt(e.target.value, 10))}
-                          className="bg-surface-lighter border border-border rounded-lg px-2.5 py-1 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer"
+                          className="bg-surface-lighter border border-border rounded-full px-3 py-1 text-xs font-semibold text-text focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer shadow-sm"
                         >
                           {[2024, 2025, 2026, 2027, 2028, 2029, 2030].map(yr => (
                             <option key={yr} value={yr}>{yr}</option>
@@ -2034,15 +2136,42 @@ export default function AdminDashboard() {
                       </div>
                     )}
 
-                    <select
-                      value={chartType}
-                      onChange={(e) => setChartType(e.target.value)}
-                      className="bg-surface-lighter border border-border rounded-lg px-2.5 py-1 text-xs text-text focus:outline-none focus:border-primary/50 cursor-pointer"
-                    >
-                      <option value="bar">Bar Chart</option>
-                      <option value="line">Line Chart</option>
-                      <option value="area">Area Chart</option>
-                    </select>
+                    {/* Chart Type Selection Pills */}
+                    <div className="bg-surface-lighter/90 p-1 rounded-full border border-border flex items-center justify-center shadow-sm shrink-0">
+                      <button
+                        onClick={() => setChartType('bar')}
+                        className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                          chartType === 'bar'
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'text-text-muted hover:text-text'
+                        }`}
+                        title="Bar Chart"
+                      >
+                        Bar
+                      </button>
+                      <button
+                        onClick={() => setChartType('line')}
+                        className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                          chartType === 'line'
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'text-text-muted hover:text-text'
+                        }`}
+                        title="Line Chart"
+                      >
+                        Line
+                      </button>
+                      <button
+                        onClick={() => setChartType('area')}
+                        className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                          chartType === 'area'
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'text-text-muted hover:text-text'
+                        }`}
+                        title="Area Chart"
+                      >
+                        Area
+                      </button>
+                    </div>
                   </div>
                 </div>
                  <div className={`w-full transition-all duration-300 ${isChartExpanded ? 'h-[450px]' : 'h-[250px]'}`}>
@@ -2073,10 +2202,10 @@ export default function AdminDashboard() {
                           {(() => {
                             if (chartType === 'line') {
                               return (
-                                <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                                  <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                                <LineChart data={chartData} margin={{ top: 10, right: 10, left: 5, bottom: 0 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border/50" vertical={false} />
+                                  <XAxis dataKey="name" stroke="currentColor" className="text-text-muted" fontSize={11} tickLine={false} axisLine={false} />
+                                  <YAxis stroke="currentColor" className="text-text-muted" fontSize={11} tickLine={false} axisLine={false} width={40} />
                                   <Tooltip content={<CustomTooltip />} />
                                   <Line type="monotone" dataKey="usage" stroke={isSuperAdmin ? '#3b82f6' : '#8b5cf6'} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                                 </LineChart>
@@ -2084,16 +2213,16 @@ export default function AdminDashboard() {
                             }
                             if (chartType === 'area') {
                               return (
-                                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 5, bottom: 0 }}>
                                   <defs>
                                     <linearGradient id="colorUsageAdmin" x1="0" y1="0" x2="0" y2="1">
                                       <stop offset="5%" stopColor={isSuperAdmin ? '#3b82f6' : '#8b5cf6'} stopOpacity={0.4}/>
                                       <stop offset="95%" stopColor={isSuperAdmin ? '#3b82f6' : '#8b5cf6'} stopOpacity={0}/>
                                     </linearGradient>
                                   </defs>
-                                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                                  <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border/50" vertical={false} />
+                                  <XAxis dataKey="name" stroke="currentColor" className="text-text-muted" fontSize={11} tickLine={false} axisLine={false} />
+                                  <YAxis stroke="currentColor" className="text-text-muted" fontSize={11} tickLine={false} axisLine={false} width={40} />
                                   <Tooltip content={<CustomTooltip />} />
                                   <Area type="monotone" dataKey="usage" stroke={isSuperAdmin ? '#3b82f6' : '#8b5cf6'} strokeWidth={3} fillOpacity={1} fill="url(#colorUsageAdmin)" />
                                 </AreaChart>
@@ -2102,13 +2231,13 @@ export default function AdminDashboard() {
                             return (
                               <BarChart 
                                 data={chartData} 
-                                margin={{ top: 10, right: 10, left: 0, bottom: 0 }} 
+                                margin={{ top: 10, right: 10, left: 5, bottom: 0 }} 
                                 layout="vertical"
                               >
-                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                                <XAxis type="number" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={85} />
-                                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#334155', opacity: 0.2 }} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border/50" horizontal={false} />
+                                <XAxis type="number" stroke="currentColor" className="text-text-muted" fontSize={11} tickLine={false} axisLine={false} />
+                                <YAxis dataKey="name" type="category" stroke="currentColor" className="text-text-muted" fontSize={11} tickLine={false} axisLine={false} width={75} />
+                                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(148, 163, 184, 0.15)' }} />
                                 <Bar dataKey="usage" radius={[0, 4, 4, 0]} barSize={20}>
                                   {chartData.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
@@ -3350,181 +3479,189 @@ export default function AdminDashboard() {
 
         {/* Bulk Invite Modal */}
         {bulkInviteModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto pt-16 pb-10">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto py-10">
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-surface border border-border w-full max-w-xl rounded-2xl p-6 shadow-2xl relative my-8"
+              className="bg-surface border border-border w-full max-w-2xl rounded-2xl p-8 shadow-2xl relative my-auto min-h-[500px] flex flex-col justify-between"
             >
               <button
                 onClick={() => { setBulkInviteModalOpen(false); setBulkInviteReport(null); setBulkInviteFile(null); }}
-                className="absolute top-4 right-4 text-text-muted hover:text-text cursor-pointer"
+                className="absolute top-5 right-5 text-text-muted hover:text-text cursor-pointer p-1 rounded-lg hover:bg-surface-lighter transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-6 h-6" />
               </button>
 
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20">
-                  <Upload className="w-5 h-5 text-violet-400" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-text">Bulk Invite Residents</h3>
-                  <p className="text-text-muted text-xs mt-0.5">Upload a CSV file to send invitations to multiple residents at once.</p>
-                </div>
-              </div>
-
-              {/* CSV Format Info */}
-              <div className="mt-4 p-3.5 rounded-xl bg-primary/5 border border-primary/15 text-xs text-primary/90 space-y-1.5">
-                <p className="font-semibold flex items-center gap-1.5">📋 Required CSV Format</p>
-                <p className="text-text-muted">Four columns: <code className="bg-surface-lighter px-1.5 py-0.5 rounded font-mono">Full Name</code>, <code className="bg-surface-lighter px-1.5 py-0.5 rounded font-mono">Email</code>, <code className="bg-surface-lighter px-1.5 py-0.5 rounded font-mono">House Number</code>, and <code className="bg-surface-lighter px-1.5 py-0.5 rounded font-mono">Meter ID</code> (last two are optional)</p>
-                <p className="text-text-muted">Row 1 must be the header. Prefilling house number and meter ID helps speed up onboarding.</p>
-                <button
-                  type="button"
-                  onClick={downloadCsvTemplate}
-                  className="flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-semibold transition-colors mt-1"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  Download CSV Template
-                </button>
-              </div>
-
-              {!bulkInviteReport ? (
-                <form onSubmit={handleBulkInviteSubmit} className="mt-5 space-y-4">
-                  {/* File Drop Zone */}
-                  <div className="relative">
-                    <label
-                      htmlFor="bulk-invite-file"
-                      className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
-                        bulkInviteFile
-                          ? 'border-violet-500/50 bg-violet-500/5'
-                          : 'border-border hover:border-violet-500/40 hover:bg-violet-500/5'
-                      }`}
-                    >
-                      <input
-                        id="bulk-invite-file"
-                        type="file"
-                        accept=".csv"
-                        className="hidden"
-                        onChange={(e) => setBulkInviteFile(e.target.files[0] || null)}
-                      />
-                      <Upload className={`w-8 h-8 mb-2 ${bulkInviteFile ? 'text-violet-400' : 'text-text-muted'}`} />
-                      {bulkInviteFile ? (
-                        <>
-                          <p className="text-sm font-bold text-violet-400">{bulkInviteFile.name}</p>
-                          <p className="text-xs text-text-muted mt-1">{(bulkInviteFile.size / 1024).toFixed(1)} KB · Click to change</p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-sm font-semibold text-text">Drag & Drop or Click to Select</p>
-                          <p className="text-xs text-text-muted mt-1">Supports .csv files only</p>
-                        </>
-                      )}
-                    </label>
+              <div>
+                <div className="flex items-center gap-3.5 mb-3">
+                  <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20">
+                    <Upload className="w-6 h-6 text-violet-400" />
                   </div>
-
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => { setBulkInviteModalOpen(false); setBulkInviteFile(null); }}
-                      className="flex-1 py-2.5 border border-border text-text-muted hover:text-text hover:border-text-muted rounded-xl font-medium transition-colors cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={bulkLoading || !bulkInviteFile}
-                      className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      {bulkLoading ? (
-                        <><Loader2 className="w-4 h-4 animate-spin" /> Sending Invitations...</>
-                      ) : (
-                        <><Mail className="w-4 h-4" /> Send All Invitations</>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                /* Results Report */
-                <div className="mt-5 space-y-4">
-                  {/* Summary cards */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="rounded-xl bg-surface-lighter border border-border p-3 text-center">
-                      <p className="text-2xl font-black text-text">{bulkInviteReport.totalRows}</p>
-                      <p className="text-xs text-text-muted mt-0.5 font-medium">Total Rows</p>
-                    </div>
-                    <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-center">
-                      <p className="text-2xl font-black text-emerald-400">{bulkInviteReport.imported}</p>
-                      <p className="text-xs text-emerald-400/70 mt-0.5 font-medium">Invited</p>
-                    </div>
-                    <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-center">
-                      <p className="text-2xl font-black text-red-400">{bulkInviteReport.failed}</p>
-                      <p className="text-xs text-red-400/70 mt-0.5 font-medium">Failed</p>
-                    </div>
-                    <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-center">
-                      <p className="text-2xl font-black text-amber-400">{bulkInviteReport.duplicates}</p>
-                      <p className="text-xs text-amber-400/70 mt-0.5 font-medium">Duplicates</p>
-                    </div>
-                  </div>
-
-                  {/* Progress bar */}
                   <div>
-                    <div className="flex justify-between text-xs text-text-muted mb-1.5">
-                      <span>Success Rate</span>
-                      <span className="font-bold text-emerald-400">{bulkInviteReport.successPercentage}</span>
-                    </div>
-                    <div className="h-2 w-full bg-surface-lighter rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-emerald-500 rounded-full transition-all duration-700"
-                        style={{ width: bulkInviteReport.successPercentage }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Row details */}
-                  {bulkInviteReport.details && bulkInviteReport.details.length > 0 && (
-                    <div className="rounded-xl border border-border overflow-hidden">
-                      <div className="px-4 py-2.5 bg-surface-lighter border-b border-border">
-                        <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Row Details</p>
-                      </div>
-                      <div className="max-h-48 overflow-y-auto divide-y divide-border/50">
-                        {bulkInviteReport.details.map((d, i) => (
-                          <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs">
-                            <div className="flex items-center gap-2">
-                              <span className="text-text-muted">Row {d.row}</span>
-                              {d.email && <span className="text-text font-medium">{d.email}</span>}
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              {d.status === 'SUCCESS' ? (
-                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">✓ Sent</span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-semibold" title={d.reason}>
-                                  {d.status === 'DUPLICATE_IN_DB' || d.status === 'DUPLICATE_IN_FILE' ? '⚠ Duplicate' : '✗ Failed'}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => { setBulkInviteReport(null); setBulkInviteFile(null); }}
-                      className="flex-1 py-2.5 border border-border text-text-muted hover:text-text hover:border-text-muted rounded-xl font-medium transition-colors cursor-pointer"
-                    >
-                      Upload Another
-                    </button>
-                    <button
-                      onClick={() => { setBulkInviteModalOpen(false); setBulkInviteReport(null); setBulkInviteFile(null); }}
-                      className="flex-1 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-xl font-bold transition-all cursor-pointer"
-                    >
-                      Done
-                    </button>
+                    <h3 className="text-2xl font-bold text-text">Bulk Invite Residents</h3>
+                    <p className="text-text-muted text-sm mt-0.5">Upload a CSV file to send invitations to multiple residents at once.</p>
                   </div>
                 </div>
-              )}
+
+                {/* CSV Format Info */}
+                <div className="mt-5 p-4 rounded-xl bg-violet-500/10 border border-violet-500/20 text-sm space-y-2">
+                  <p className="font-bold flex items-center gap-2 text-violet-700 dark:text-violet-300 text-base">📋 Required CSV Format</p>
+                  <p className="text-text font-medium leading-relaxed">
+                    Four columns: <code className="bg-surface-lighter text-text dark:text-violet-200 px-2 py-0.5 rounded font-mono font-bold border border-violet-500/40">Full Name</code>, <code className="bg-surface-lighter text-text dark:text-violet-200 px-2 py-0.5 rounded font-mono font-bold border border-violet-500/40">Email</code>, <code className="bg-surface-lighter text-text dark:text-violet-200 px-2 py-0.5 rounded font-mono font-bold border border-violet-500/40">House Number</code>, and <code className="bg-surface-lighter text-text dark:text-violet-200 px-2 py-0.5 rounded font-mono font-bold border border-violet-500/40">Meter ID</code> (last two are optional)
+                  </p>
+                  <p className="text-text font-medium">Row 1 must be the header. Prefilling house number and meter ID helps speed up onboarding.</p>
+                  <button
+                    type="button"
+                    onClick={downloadCsvTemplate}
+                    className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 font-extrabold transition-colors mt-2 text-sm"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download CSV Template (.csv)
+                  </button>
+                </div>
+
+                {!bulkInviteReport ? (
+                  <form onSubmit={handleBulkInviteSubmit} className="mt-6 space-y-6">
+                    {/* File Drop Zone */}
+                    <div className="relative">
+                      <label
+                        htmlFor="bulk-invite-file"
+                        className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all ${
+                          bulkInviteFile
+                            ? 'border-violet-500/60 bg-violet-500/10'
+                            : 'border-border hover:border-violet-500/50 hover:bg-violet-500/5'
+                        }`}
+                      >
+                        <input
+                          id="bulk-invite-file"
+                          type="file"
+                          accept=".csv"
+                          className="hidden"
+                          onChange={(e) => setBulkInviteFile(e.target.files[0] || null)}
+                        />
+                        <Upload className={`w-10 h-10 mb-3 ${bulkInviteFile ? 'text-violet-400' : 'text-text-muted'}`} />
+                        {bulkInviteFile ? (
+                          <>
+                            <p className="text-base font-bold text-violet-400">{bulkInviteFile.name}</p>
+                            <p className="text-sm text-text-muted mt-1">{(bulkInviteFile.size / 1024).toFixed(1)} KB · Click to change file</p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-base font-bold text-text">Drag & Drop or Click to Select CSV File</p>
+                            <p className="text-sm text-text-muted mt-1">Supports standard .csv files only</p>
+                          </>
+                        )}
+                      </label>
+                    </div>
+
+                    <div className="flex gap-4 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => { setBulkInviteModalOpen(false); setBulkInviteFile(null); }}
+                        className="flex-1 py-3 border border-border text-text-muted hover:text-text hover:border-text-muted rounded-xl font-semibold transition-colors cursor-pointer text-base"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={bulkLoading || !bulkInviteFile}
+                        className="flex-1 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer text-base shadow-lg shadow-violet-600/20"
+                      >
+                        {bulkLoading ? (
+                          <><Loader2 className="w-5 h-5 animate-spin" /> Sending Invitations...</>
+                        ) : (
+                          <><Mail className="w-5 h-5" /> Send All Invitations</>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  /* Results Report */
+                  <div className="mt-6 space-y-5">
+                    {/* Summary cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                      <div className="rounded-xl bg-surface-lighter border border-border p-4 text-center">
+                        <p className="text-3xl font-black text-slate-900 dark:text-text">{bulkInviteReport.totalRows}</p>
+                        <p className="text-sm text-slate-700 dark:text-text-muted mt-1 font-bold">Total Rows</p>
+                      </div>
+                      <div className="rounded-xl bg-emerald-500/15 border border-emerald-500/30 p-4 text-center">
+                        <p className="text-3xl font-black text-emerald-700 dark:text-emerald-400">{bulkInviteReport.imported}</p>
+                        <p className="text-sm text-emerald-800 dark:text-emerald-300 mt-1 font-bold">Invited</p>
+                      </div>
+                      <div className="rounded-xl bg-red-500/15 border border-red-500/30 p-4 text-center">
+                        <p className="text-3xl font-black text-red-700 dark:text-red-400">{bulkInviteReport.failed}</p>
+                        <p className="text-sm text-red-800 dark:text-red-300 mt-1 font-bold">Failed</p>
+                      </div>
+                      <div className="rounded-xl bg-amber-500/15 border border-amber-500/30 p-4 text-center">
+                        <p className="text-3xl font-black text-amber-700 dark:text-amber-400">{bulkInviteReport.duplicates}</p>
+                        <p className="text-sm text-amber-800 dark:text-amber-300 mt-1 font-bold">Duplicates</p>
+                      </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="font-bold text-slate-800 dark:text-text-muted">Success Rate</span>
+                        <span className="font-black text-emerald-700 dark:text-emerald-400 text-base">{bulkInviteReport.successPercentage}</span>
+                      </div>
+                      <div className="h-3 w-full bg-slate-200 dark:bg-surface-lighter rounded-full overflow-hidden border border-slate-300 dark:border-border">
+                        <div
+                          className="h-full bg-emerald-600 dark:bg-emerald-500 rounded-full transition-all duration-700"
+                          style={{ width: bulkInviteReport.successPercentage }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Row details */}
+                    {bulkInviteReport.details && bulkInviteReport.details.length > 0 && (
+                      <div className="rounded-xl border border-slate-300 dark:border-border overflow-hidden bg-white dark:bg-surface">
+                        <div className="px-4 py-3 bg-slate-100 dark:bg-surface-lighter border-b border-slate-300 dark:border-border">
+                          <p className="text-xs font-black text-slate-800 dark:text-text-muted uppercase tracking-wider">ROW DETAILS</p>
+                        </div>
+                        <div className="max-h-56 overflow-y-auto divide-y divide-slate-200 dark:divide-border/50">
+                          {bulkInviteReport.details.map((d, i) => (
+                            <div key={i} className="flex items-center justify-between px-4 py-3 text-sm">
+                              <div className="flex items-center gap-3">
+                                <span className="text-slate-700 dark:text-text-muted font-bold">Row {d.row}</span>
+                                {d.email && <span className="text-slate-900 dark:text-text font-bold">{d.email}</span>}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {d.status === 'SUCCESS' ? (
+                                  <span className="px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-400 dark:border-emerald-500/20 font-black text-xs">✓ Sent</span>
+                                ) : (
+                                  <span className={`px-3 py-1 rounded-full font-black text-xs ${
+                                    d.status === 'DUPLICATE_IN_DB' || d.status === 'DUPLICATE_IN_FILE'
+                                      ? 'bg-amber-100 dark:bg-amber-500/10 text-amber-900 dark:text-amber-400 border border-amber-400 dark:border-amber-500/20'
+                                      : 'bg-red-100 dark:bg-red-500/10 text-red-800 dark:text-red-400 border border-red-400 dark:border-red-500/20'
+                                  }`} title={d.reason}>
+                                    {d.status === 'DUPLICATE_IN_DB' || d.status === 'DUPLICATE_IN_FILE' ? '⚠ Duplicate' : '✗ Failed'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-4 pt-2">
+                      <button
+                        onClick={() => { setBulkInviteReport(null); setBulkInviteFile(null); }}
+                        className="flex-1 py-3 border border-slate-300 dark:border-border text-slate-800 dark:text-text-muted hover:text-slate-950 dark:hover:text-text hover:border-slate-400 dark:hover:border-text-muted rounded-xl font-bold transition-colors cursor-pointer text-base bg-slate-100 dark:bg-transparent"
+                      >
+                        Upload Another
+                      </button>
+                      <button
+                        onClick={() => { setBulkInviteModalOpen(false); setBulkInviteReport(null); setBulkInviteFile(null); }}
+                        className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all cursor-pointer text-base shadow-lg shadow-blue-600/30"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </motion.div>
           </div>
         )}

@@ -5,6 +5,14 @@
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AquaTrack</title>
+    <!-- PWA Web Manifest & App Setup -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0284c7" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="AquaTrack" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+
     <!-- Performance pre-connects for external resources -->
     <link rel="dns-prefetch" href="https://translate.google.com">
     <link rel="dns-prefetch" href="https://translate.googleapis.com">
@@ -21,5 +29,16 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then((reg) => {
+            console.log('AquaTrack ServiceWorker registered:', reg.scope);
+          }).catch((err) => {
+            console.log('AquaTrack ServiceWorker registration failed:', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>
