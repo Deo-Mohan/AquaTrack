@@ -55,7 +55,7 @@ export default function SharedHeader({ activeTab = 'home' }) {
       };
       const script = document.createElement('script');
       script.id = 'google-translate-script';
-      script.src = '//translate.google.com/translate_a/element.js?cb=googleTranslateElementInitLanding';
+      script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInitLanding';
       script.async = true;
       script.onerror = () => resolve(); // don't hang on network error
       document.body.appendChild(script);
@@ -144,7 +144,7 @@ export default function SharedHeader({ activeTab = 'home' }) {
 
   return (
     <>
-    <header className="sticky top-0 w-full px-4 sm:px-8 py-3.5 z-50 backdrop-blur-2xl bg-surface/40 dark:bg-surface/30 border-b border-primary/20 shadow-[0_8px_32px_0_rgba(0,120,255,0.08)] transition-all">
+    <header className="sticky top-0 w-full px-4 sm:px-8 py-3.5 z-50 backdrop-blur-md bg-transparent transition-all">
       <div id="google_translate_element_landing" className="hidden"></div>
       <motion.div 
         initial={{ opacity: 0, y: -10 }}
@@ -213,7 +213,7 @@ export default function SharedHeader({ activeTab = 'home' }) {
                 ensureGoogleTranslate();
                 setLangDropdownOpen(!langDropdownOpen);
               }}
-              className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-2 rounded-xl bg-surface/80 hover:bg-surface-lighter border border-border/70 text-xs font-bold text-text transition-all hover:scale-105 shadow-sm"
+              className="flex items-center justify-center gap-1.5 w-[36px] h-[36px] md:w-auto md:h-auto sm:px-3 sm:py-2 rounded-full sm:rounded-xl bg-surface hover:bg-surface-lighter border border-border text-xs font-bold text-text transition-all hover:scale-105 shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] hover:border-primary"
               title="Change Website Language"
             >
               <Globe className="w-4 h-4 text-primary animate-spin-slow" />

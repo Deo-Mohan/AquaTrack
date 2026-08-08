@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Home, Droplet, AlertCircle, Server, Settings, Database, Activity, 
   Plus, Trash2, Edit, Send, Receipt, Search, FileText, CheckCircle2, X, Info, Loader2, ShieldAlert,
-  Building2, MapPin, Upload, Download, Mail, Zap, BarChart3, Lightbulb, Coins, Truck
+  Building2, MapPin, Upload, Download, Mail, Zap, BarChart3, Lightbulb, Coins, Truck, Printer
 } from 'lucide-react';
 
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -227,6 +227,7 @@ export default function AdminDashboard() {
   const [quickRateUser, setQuickRateUser] = useState(null); // for inline rate modal
   const [quickRateValue, setQuickRateValue] = useState('');
   const [selectedAdminAnalytics, setSelectedAdminAnalytics] = useState(null);
+  const [communityAnalyticsSearch, setCommunityAnalyticsSearch] = useState('');
   
   const [billingSubTab, setBillingSubTab] = useState('cycles'); // cycles, records
   const [approvalSubTab, setApprovalSubTab] = useState(isSuperAdmin ? 'registrations' : 'verifications'); // registrations (super admin only), verifications
@@ -1303,6 +1304,29 @@ export default function AdminDashboard() {
     }
   };
 
+  const exportCommunityReport = (item) => {
+    if (!item) return;
+    const blockName = item.apartmentBlock || 'Block';
+    const blockUsageLogs = usageLogs.filter(l => l.apartmentBlock?.trim().toLowerCase() === blockName.toLowerCase());
+    const blockBills = bills.filter(b => b.apartmentBlock?.trim().toLowerCase() === blockName.toLowerCase());
+
+    const headers = "Community Name,Block,Total Households,Monthly Usage (L),Monthly Revenue (INR),Pending Collections (INR),Avg Consumption (L/home)\n";
+    const summaryRow = `"${item.colonyName}","${item.apartmentBlock}",${item.totalHouseholds},${item.monthlyUsage},${item.monthlyRevenue},${item.pendingCollections},${Math.round(item.avgConsumption)}\n\n`;
+
+    const logHeaders = "House / Flat,Reading Date,Volume (Liters),Status\n";
+    const logRows = blockUsageLogs.map(l => `"${l.houseNumber}","${l.readingDate}",${l.readingLiters},"${l.status || 'NORMAL'}"`).join("\n");
+
+    const csvContent = headers + summaryRow + logHeaders + logRows;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `AquaTrack_Analytics_${blockName}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Helper to find the colony name of a block/building
   const getColonyNameForBlock = (blockName) => {
     if (!blockName) return 'Unassigned';
@@ -1573,10 +1597,18 @@ export default function AdminDashboard() {
   };
 
   const getCommunityAnalytics = () => {
-    const communityAdmins = users.filter(u => u.role === 'ROLE_COMMUNITY_ADMIN');
+    // 1. Gather all unique block names from users, usageLogs, and bills
+    const allBlockNamesSet = new Set();
+    users.forEach(u => { if (u.apartmentBlock) allBlockNamesSet.add(u.apartmentBlock.trim()); });
+    usageLogs.forEach(l => { if (l.apartmentBlock) allBlockNamesSet.add(l.apartmentBlock.trim()); });
+    bills.forEach(b => { if (b.apartmentBlock) allBlockNamesSet.add(b.apartmentBlock.trim()); });
+
+    const communityAdmins = users.filter(u => u.role === 'ROLE_COMMUNITY_ADMIN' || u.role === 'COMMUNITY_ADMIN');
+    
     return communityAdmins.map(admin => {
-      const blockName = admin.apartmentBlock;
-      const blockHH = users.filter(u => (u.role === 'ROLE_RESIDENT' || u.role === 'ROLE_HOUSEHOLD_USER') && u.apartmentBlock?.trim().toLowerCase() === blockName?.trim().toLowerCase());
+      const blockName = admin.apartmentBlock || 'Unassigned Block';
+      const colonyName = admin.colonyName || getColonyNameForBlock(blockName);
+      const blockHH = users.filter(u => (u.role === 'ROLE_RESIDENT' || u.role === 'ROLE_HOUSEHOLD_USER' || u.role === 'RESIDENT') && u.apartmentBlock?.trim().toLowerCase() === blockName.toLowerCase());
       const verifiedCount = blockHH.filter(u => u.verificationStatus === 'VERIFIED').length;
       const pendingCount = blockHH.filter(u => u.verificationStatus === 'PENDING_VERIFICATION').length;
       
@@ -1584,17 +1616,17 @@ export default function AdminDashboard() {
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       startOfMonth.setHours(0,0,0,0);
-      const blockUsageLogs = usageLogs.filter(l => l.apartmentBlock?.trim().toLowerCase() === blockName?.trim().toLowerCase());
+      const blockUsageLogs = usageLogs.filter(l => l.apartmentBlock?.trim().toLowerCase() === blockName.toLowerCase());
       const monthlyUsage = blockUsageLogs.reduce((sum, log) => {
         const logDate = new Date(log.readingDate);
-        if (logDate >= startOfMonth) {
+        if (logDate >= startOfMonth || isNaN(logDate.getTime())) {
           return sum + (log.readingLiters || 0);
         }
         return sum;
       }, 0);
 
       // Monthly revenue & collections
-      const blockBills = bills.filter(b => b.apartmentBlock?.trim().toLowerCase() === blockName?.trim().toLowerCase());
+      const blockBills = bills.filter(b => b.apartmentBlock?.trim().toLowerCase() === blockName.toLowerCase());
       const monthlyRevenue = blockBills.reduce((sum, b) => {
         if (b.status === 'PAID') {
           return sum + (b.amount || 0);
@@ -1608,7 +1640,17 @@ export default function AdminDashboard() {
         return sum;
       }, 0);
 
-      const avgConsumption = blockHH.length > 0 ? (monthlyUsage / blockHH.length) : 0;
+      const avgConsumption = blockHH.length > 0 ? (monthlyUsage / blockHH.length) : (blockUsageLogs.length > 0 ? monthlyUsage / blockUsageLogs.length : 0);
+
+      // Water purchase logs for this block/admin
+      const blockPurchases = (waterPurchasedStats.allPurchases || []).filter(p => 
+        (p.apartmentBlock && p.apartmentBlock.trim().toLowerCase() === blockName.toLowerCase()) ||
+        (p.purchasedBy && admin.username && p.purchasedBy.toLowerCase() === admin.username.toLowerCase())
+      );
+      const waterPurchasedLiters = blockPurchases.reduce((sum, p) => sum + (p.volumeLiters || 0), 0) || (monthlyUsage > 0 ? monthlyUsage * 1.1 : 0);
+      const waterPurchaseCost = blockPurchases.reduce((sum, p) => sum + (p.totalCost || 0), 0) || (waterPurchasedLiters * 0.15);
+      
+      const netProfitLoss = monthlyRevenue - waterPurchaseCost;
 
       // Recent Activity logs
       const recentLogs = [...blockUsageLogs]
@@ -1617,12 +1659,16 @@ export default function AdminDashboard() {
 
       return {
         admin,
-        colonyName: admin.colonyName || 'N/A',
+        adminName: admin.fullName || admin.username || 'Community Admin',
+        colonyName: colonyName !== 'Unassigned' ? colonyName : (admin.colonyName || 'AquaTrack Community'),
         apartmentBlock: blockName,
         totalHouseholds: blockHH.length,
         verifiedCount,
         pendingCount,
         monthlyUsage,
+        waterPurchasedLiters,
+        waterPurchaseCost,
+        netProfitLoss,
         monthlyRevenue,
         pendingCollections,
         avgConsumption,
@@ -1631,131 +1677,96 @@ export default function AdminDashboard() {
     });
   };
 
-  const exportCommunityReport = (adminAnalytic) => {
-    const admin = adminAnalytic.admin;
-    const blockHH = users.filter(u => (u.role === 'ROLE_RESIDENT' || u.role === 'ROLE_HOUSEHOLD_USER') && u.apartmentBlock?.trim().toLowerCase() === admin.apartmentBlock?.trim().toLowerCase());
-    const blockBills = bills.filter(b => b.apartmentBlock?.trim().toLowerCase() === admin.apartmentBlock?.trim().toLowerCase());
-    const blockUsage = usageLogs.filter(l => l.apartmentBlock?.trim().toLowerCase() === admin.apartmentBlock?.trim().toLowerCase());
-    
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += `Community Admin Report for ${admin.fullName || admin.username} (${admin.apartmentBlock})\n`;
-    csvContent += `Community Name,${admin.colonyName || 'N/A'}\n`;
-    csvContent += `Apartment Block,${admin.apartmentBlock}\n`;
-    csvContent += `Total Households,${blockHH.length}\n`;
-    csvContent += `Verified,${adminAnalytic.verifiedCount},Pending,${adminAnalytic.pendingCount}\n`;
-    csvContent += `Monthly Water Usage (L),${adminAnalytic.monthlyUsage}\n`;
-    csvContent += `Monthly Revenue (INR),${adminAnalytic.monthlyRevenue}\n`;
-    csvContent += `Pending Collections (INR),${adminAnalytic.pendingCollections}\n\n`;
-    
-    csvContent += "House Number,Resident Name,Email,Mobile,Status,Verification,Water Rate\n";
-    blockHH.forEach(u => {
-      csvContent += `"${u.houseNumber || ''}","${u.fullName || u.username}","${u.email}","${u.mobileNumber || ''}","${u.status}","${u.verificationStatus}","${u.waterRatePerLiter || ''}"\n`;
-    });
-    
-    csvContent += "\nBilling Records\nHouse Number,Amount,Due Date,Status\n";
-    blockBills.forEach(b => {
-      csvContent += `"${b.houseNumber}","${b.amount}","${b.dueDate}","${b.status}"\n`;
-    });
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Report_${admin.apartmentBlock}_${admin.colonyName || 'Community'}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
 
   const StatCard = ({ title, value, subtitle, icon: Icon, svgSrc, color, delay, onClick }) => (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.4 }}
+      transition={{ delay, duration: 0.3 }}
       onClick={onClick}
-      className={`glass-card p-6 relative overflow-hidden group transition-all duration-300 ${onClick ? 'cursor-pointer hover:scale-[1.02] hover:bg-surface-lighter/25 hover:border-primary/30 border-border/65' : ''}`}
+      className={`glass-card p-4 sm:p-5 relative overflow-hidden group transition-all duration-300 flex items-center justify-between min-h-[105px] ${onClick ? 'cursor-pointer hover:scale-[1.02] hover:bg-surface-lighter/25 hover:border-primary/30 border-border/65' : ''}`}
     >
-      <div className="flex justify-between items-center h-full">
-        <div>
-          <p className="text-text-muted text-sm font-medium mb-1">{title}</p>
-          <h3 className="text-3xl font-bold text-text tracking-tight">{value}</h3>
-          {subtitle && (
-            <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
-              <span>{subtitle}</span>
-            </p>
-          )}
-        </div>
-        {Icon === Truck ? (
-          <div className="relative flex flex-col items-center justify-center p-1 my-auto">
-            {/* Shaking Truck Icon */}
-            <motion.div
-              animate={{
-                y: [0, -1.5, 0.8, -0.8, 0],
-                rotate: [0, -0.6, 0.6, -0.3, 0]
-              }}
-              transition={{
-                repeat: Infinity,
-                duration: 1.2,
-                ease: "easeInOut"
-              }}
-              className="z-10"
-            >
-              <Truck className="w-8 h-8 text-blue-500 dark:text-blue-400 drop-shadow-sm" />
-            </motion.div>
-
-            {/* Infinitely Moving Road Dashed Line Below Truck */}
-            <div className="w-12 h-1 overflow-hidden relative -mt-1 opacity-80">
-              <motion.div
-                className="w-[200%] h-full border-b-2 border-dashed border-blue-500/80 dark:border-blue-400/80"
-                animate={{ x: [0, -24] }}
-                transition={{
-                  repeat: Infinity,
-                  duration: 0.9,
-                  ease: "linear"
-                }}
-              />
-            </div>
-          </div>
-        ) : svgSrc ? (
-          <motion.img 
-            src={svgSrc} 
-            alt={title} 
-            className="w-16 h-16 sm:w-20 sm:h-20 object-contain group-hover:scale-110 transition-transform duration-300 my-auto"
-            animate={{ y: [0, -4, 0] }}
-            transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
-          />
-        ) : (
-          Icon === Settings ? (
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
-              className={`p-2 text-${color}-400 group-hover:scale-110 transition-transform duration-300 my-auto`}
-            >
-              <Icon className="w-8 h-8 drop-shadow-sm" />
-            </motion.div>
-          ) : Icon === Home ? (
-            <motion.div
-              animate={{ y: [0, -3.5, 0] }}
-              transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
-              className={`p-2 text-${color}-400 group-hover:scale-110 transition-transform duration-300 my-auto`}
-            >
-              <Icon className="w-8 h-8 drop-shadow-sm" />
-            </motion.div>
-          ) : Icon === Users ? (
-            <motion.div
-              animate={{ scale: [1, 1.12, 1] }}
-              transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-              className={`p-2 text-${color}-400 group-hover:scale-110 transition-transform duration-300 my-auto`}
-            >
-              <Icon className="w-8 h-8 drop-shadow-sm" />
-            </motion.div>
-          ) : (
-            <div className={`p-3.5 rounded-xl bg-${color}-500/10 text-${color}-400 group-hover:scale-105 transition-transform duration-300 border border-${color}-500/20 my-auto`}>
-              {Icon && <Icon className="w-6 h-6" />}
-            </div>
-          )
+      <div className="min-w-0 flex-1 pr-1.5">
+        <p className="text-text-muted text-[11px] font-semibold leading-tight line-clamp-2 mb-1">{title}</p>
+        <h3 className="text-lg sm:text-xl font-bold text-text tracking-tight leading-none">{value}</h3>
+        {subtitle && (
+          <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1 truncate">
+            <span>{subtitle}</span>
+          </p>
         )}
       </div>
-      <div className={`absolute -right-10 -bottom-10 w-32 h-32 bg-${color}-500/5 rounded-full blur-2xl`} />
+
+      {Icon === Truck ? (
+        <div className="relative flex flex-col items-center justify-center p-0.5 my-auto shrink-0">
+          {/* Shaking Truck Icon */}
+          <motion.div
+            animate={{
+              y: [0, -1.5, 0.8, -0.8, 0],
+              rotate: [0, -0.6, 0.6, -0.3, 0]
+            }}
+            transition={{
+              repeat: Infinity,
+              duration: 1.2,
+              ease: "easeInOut"
+            }}
+            className="z-10"
+          >
+            <Truck className="w-5 h-5 text-blue-500 dark:text-blue-400 drop-shadow-sm" />
+          </motion.div>
+
+          {/* Infinitely Moving Road Dashed Line Below Truck */}
+          <div className="w-8 h-0.5 overflow-hidden relative -mt-0.5 opacity-80">
+            <motion.div
+              className="w-[200%] h-full border-b border-dashed border-blue-500/80 dark:border-blue-400/80"
+              animate={{ x: [0, -16] }}
+              transition={{
+                repeat: Infinity,
+                duration: 0.9,
+                ease: "linear"
+              }}
+            />
+          </div>
+        </div>
+      ) : svgSrc ? (
+        <motion.img 
+          src={svgSrc} 
+          alt={title} 
+          className="w-7 h-7 sm:w-8 sm:h-8 object-contain group-hover:scale-110 transition-transform duration-300 shrink-0 my-auto"
+          animate={{ y: [0, -2, 0] }}
+          transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
+        />
+      ) : (
+        Icon === Settings ? (
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
+            className={`text-${color}-400 group-hover:scale-110 transition-transform duration-300 shrink-0 my-auto`}
+          >
+            <Icon className="w-5 h-5 drop-shadow-sm" />
+          </motion.div>
+        ) : Icon === Home ? (
+          <motion.div
+            animate={{ y: [0, -2, 0] }}
+            transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
+            className={`text-${color}-400 group-hover:scale-110 transition-transform duration-300 shrink-0 my-auto`}
+          >
+            <Icon className="w-5 h-5 drop-shadow-sm" />
+          </motion.div>
+        ) : Icon === Users ? (
+          <motion.div
+            animate={{ scale: [1, 1.1, 1] }}
+            transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+            className={`text-${color}-400 group-hover:scale-110 transition-transform duration-300 shrink-0 my-auto`}
+          >
+            <Icon className="w-5 h-5 drop-shadow-sm" />
+          </motion.div>
+        ) : (
+          <div className={`p-1 rounded-lg bg-${color}-500/10 text-${color}-400 group-hover:scale-105 transition-transform duration-300 border border-${color}-500/20 shrink-0 my-auto`}>
+            {Icon && <Icon className="w-4 h-4" />}
+          </div>
+        )
+      )}
+      <div className={`absolute -right-8 -bottom-8 w-20 h-20 bg-${color}-500/5 rounded-full blur-xl`} />
     </motion.div>
   );
 
@@ -1786,17 +1797,7 @@ export default function AdminDashboard() {
             </div>
           </div>
         );
-      case 'community-analytics':
-        return (
-          <div className="space-y-3 bg-surface-lighter/25 p-5 rounded-xl border border-border/50 text-sm text-text">
-            <p className="font-bold text-primary text-base flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-primary" /> Community Block Analytics
-            </p>
-            <p className="text-sm leading-relaxed text-text">
-              Visualize real-time trends for all apartment blocks. You can view overall billing collection progress, monthly revenue, pending community dues, average consumption stats, and recent action logs. Export complete data reports using the <strong className="text-primary font-bold">Download PDF/CSV</strong> option to share reports with committee members.
-            </p>
-          </div>
-        );
+
       case 'users':
         return (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-text">
@@ -1959,7 +1960,6 @@ export default function AdminDashboard() {
           <div className="flex overflow-x-auto gap-8">
             {[
               { id: 'overview', label: 'Overview' },
-              isSuperAdmin && { id: 'community-analytics', label: 'Community Analytics 📊' },
               isSuperAdmin && { id: 'colonies', label: '🏘️ Colony Management' },
               { 
                 id: 'approvals', 
@@ -2023,11 +2023,13 @@ export default function AdminDashboard() {
           >
             {/* Stat Cards */}
             {isSuperAdmin ? (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
                 <StatCard title="Total Buildings" value={stats ? `${stats.totalApartments}` : '...'} icon={Home} color="blue" delay={0.1} />
                 <StatCard title="Community Admins" value={stats ? `${stats.totalCommunityAdmins}` : '...'} icon={Users} color="emerald" delay={0.2} />
                 <StatCard title="Registered Residents" value={stats ? `${stats.totalHouseholdUsers}` : '...'} svgSrc="/colleague.svg" color="purple" delay={0.3} onClick={() => setActiveTab('users')} />
                 <StatCard title="Total Platform Users" value={stats ? `${stats.totalUsers}` : '...'} icon={Settings} color="pink" delay={0.4} />
+                <StatCard title="Total Platform Revenue" value={stats ? `₹${(stats.totalRevenue || 0).toLocaleString()}` : '...'} svgSrc="/coin.gif" color="emerald" delay={0.5} />
+                <StatCard title="Pending System Collections" value={stats ? `₹${(stats.totalPending || 0).toLocaleString()}` : '...'} svgSrc="/coin.gif" color="amber" delay={0.6} />
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -2043,14 +2045,6 @@ export default function AdminDashboard() {
                   delay={0.4}
                   onClick={() => navigate('/water-purchase')}
                 />
-              </div>
-            )}
-
-            {/* Platform Analytics Cards */}
-            {isSuperAdmin && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <StatCard title="Total Platform Revenue" value={stats ? `₹${(stats.totalRevenue || 0).toLocaleString()}` : '...'} svgSrc="/coin.gif" color="emerald" delay={0.5} />
-                <StatCard title="Pending System Collections" value={stats ? `₹${(stats.totalPending || 0).toLocaleString()}` : '...'} svgSrc="/coin.gif" color="amber" delay={0.6} />
               </div>
             )}
 
@@ -2389,242 +2383,7 @@ export default function AdminDashboard() {
           </motion.div>
         )}
 
-        {activeTab === 'community-analytics' && (
-          <motion.div
-            key="community-analytics"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-6"
-          >
-            {/* Analytics Overview Cards */}
-            {(() => {
-              const analyticsData = getCommunityAnalytics();
-              const totalBlocks = analyticsData.length;
-              const totalHH = analyticsData.reduce((acc, curr) => acc + curr.totalHouseholds, 0);
-              const totalUsage = analyticsData.reduce((acc, curr) => acc + curr.monthlyUsage, 0);
-              const totalRevenue = analyticsData.reduce((acc, curr) => acc + curr.monthlyRevenue, 0);
-              const totalPending = analyticsData.reduce((acc, curr) => acc + curr.pendingCollections, 0);
 
-              return (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <StatCard title="Monitored Blocks" value={`${totalBlocks}`} icon={Home} color="blue" delay={0.1} />
-                    <StatCard title="Total Households" value={`${totalHH}`} svgSrc="/colleague.svg" color="emerald" delay={0.2} />
-                    <StatCard title="Cumulative Usage (L)" value={`${totalUsage.toLocaleString()}`} svgSrc="/empty_state_meter_reading.svg" color="purple" delay={0.3} />
-                    <StatCard title="Cumulative Collections" value={`₹${totalRevenue.toLocaleString()}`} svgSrc="/coin.gif" color="pink" delay={0.4} />
-                  </div>
-
-                  {/* Main Analytics Table */}
-                  <div className="glass-card overflow-hidden border-primary/20">
-                    <div className="px-6 py-4 bg-primary/5 border-b border-border flex items-center justify-between">
-                      <h3 className="font-bold text-text text-base">Community Block Performance Metrics</h3>
-                      <span className="text-text-muted text-xs font-semibold">Real-Time Data aggregation</span>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-surface-lighter border-b border-border">
-                            <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase">Community Name</th>
-                            <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase">Block</th>
-                            <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase">Households</th>
-                            <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase">Verification Status</th>
-                            <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase">Monthly Usage</th>
-                            <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase">Monthly Rev / Pending</th>
-                            <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase">Avg Consumption</th>
-                            <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/40">
-                          {analyticsData.length > 0 ? (
-                            analyticsData.map(item => {
-                              const isSelected = selectedAdminAnalytics?.apartmentBlock === item.apartmentBlock;
-                              return (
-                                <tr 
-                                  key={item.admin.id} 
-                                  className={`hover:bg-primary/5 transition-colors cursor-pointer ${isSelected ? 'bg-primary/10' : ''}`}
-                                  onClick={() => setSelectedAdminAnalytics(item)}
-                                >
-                                  <td className="px-6 py-4 font-bold text-text text-sm">{item.colonyName}</td>
-                                  <td className="px-6 py-4 font-semibold text-text-muted text-sm">{item.apartmentBlock}</td>
-                                  <td className="px-6 py-4 text-text text-sm">{item.totalHouseholds} homes</td>
-                                  <td className="px-6 py-4 text-sm">
-                                    <div className="flex flex-col gap-0.5">
-                                      <span className="text-emerald-400 font-semibold text-xs">{item.verifiedCount} Verified</span>
-                                      {item.pendingCount > 0 && (
-                                        <span className="text-amber-400 text-xs font-semibold">{item.pendingCount} Pending</span>
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4 text-sm font-semibold text-purple-400">{item.monthlyUsage.toLocaleString()} Liters</td>
-                                  <td className="px-6 py-4 text-sm">
-                                    <div className="flex flex-col gap-0.5">
-                                      <span className="text-emerald-400 font-semibold">₹{item.monthlyRevenue.toLocaleString()}</span>
-                                      <span className="text-red-400 text-xs">₹{item.pendingCollections.toLocaleString()} Unpaid</span>
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4 text-sm font-semibold text-blue-400">
-                                    {Math.round(item.avgConsumption).toLocaleString()} L/home
-                                  </td>
-                                  <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                                    <div className="flex items-center justify-end gap-2">
-                                      <button 
-                                        onClick={() => setSelectedAdminAnalytics(item)}
-                                        className="px-3 py-1.5 bg-primary/10 hover:bg-primary/25 text-primary border border-primary/20 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
-                                      >
-                                        <Activity className="w-3.5 h-3.5" /> Trend
-                                      </button>
-                                      <button 
-                                        onClick={() => exportCommunityReport(item)}
-                                        className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/20 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
-                                      >
-                                        <FileText className="w-3.5 h-3.5" /> Export
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })
-                          ) : (
-                            <tr>
-                              <td colSpan="8" className="px-6 py-10 text-center text-text-muted text-sm">No community admin data available.</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Detailed Analysis Drawer/Card */}
-                  {selectedAdminAnalytics && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 15 }} 
-                      animate={{ opacity: 1, y: 0 }} 
-                      className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-                    >
-                      {/* Trend Analysis Chart */}
-                      <div className="glass-card p-6 lg:col-span-2 min-h-[350px]">
-                        <div className="flex items-center justify-between mb-6">
-                          <div>
-                            <h3 className="font-bold text-text text-lg">
-                              📊 Water Consumption Trend: {selectedAdminAnalytics.apartmentBlock}
-                            </h3>
-                            <p className="text-text-muted text-xs mt-0.5">Daily aggregated meter readings logged for this block</p>
-                          </div>
-                          <button 
-                            onClick={() => setSelectedAdminAnalytics(null)}
-                            className="p-1.5 hover:bg-surface-lighter rounded-lg text-text-muted hover:text-text cursor-pointer"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <div className="h-[250px] w-full">
-                          {(() => {
-                            const blockUsageLogs = usageLogs.filter(l => l.apartmentBlock === selectedAdminAnalytics.apartmentBlock);
-                            const dailyMap = {};
-                            blockUsageLogs.forEach(l => {
-                              const d = l.readingDate;
-                              dailyMap[d] = (dailyMap[d] || 0) + (l.readingLiters || 0);
-                            });
-                            const trendData = Object.keys(dailyMap).map(d => ({
-                              date: d,
-                              usage: dailyMap[d]
-                            })).sort((a,b) => new Date(a.date) - new Date(b.date));
-
-                            if (trendData.length === 0) {
-                              return (
-                                <div className="h-full flex items-center justify-center text-text-muted text-sm italic">
-                                  No usage readings logged for this block yet.
-                                </div>
-                              );
-                            }
-
-                            return (
-                              <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                  <defs>
-                                    <linearGradient id="colorUsageTrend" x1="0" y1="0" x2="0" y2="1">
-                                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4}/>
-                                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
-                                    </linearGradient>
-                                  </defs>
-                                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                  <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                                  <Tooltip 
-                                    contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
-                                    labelStyle={{ color: '#f8fafc' }}
-                                    itemStyle={{ color: '#cbd5e1' }}
-                                  />
-                                  <Area type="monotone" dataKey="usage" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorUsageTrend)" />
-                                </AreaChart>
-                              </ResponsiveContainer>
-                            );
-                          })()}
-                        </div>
-                      </div>
-
-                      {/* Collections & Recent Activity */}
-                      <div className="glass-card p-6 flex flex-col justify-between">
-                        <div>
-                          <h3 className="font-bold text-text text-base mb-4">Financial Overview & Recent Activity</h3>
-                          <div className="space-y-4">
-                            <div className="bg-surface-lighter/40 border border-border/40 rounded-xl p-4">
-                              <p className="text-xs text-text-muted font-medium mb-2">Revenue Realization Rate</p>
-                              {(() => {
-                                const rev = selectedAdminAnalytics.monthlyRevenue;
-                                const pend = selectedAdminAnalytics.pendingCollections;
-                                const total = rev + pend;
-                                const rate = total > 0 ? Math.round((rev / total) * 100) : 100;
-                                return (
-                                  <div className="space-y-1.5">
-                                    <div className="flex justify-between items-center text-sm font-bold">
-                                      <span className="text-emerald-400">{rate}% Collected</span>
-                                      <span className="text-text-muted">₹{total.toLocaleString()} Total</span>
-                                    </div>
-                                    <div className="w-full h-2 bg-surface-lighter rounded-full overflow-hidden">
-                                      <div className="h-full bg-emerald-500 transition-all" style={{ width: `${rate}%` }} />
-                                    </div>
-                                  </div>
-                                );
-                              })()}
-                            </div>
-
-                            <div>
-                              <p className="text-xs text-text-muted font-bold uppercase tracking-wider mb-2">Recent Readings</p>
-                              <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
-                                {selectedAdminAnalytics.recentLogs.length > 0 ? (
-                                  selectedAdminAnalytics.recentLogs.map((log, idx) => (
-                                    <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-surface-lighter/20 border border-border/20 text-xs">
-                                      <div>
-                                        <p className="font-bold text-text">{log.houseNumber}</p>
-                                        <p className="text-text-muted font-medium mt-0.5">{log.readingDate}</p>
-                                      </div>
-                                      <span className="font-bold text-primary">{log.readingLiters.toLocaleString()} L</span>
-                                    </div>
-                                  ))
-                                ) : (
-                                  <p className="text-xs text-text-muted italic">No recent logs found.</p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <button 
-                          onClick={() => exportCommunityReport(selectedAdminAnalytics)}
-                          className="w-full mt-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/10"
-                        >
-                          <FileText className="w-4 h-4" /> Export Block CSV Report
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </>
-              );
-            })()}
-          </motion.div>
-        )}
 
         {activeTab === 'users' && (
           <motion.div
@@ -2696,27 +2455,27 @@ export default function AdminDashboard() {
 
             {/* Quick Water Rate Modal */}
             {quickRateUser && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-surface border border-border w-full max-w-md rounded-2xl p-6 shadow-2xl">
-                  <h3 className="text-lg font-bold text-text mb-2">💧 Set Water Rate</h3>
-                  <p className="text-text-muted text-sm mb-1">For: <strong className="text-emerald-400">{quickRateUser.fullName || quickRateUser.username}</strong> ({quickRateUser.apartmentBlock})</p>
-                  <p className="text-text-muted text-xs mb-5 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
+                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-surface border border-border w-full max-w-md rounded-2xl p-4 sm:p-6 shadow-2xl my-auto max-h-[90vh] overflow-y-auto custom-scrollbar">
+                  <h3 className="text-base sm:text-lg font-bold text-text mb-2">💧 Set Water Rate</h3>
+                  <p className="text-text-muted text-xs sm:text-sm mb-1">For: <strong className="text-emerald-400">{quickRateUser.fullName || quickRateUser.username}</strong> ({quickRateUser.apartmentBlock})</p>
+                  <p className="text-text-muted text-xs mb-4 sm:mb-5 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5 sm:px-3 sm:py-2">
                     ✅ This rate will be <strong>automatically applied</strong> to all household users under this block.
                   </p>
-                  <div className="flex gap-3 items-center mb-6">
-                    <span className="text-text font-bold text-lg">₹</span>
+                  <div className="flex gap-2.5 sm:gap-3 items-center mb-5 sm:mb-6">
+                    <span className="text-text font-bold text-base sm:text-lg">₹</span>
                     <input
                       type="number" step="0.01" min="0" autoFocus
                       value={quickRateValue}
                       onChange={(e) => setQuickRateValue(e.target.value)}
                       placeholder="e.g. 0.05"
-                      className="flex-1 bg-surface-lighter border border-border rounded-xl px-4 py-3 text-lg text-text focus:outline-none focus:border-primary font-bold"
+                      className="flex-1 bg-surface-lighter border border-border rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 text-base sm:text-lg text-text focus:outline-none focus:border-primary font-bold"
                     />
-                    <span className="text-text-muted font-medium">per Liter</span>
+                    <span className="text-text-muted text-xs sm:text-sm font-medium whitespace-nowrap">per Liter</span>
                   </div>
-                  <div className="flex gap-3 justify-end">
-                    <button onClick={() => setQuickRateUser(null)} className="px-4 py-2 text-text-muted hover:text-text transition-colors cursor-pointer">Cancel</button>
-                    <button onClick={handleQuickRateSave} disabled={!quickRateValue} className="px-6 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-xl font-semibold transition-colors disabled:opacity-50 cursor-pointer">Save & Apply to All</button>
+                  <div className="flex flex-col-reverse sm:flex-row gap-2.5 sm:gap-3 justify-end">
+                    <button onClick={() => setQuickRateUser(null)} className="w-full sm:w-auto px-4 py-2 text-text-muted hover:text-text transition-colors cursor-pointer text-xs sm:text-sm font-semibold">Cancel</button>
+                    <button onClick={handleQuickRateSave} disabled={!quickRateValue} className="w-full sm:w-auto px-5 py-2.5 sm:px-6 sm:py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-xl font-semibold transition-colors disabled:opacity-50 cursor-pointer text-xs sm:text-sm">Save & Apply to All</button>
                   </div>
                 </motion.div>
               </div>

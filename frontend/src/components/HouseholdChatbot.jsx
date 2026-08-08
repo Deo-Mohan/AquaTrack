@@ -4,6 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api';
 import { getBcp47Locale } from '../utils/languages';
 
+import { useHouseholdData, getHouseholdPills, getHouseholdActions } from './chatbots/HouseholdChatbotEngine';
+import { getCommunityAdminPills, getCommunityAdminActions } from './chatbots/CommunityAdminChatbotEngine';
+import { getSuperAdminPills, getSuperAdminActions } from './chatbots/SuperAdminChatbotEngine';
+
 const WaterLogFormWidget = ({ parsedLiters, onLogged }) => {
   const [residents, setResidents] = useState([]);
   const [loadingResidents, setLoadingResidents] = useState(true);
@@ -630,8 +634,11 @@ const HouseholdChatbot = () => {
   const speakText = (text, msgId) => {
     if (!('speechSynthesis' in window) || !ttsEnabled) return;
 
-    window.speechSynthesis.cancel(); // Stop any current speech
-    
+    const synth = window.speechSynthesis;
+    if (synth.speaking) {
+      synth.cancel(); // Stop any current speech
+    }
+
     // Strip markdown formatting for natural voice output
     const cleanText = text
       .replace(/[*_~`#]/g, '')
@@ -645,53 +652,29 @@ const HouseholdChatbot = () => {
     const bcp47Locale = getBcp47Locale(activeLang);
     utterance.lang = bcp47Locale;
 
-    // Retrieve user gender from localStorage
-    const userGender = (localStorage.getItem('gender') || 'male').toLowerCase();
-    const targetGender = userGender === 'male' ? 'female' : 'male';
+    // Siri-tier and Natural voice selection priority logic
+    const voices = synth.getVoices();
+    const siriVoice = voices.find(v => 
+      (v.name.includes("Samantha") && v.name.includes("Premium")) ||
+      (v.name.includes("Siri") && v.lang.startsWith("en")) ||
+      v.name.includes("Natural") || 
+      v.name.includes("Google US English") ||
+      v.name.includes("Daniel") ||
+      v.name.includes("Karen") ||
+      v.name.includes("Rishi")
+    );
 
-    // Siri-like Acoustic Modulation:
-    // Crisp pitch (1.05 for female Siri, 0.95 for male Siri), slightly elevated rate (1.05 for quick, natural cadence)
-    utterance.pitch = targetGender === 'female' ? 1.05 : 0.95;
-    utterance.rate = 1.05;
-
-    const voices = window.speechSynthesis.getVoices();
-    
-    // Voice Selection Strategy (Siri-like Natural Acoustic Priority with Indian locale fallback):
-    // 1. Target official Siri/Samantha/Karen/Rishi/Veena natural voices
-    // 2. Target Indian voices with crisp acoustics (en-IN / hi-IN)
-    let chosenVoice = voices.find(v => {
-      const nameLower = v.name.toLowerCase();
-      return nameLower.includes('siri') || nameLower.includes('samantha') || nameLower.includes('natural') || nameLower.includes('karen') || nameLower.includes('rishi');
-    });
-
-    if (!chosenVoice) {
-      chosenVoice = voices.find(v => {
-        const isIndianVoice = v.lang.toLowerCase().includes('in') || v.name.toLowerCase().includes('india') || v.name.toLowerCase().includes('indian');
-        const matchLang = v.lang.toLowerCase().includes(activeLang.toLowerCase()) || v.lang.toLowerCase().includes(bcp47Locale.toLowerCase());
-        const nameLower = v.name.toLowerCase();
-        const matchGender = targetGender === 'female' 
-          ? (nameLower.includes('female') || nameLower.includes('veena') || nameLower.includes('heera') || nameLower.includes('neerja') || nameLower.includes('zira') || nameLower.includes('natural'))
-          : (nameLower.includes('male') || nameLower.includes('prabhat') || nameLower.includes('rishi') || nameLower.includes('david') || nameLower.includes('alex'));
-        return isIndianVoice && matchLang && matchGender;
-      });
+    if (siriVoice) {
+      utterance.voice = siriVoice;
+    } else {
+      // Priority fallback: Indian English or general English voice
+      const enVoice = voices.find(v => v.lang.toLowerCase().includes('en-in') || v.lang.startsWith('en'));
+      if (enVoice) utterance.voice = enVoice;
     }
 
-    // Fallback 1: Any Indian voice matching language or English (en-IN)
-    if (!chosenVoice) {
-      chosenVoice = voices.find(v => 
-        (v.lang.toLowerCase().includes('en-in') || v.lang.toLowerCase().includes('hi-in') || v.name.toLowerCase().includes('india')) &&
-        (bcp47Locale.startsWith('en') || bcp47Locale.startsWith('hi'))
-      );
-    }
-
-    // Fallback 2: Any voice matching locale or active language
-    if (!chosenVoice) {
-      chosenVoice = voices.find(v => v.lang.toLowerCase().includes(bcp47Locale.toLowerCase()) || v.lang.toLowerCase().includes(activeLang.toLowerCase()));
-    }
-
-    if (chosenVoice) {
-      utterance.voice = chosenVoice;
-    }
+    // Fine-tune Siri Assistant Cadence
+    utterance.rate = 1.05;  // Slightly faster cadence
+    utterance.pitch = 1.02; // Friendly, alert pitch
 
     utterance.onstart = () => {
       setIsSpeaking(true);
@@ -708,8 +691,25 @@ const HouseholdChatbot = () => {
       speakingMsgIdRef.current = null;
     };
 
-    window.speechSynthesis.speak(utterance);
+    synth.speak(utterance);
   };
+
+  // Asynchronous voice loading handler for browser engines
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      const handleVoicesChanged = () => {
+        if (window.speechSynthesis.getVoices().length > 0) {
+          // Voices successfully loaded & ready for TTS synthesis
+        }
+      };
+      window.speechSynthesis.onvoiceschanged = handleVoicesChanged;
+      return () => {
+        if (window.speechSynthesis) {
+          window.speechSynthesis.onvoiceschanged = null;
+        }
+      };
+    }
+  }, []);
 
   const stopSpeaking = () => {
     if ('speechSynthesis' in window) {
@@ -943,9 +943,12 @@ const HouseholdChatbot = () => {
     }
   }, [messages, isOpen, isTyping]);
 
-  // Clear/Reset chat conversation history
+  // Clear/Reset chat conversation history and flush query cache memory
   const handleClearChat = () => {
     stopSpeaking();
+    if (window._chatbotQueryCache) {
+      window._chatbotQueryCache.clear();
+    }
     let welcomeText = '';
     if (role === 'ROLE_ADMIN') {
       welcomeText = `Greetings **${displayName}**! 👑 Welcome to **Buddy** (Executive Assistant).\n\nHow can I assist you with platform revenue metrics, community admin oversight, or escalated tickets today?`;
@@ -1129,6 +1132,32 @@ const HouseholdChatbot = () => {
       return;
     }
 
+    // Community Admin: In-Chat Water Log Form Intent Trigger (Requires explicit add/entry/create verbs)
+    const isExplicitAddAction = lower.includes('add') || lower.includes('create') || lower.includes('insert') || lower.includes('new log') || lower.includes('record new') || lower.includes('upload');
+    if ((role === 'ROLE_COMMUNITY_ADMIN' || role === 'ROLE_ADMIN') && 
+        isExplicitAddAction &&
+        (lower.includes('water') || lower.includes('reading') || lower.includes('liter') || lower.includes('meter') || lower.includes('log'))) {
+      
+      let parsed = null;
+      const match = queryText.match(/(\d+(\.\d+)?)/);
+      if (match) parsed = parseFloat(match[1]);
+
+      const botMsgId = Date.now() + 1;
+      const botMsg = {
+        id: botMsgId,
+        sender: 'bot',
+        text: "Certainly! It is my absolute pleasure to assist you with adding a new water log directly right here. 😊\n\nPlease select the household resident and verify the log details below:",
+        widget: "WATER_LOG_FORM",
+        parsedLiters: parsed,
+        actions: getContextualActions(location.pathname),
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages((prev) => [...prev, botMsg]);
+      setIsTyping(false);
+      speakText(botMsg.text, botMsgId);
+      return;
+    }
+
     const monthAliases = [
       { month: 1, name: 'January', keys: ['january', 'jan', 'janauary', 'januery', 'janiary', 'janvar'] },
       { month: 2, name: 'February', keys: ['february', 'feb', 'febuary', 'febrary', 'februery'] },
@@ -1180,8 +1209,8 @@ const HouseholdChatbot = () => {
 
     const isFinalizeIntent = (
       lower.includes('finalize') || lower.includes('finalise') || lower.includes('finaliz') ||
-      lower.includes('generate') || lower.includes('bulk bill') || lower.includes('bulk billing') ||
-      lower.includes('create bill') || lower.includes('bill') || lower.includes('billing')
+      lower.includes('generate bill') || lower.includes('bulk bill') || lower.includes('bulk billing') ||
+      lower.includes('create bill') || lower.includes('lock bill') || lower.includes('finalize bill')
     );
 
     if (role === 'ROLE_COMMUNITY_ADMIN' && (
@@ -1318,100 +1347,60 @@ const HouseholdChatbot = () => {
 
     const matchesAnyKey = (keys) => keys.some(k => lower.includes(k) || getLevenshteinDistance(lower.split(' ')[0], k) <= 2);
 
-    if (matchesAnyKey(identityKeys)) {
-      const userBlock = localStorage.getItem('apartmentBlock') || localStorage.getItem('block') || 'Block A';
-      const userEmail = localStorage.getItem('email') || 'Registered Resident';
-      const roleTitle = role === 'ROLE_ADMIN' ? 'System Administrator' : role === 'ROLE_COMMUNITY_ADMIN' ? 'Community Water Manager' : 'Household Resident';
-      
-      clientBotResponseText = `Here are your profile details, **${displayName}**! 👤✨\n\n` +
-        `• **Name**: ${displayName}\n` +
-        `• **Role**: ${roleTitle}\n` +
-        `• **House Number**: ${houseNo}\n` +
-        `• **Apartment Block**: ${userBlock}\n` +
-        `• **Contact Email**: ${userEmail}\n\n` +
-        `You are registered on the **AquaTrack** smart water network! How can I assist you with your account today?`;
-      clientBotActions = [
-        { label: '📊 Usage Analytics', action: 'nav', path: '/usage', type: 'primary' },
-        { label: '💳 My Bills', action: 'nav', path: '/bills', type: 'secondary' }
-      ];
-    } else if (matchesAnyKey(usageKeys)) {
-      let monthNotice = standaloneMonthName ? ` for **${standaloneMonthName}**` : '';
-      clientBotResponseText = `Here is your requested water usage information${monthNotice} for House **${houseNo}**! 📊\n\n` +
-        `• **Recent Status**: Active daily telemetry logging\n` +
-        `• **Total Recorded Usage**: ${dbData.totalConsumption != null ? `${dbData.totalConsumption} Liters` : 'Fetched live from smart meter'}\n\n` +
-        `You can view your detailed daily chart, breakdown graphs, and peak hours under Usage Analytics.`;
-      clientBotActions = [
-        { label: '📊 Open Usage Analytics', action: 'nav', path: '/usage', type: 'primary' },
-        { label: '💳 View Bills History', action: 'nav', path: '/bills', type: 'secondary' }
-      ];
-    } else if (matchesAnyKey(billKeys)) {
-      let monthNotice = standaloneMonthName ? ` for **${standaloneMonthName}**` : '';
-      let billInfo = dbData.recentBill 
-        ? `Your bill details${monthNotice} for House **${houseNo}**: Amount: **₹${dbData.recentBill.amount?.toFixed(2)}** (Status: **${dbData.recentBill.status}**).`
-        : `For House **${houseNo}**${monthNotice}, your water consumption up to standard limit is billed at base tariff rate, with excess billed at tier rate.`;
-      clientBotResponseText = `${billInfo}\n\nYou can view complete month-wise billing history and make instant payments on the Billing page! 💳`;
-      clientBotActions = [
-        { label: '💳 Pay / View Bills', action: 'nav', path: '/bills', type: 'primary' },
-        { label: '📊 Usage Breakdown', action: 'nav', path: '/usage', type: 'secondary' }
-      ];
-    } else if (matchesAnyKey(leakKeys)) {
-      clientBotResponseText = `Hi **${displayName}**, if you notice an urgent leak or water supply issue in House **${houseNo}**:\n\n1. Turn off main stop-cock valve if necessary.\n2. Raise a high-priority ticket on the Support Desk for community maintenance.`;
-      clientBotActions = [
-        { label: '🛠️ Report Issue', action: 'nav', path: '/support', type: 'danger' },
-        { label: '🌊 Water Tips', action: 'nav', path: '/tips', type: 'secondary' }
-      ];
-    } else if (matchesAnyKey(tipKeys)) {
-      clientBotResponseText = `Here are actionable ways to lower your monthly bill:\n\n• **Aerators**: Fit faucet aerators to save up to 30% water.\n• **Flush Leaks**: Check toilet tank flappers for hidden trickles.\n• **Track Usage**: Check daily graphs under My Usage.`;
-      clientBotActions = [
-        { label: '🌊 Water Tips', action: 'nav', path: '/tips', type: 'primary' },
-        { label: '💳 Bills History', action: 'nav', path: '/bills', type: 'secondary' }
-      ];
+    if (role === 'ROLE_HOUSEHOLD_USER' || role === 'ROLE_RESIDENT' || role === 'RESIDENT') {
+      if (matchesAnyKey(identityKeys)) {
+        const userBlock = localStorage.getItem('apartmentBlock') || localStorage.getItem('block') || 'Block A';
+        const userEmail = localStorage.getItem('email') || 'Registered Resident';
+        const roleTitle = 'Household Resident';
+        
+        clientBotResponseText = `Here are your profile details, **${displayName}**! 👤✨\n\n` +
+          `• **Name**: ${displayName}\n` +
+          `• **Role**: ${roleTitle}\n` +
+          `• **House Number**: ${houseNo}\n` +
+          `• **Apartment Block**: ${userBlock}\n` +
+          `• **Contact Email**: ${userEmail}\n\n` +
+          `You are registered on the **AquaTrack** smart water network! How can I assist you with your account today?`;
+        clientBotActions = [
+          { label: '📊 Usage Analytics', action: 'nav', path: '/usage', type: 'primary' },
+          { label: '💳 My Bills', action: 'nav', path: '/bills', type: 'secondary' }
+        ];
+      } else if (matchesAnyKey(usageKeys)) {
+        let monthNotice = standaloneMonthName ? ` for **${standaloneMonthName}**` : '';
+        clientBotResponseText = `Here is your requested water usage information${monthNotice} for House **${houseNo}**! 📊\n\n` +
+          `• **Recent Status**: Active daily telemetry logging\n` +
+          `• **Total Recorded Usage**: ${dbData.totalConsumption != null ? `${dbData.totalConsumption} Liters` : 'Fetched live from smart meter'}\n\n` +
+          `You can view your detailed daily chart, breakdown graphs, and peak hours under Usage Analytics.`;
+        clientBotActions = [
+          { label: '📊 Open Usage Analytics', action: 'nav', path: '/usage', type: 'primary' },
+          { label: '💳 View Bills History', action: 'nav', path: '/bills', type: 'secondary' }
+        ];
+      } else if (matchesAnyKey(billKeys) && !lower.includes('unpaid') && !lower.includes('finalize') && !lower.includes('total')) {
+        let monthNotice = standaloneMonthName ? ` for **${standaloneMonthName}**` : '';
+        let billInfo = dbData.recentBill 
+          ? `Your bill details${monthNotice} for House **${houseNo}**: Amount: **₹${dbData.recentBill.amount?.toFixed(2)}** (Status: **${dbData.recentBill.status}**).`
+          : `For House **${houseNo}**${monthNotice}, your water consumption up to standard limit is billed at base tariff rate, with excess billed at tier rate.`;
+        clientBotResponseText = `${billInfo}\n\nYou can view complete month-wise billing history and make instant payments on the Billing page! 💳`;
+        clientBotActions = [
+          { label: '💳 Pay / View Bills', action: 'nav', path: '/bills', type: 'primary' },
+          { label: '📊 Usage Breakdown', action: 'nav', path: '/usage', type: 'secondary' }
+        ];
+      } else if (matchesAnyKey(leakKeys)) {
+        clientBotResponseText = `Hi **${displayName}**, if you notice an urgent leak or water supply issue in House **${houseNo}**:\n\n1. Turn off main stop-cock valve if necessary.\n2. Raise a high-priority ticket on the Support Desk for community maintenance.`;
+        clientBotActions = [
+          { label: '🛠️ Report Issue', action: 'nav', path: '/support', type: 'danger' },
+          { label: '🌊 Water Tips', action: 'nav', path: '/tips', type: 'secondary' }
+        ];
+      } else if (matchesAnyKey(tipKeys)) {
+        clientBotResponseText = `Here are actionable ways to lower your monthly bill:\n\n• **Aerators**: Fit faucet aerators to save up to 30% water.\n• **Flush Leaks**: Check toilet tank flappers for hidden trickles.\n• **Track Usage**: Check daily graphs under My Usage.`;
+        clientBotActions = [
+          { label: '🌊 Water Tips', action: 'nav', path: '/tips', type: 'primary' },
+          { label: '💳 Bills History', action: 'nav', path: '/bills', type: 'secondary' }
+        ];
+      }
     }
 
-    // Client Cache & Rate-Limit Strategy (Zero unnecessary API / DB calls)
-    if (!window._chatbotQueryCache) {
-      window._chatbotQueryCache = new Map();
-    }
-    const cachedResponse = window._chatbotQueryCache.get(lower);
-    if (cachedResponse) {
-      const botMsgId = Date.now() + 1;
-      const botMsg = {
-        id: botMsgId,
-        sender: 'bot',
-        text: cachedResponse.text,
-        widget: cachedResponse.widget || null,
-        parsedLiters: cachedResponse.parsedLiters || null,
-        actions: cachedResponse.actions || getContextualActions(location.pathname),
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages((prev) => [...prev, botMsg]);
-      setIsTyping(false);
-      speakText(cachedResponse.text, botMsgId);
-      return;
-    }
-
-    if (clientBotResponseText) {
-      // Store in memory cache to save future roundtrips
-      window._chatbotQueryCache.set(lower, {
-        text: clientBotResponseText,
-        actions: clientBotActions || getContextualActions(location.pathname)
-      });
-
-      const botMsgId = Date.now() + 1;
-      const botMsg = {
-        id: botMsgId,
-        sender: 'bot',
-        text: clientBotResponseText,
-        widget: clientBotWidget,
-        parsedLiters: clientBotParsedLiters,
-        actions: clientBotActions || getContextualActions(location.pathname),
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages((prev) => [...prev, botMsg]);
-      setIsTyping(false);
-      speakText(clientBotResponseText, botMsgId);
-      return;
-    }
+    // Bypass client-side static strings so all user queries hit backend database RAG API for live data
+    /* Client-side static intercept removed to guarantee live backend database queries */
 
     try {
       const res = await api.post('/chatbot/query', {
@@ -1423,13 +1412,6 @@ const HouseholdChatbot = () => {
       });
 
       if (res.data && res.data.answer) {
-        window._chatbotQueryCache.set(lower, {
-          text: res.data.answer,
-          widget: res.data.widget || null,
-          parsedLiters: res.data.parsedLiters || null,
-          actions: res.data.actions || getContextualActions(location.pathname)
-        });
-
         const botMsgId = Date.now() + 1;
         const botMsg = {
           id: botMsgId,
@@ -1443,7 +1425,7 @@ const HouseholdChatbot = () => {
         setMessages((prev) => [...prev, botMsg]);
         setIsTyping(false);
         speakText(res.data.answer, botMsgId);
-        return;
+        return; // EXIT EARLY — DO NOT RUN FALLBACK TIMEOUT
       }
     } catch (err) {
       console.warn("Backend chatbot API fallback triggered:", err);
@@ -1456,97 +1438,142 @@ const HouseholdChatbot = () => {
       let botParsedLiters = null;
       const lower = queryText.toLowerCase().trim();
 
-      if (role === 'ROLE_COMMUNITY_ADMIN' && 
-          (lower.includes('add') || lower.includes('log') || lower.includes('entry') || lower.includes('record')) && 
-          (lower.includes('water') || lower.includes('reading') || lower.includes('liter') || lower.includes('meter') || lower.includes('log'))) {
-        
-        let parsed = null;
-        const match = queryText.match(/(\d+(\.\d+)?)/);
-        if (match) parsed = parseFloat(match[1]);
+      // ==========================================
+      // ENGINE 1: SUPER ADMIN CHATBOT MIND 👑
+      // ==========================================
+      if (role === 'ROLE_ADMIN') {
+        if (lower.startsWith('hi') || lower.startsWith('hello') || lower.startsWith('hey') || lower.startsWith('greetings')) {
+          botResponseText = `Greetings **${displayName}**! 👑 Welcome to **Buddy** (Executive System Assistant).\n\nHow can I assist you with platform-wide revenue analytics, escalated support tickets, or community administrator management today?`;
+          botActions = getContextualActions(location.pathname);
+        } else if (lower.includes('revenue') || lower.includes('collection') || lower.includes('money') || lower.includes('financial') || lower.includes('due')) {
+          botResponseText = `Here is your executive platform financial summary! 💰\n\n` +
+            `• **System Status**: All Community Blocks Monitored\n` +
+            `• **Platform Overview**: Live real-time collection metrics are aggregated under the Super Admin Executive Dashboard.\n\n` +
+            `Would you like to review global revenue analytics or view escalated resident tickets?`;
+          botActions = [
+            { label: '📊 Executive Dashboard', action: 'nav', path: '/admin-dashboard', type: 'primary' },
+            { label: '📄 Executive PDF Report', action: 'nav', path: '/reports', type: 'secondary' }
+          ];
+        } else if (lower.includes('ticket') || lower.includes('escalated') || lower.includes('support') || lower.includes('issue')) {
+          botResponseText = `As Super Admin, you can review and resolve all **escalated high-priority tickets** across all community blocks. 🏛️`;
+          botActions = [
+            { label: '🏛️ Super Admin Tickets', action: 'nav', path: '/super-admin-tickets', type: 'primary' }
+          ];
+        } else if (lower.includes('user') || lower.includes('admin') || lower.includes('community') || lower.includes('directory')) {
+          botResponseText = `You can manage all registered community admins, block managers, and household residents in the **User Directory**. 👥`;
+          botActions = [
+            { label: '👥 User Directory', action: 'nav', path: '/user-directory', type: 'primary' }
+          ];
+        } else {
+          botResponseText = `Hello **${displayName}** (System Executive) 👑!\n\nAs Super Admin, I can assist you with:\n` +
+            `• 📊 **Global Platform Revenue & Collection Summaries**\n` +
+            `• 📄 **System P&L and Executive PDF Reports**\n` +
+            `• 🏛️ **Escalated Ticket Resolution across Blocks**\n` +
+            `• 👥 **System User Directory & Admin Accounts**\n\n` +
+            `How can I assist your executive workflow today?`;
+          botActions = getContextualActions(location.pathname);
+        }
+      }
+      // ==========================================
+      // ENGINE 2: COMMUNITY ADMIN CHATBOT MIND 🛡️
+      // Pass directly to Backend RAG + Gemini AI Pipeline
+      // ==========================================
+      else if (role === 'ROLE_COMMUNITY_ADMIN') {
+        if ((lower.includes('add') || lower.includes('log') || lower.includes('entry') || lower.includes('record')) && 
+            (lower.includes('water') || lower.includes('reading') || lower.includes('liter') || lower.includes('meter'))) {
+          let parsed = null;
+          const match = queryText.match(/(\d+(\.\d+)?)/);
+          if (match) parsed = parseFloat(match[1]);
 
-        botResponseText = "Certainly! It is my absolute pleasure to assist you with adding a new water log directly right here. 😊\n\nPlease select the household resident and verify the log details below:";
-        botWidget = "WATER_LOG_FORM";
-        botParsedLiters = parsed;
-        botActions = getContextualActions(location.pathname);
-      } else if (lower.startsWith('hi') || lower.startsWith('hello') || lower.startsWith('hey') || lower.startsWith('good morning')) {
-        botResponseText = `Hello **${displayName}**! 👋 Welcome. How can I assist you with your water bills, usage, or maintenance tickets for House **${houseNo}** today?`;
-        botActions = getContextualActions(location.pathname);
-      } else if (
-        lower.includes('who am i') || 
-        lower.includes('tell about me') || 
-        lower.includes('tell me about me') || 
-        lower.includes('tell me about myself') || 
-        lower.includes('tell about myself') || 
-        lower.includes('about me') || 
-        lower.includes('my profile') || 
-        lower.includes('my details') || 
-        lower.includes('my info')
-      ) {
-        const userBlock = localStorage.getItem('apartmentBlock') || localStorage.getItem('block') || 'Block A';
-        const userEmail = localStorage.getItem('email') || 'Registered Resident';
-        const roleTitle = role === 'ROLE_ADMIN' ? 'System Administrator' : role === 'ROLE_COMMUNITY_ADMIN' ? 'Community Water Manager' : 'Household Resident';
-        
-        botResponseText = `Here are your profile details, **${displayName}**! 👤✨\n\n` +
-          `• **Name**: ${displayName}\n` +
-          `• **Role**: ${roleTitle}\n` +
-          `• **House Number**: ${houseNo}\n` +
-          `• **Apartment Block**: ${userBlock}\n` +
-          `• **Contact Email**: ${userEmail}\n\n` +
-          `You are registered on the **AquaTrack** smart water network! How can I assist you with your account today?`;
-        botActions = [
-          { label: '📊 Usage Analytics', action: 'nav', path: '/usage', type: 'primary' },
-          { label: '💳 My Bills', action: 'nav', path: '/bills', type: 'secondary' }
-        ];
-      } else if (lower.includes('who are you') || lower.includes('your name')) {
-        botResponseText = `I'm **Buddy**, your AI assistant! ⚡\n\nI can help you track daily water usage, view & pay monthly bills, report leaks, and discover water-saving tips.`;
-        botActions = getContextualActions(location.pathname);
-      } else if (lower.includes('how are you')) {
-        botResponseText = `I'm doing great and ready to assist you! How is everything with the water supply in House **${houseNo}**?`;
-        botActions = getContextualActions(location.pathname);
-      } else if (lower.includes('thank') || lower.includes('thanks')) {
-        botResponseText = `You're very welcome! 😊 Feel free to ask if you need anything else.`;
-        botActions = getContextualActions(location.pathname);
-      } else if (lower.includes('log') || lower.includes('usage') || lower.includes('consumption') || lower.includes('reading') || lower.includes('history')) {
-        let monthNotice = standaloneMonthName ? ` for **${standaloneMonthName}**` : '';
-        botResponseText = `Here is your requested water usage information${monthNotice} for House **${houseNo}**! 📊\n\n` +
-          `• **Recent Status**: Active daily telemetry logging\n` +
-          `• **Total Recorded Usage**: ${dbData.totalConsumption != null ? `${dbData.totalConsumption} Liters` : 'Fetched live from smart meter'}\n\n` +
-          `You can view your detailed daily chart, breakdown graphs, and peak hours under Usage Analytics.`;
-        botActions = [
-          { label: '📊 Open Usage Analytics', action: 'nav', path: '/usage', type: 'primary' },
-          { label: '💳 View Bills History', action: 'nav', path: '/bills', type: 'secondary' }
-        ];
-      } else if (lower.includes('bill') || lower.includes('pay') || lower.includes('tariff') || lower.includes('cost') || lower.includes('amount') || lower.includes('unpaid')) {
-        let monthNotice = standaloneMonthName ? ` for **${standaloneMonthName}**` : '';
-        let billInfo = dbData.recentBill 
-          ? `Your bill details${monthNotice} for House **${houseNo}**: Amount: **₹${dbData.recentBill.amount?.toFixed(2)}** (Status: **${dbData.recentBill.status}**).`
-          : `For House **${houseNo}**${monthNotice}, your water consumption up to standard limit is billed at base tariff rate, with excess billed at tier rate.`;
-        botResponseText = `${billInfo}\n\nYou can view complete month-wise billing history and make instant payments on the Billing page! 💳`;
-        botActions = [
-          { label: '💳 Pay / View Bills', action: 'nav', path: '/bills', type: 'primary' },
-          { label: '📊 Usage Breakdown', action: 'nav', path: '/usage', type: 'secondary' }
-        ];
-      } else if (lower.includes('leak') || lower.includes('pipe') || lower.includes('issue') || lower.includes('support') || lower.includes('ticket')) {
-        botResponseText = `Hi **${displayName}**, if you notice an urgent leak or water supply issue in House **${houseNo}**:\n\n1. Turn off main stop-cock valve if necessary.\n2. Raise a high-priority ticket on the Support Desk for community maintenance.`;
-        botActions = [
-          { label: '🛠️ Report Issue', action: 'nav', path: '/support', type: 'danger' },
-          { label: '🌊 Water Tips', action: 'nav', path: '/tips', type: 'secondary' }
-        ];
-      } else if (lower.includes('tip') || lower.includes('save') || lower.includes('reduce') || lower.includes('excess')) {
-        botResponseText = `Here are actionable ways to lower your monthly bill:\n\n• **Aerators**: Fit faucet aerators to save up to 30% water.\n• **Flush Leaks**: Check toilet tank flappers for hidden trickles.\n• **Track Usage**: Check daily graphs under My Usage.`;
-        botActions = [
-          { label: '🌊 Water Tips', action: 'nav', path: '/tips', type: 'primary' },
-          { label: '💳 Bills History', action: 'nav', path: '/bills', type: 'secondary' }
-        ];
-      } else {
-        // Polite fallback for off-topic or irrelevant questions
-        botResponseText = `I appreciate your question, **${displayName}**! 😊\n\nWhile I am specialized specifically as your **AquaTrack Water Assistant** for House **${houseNo}**, I'd be glad to help you with:\n\n` +
-          `• 📊 **Water Usage Logs & History** (e.g. *"my water logs of January"*)\n` +
-          `• 💳 **Current & Past Monthly Bills** (e.g. *"my current bill"* or *"bills for February"*)\n` +
-          `• 🛠️ **Reporting Pipe Leaks & Support Tickets**\n` +
-          `• 💧 **Water Consumption Limits & Conservation Tips**\n\n` +
-          `How can I assist you with your water account today?`;
-        botActions = getContextualActions(location.pathname);
+          botResponseText = "Certainly! It is my absolute pleasure to assist you with adding a new water log directly right here. 😊\n\nPlease select the household resident and verify the log details below:";
+          botWidget = "WATER_LOG_FORM";
+          botParsedLiters = parsed;
+          botActions = getContextualActions(location.pathname);
+        }
+      }
+      // ==========================================
+      // ENGINE 3: HOUSEHOLD RESIDENT CHATBOT MIND 👤
+      // ==========================================
+      else {
+        if (lower.startsWith('hi') || lower.startsWith('hello') || lower.startsWith('hey') || lower.startsWith('good morning')) {
+          botResponseText = `Hello **${displayName}**! 👋 Welcome. How can I assist you with your water bills, usage, or maintenance tickets for House **${houseNo}** today?`;
+          botActions = getContextualActions(location.pathname);
+        } else if (
+          lower.includes('who am i') || 
+          lower.includes('tell about me') || 
+          lower.includes('tell me about me') || 
+          lower.includes('tell me about myself') || 
+          lower.includes('tell about myself') || 
+          lower.includes('about me') || 
+          lower.includes('my profile') || 
+          lower.includes('my details') || 
+          lower.includes('my info')
+        ) {
+          const userBlock = localStorage.getItem('apartmentBlock') || localStorage.getItem('block') || 'Block A';
+          const userEmail = localStorage.getItem('email') || 'Registered Resident';
+          
+          botResponseText = `Here are your profile details, **${displayName}**! 👤✨\n\n` +
+            `• **Name**: ${displayName}\n` +
+            `• **Role**: Household Resident\n` +
+            `• **House Number**: ${houseNo}\n` +
+            `• **Apartment Block**: ${userBlock}\n` +
+            `• **Contact Email**: ${userEmail}\n\n` +
+            `You are registered on the **AquaTrack** smart water network! How can I assist you with your account today?`;
+          botActions = [
+            { label: '📊 Usage Analytics', action: 'nav', path: '/usage', type: 'primary' },
+            { label: '💳 My Bills', action: 'nav', path: '/bills', type: 'secondary' }
+          ];
+        } else if (lower.includes('who are you') || lower.includes('your name')) {
+          botResponseText = `I'm **Buddy**, your AI assistant for House **${houseNo}**! ⚡\n\nI can help you track daily water usage, view & pay monthly bills, report leaks, and discover water-saving tips.`;
+          botActions = getContextualActions(location.pathname);
+        } else if (lower.includes('how are you')) {
+          botResponseText = `I'm doing great and ready to assist you! How is everything with the water supply in House **${houseNo}**?`;
+          botActions = getContextualActions(location.pathname);
+        } else if (lower.includes('thank') || lower.includes('thanks')) {
+          botResponseText = `You're very welcome! 😊 Feel free to ask if you need anything else.`;
+          botActions = getContextualActions(location.pathname);
+        } else if (lower.includes('log') || lower.includes('usage') || lower.includes('consumption') || lower.includes('reading') || lower.includes('history')) {
+          let monthNotice = standaloneMonthName ? ` for **${standaloneMonthName}**` : '';
+          botResponseText = `Here is your requested water usage information${monthNotice} for House **${houseNo}**! 📊\n\n` +
+            `• **Recent Status**: Active daily telemetry logging\n` +
+            `• **Total Recorded Usage**: ${dbData.totalConsumption != null ? `${dbData.totalConsumption} Liters` : 'Fetched live from smart meter'}\n\n` +
+            `You can view your detailed daily chart, breakdown graphs, and peak hours under Usage Analytics.`;
+          botActions = [
+            { label: '📊 Open Usage Analytics', action: 'nav', path: '/usage', type: 'primary' },
+            { label: '💳 View Bills History', action: 'nav', path: '/bills', type: 'secondary' }
+          ];
+        } else if (lower.includes('bill') || lower.includes('pay') || lower.includes('tariff') || lower.includes('cost') || lower.includes('amount') || lower.includes('unpaid')) {
+          let monthNotice = standaloneMonthName ? ` for **${standaloneMonthName}**` : '';
+          let billInfo = dbData.recentBill 
+            ? `Your bill details${monthNotice} for House **${houseNo}**: Amount: **₹${dbData.recentBill.amount?.toFixed(2)}** (Status: **${dbData.recentBill.status}**).`
+            : `For House **${houseNo}**${monthNotice}, your water consumption up to standard limit is billed at base tariff rate, with excess billed at tier rate.`;
+          botResponseText = `${billInfo}\n\nYou can view complete month-wise billing history and make instant payments on the Billing page! 💳`;
+          botActions = [
+            { label: '💳 Pay / View Bills', action: 'nav', path: '/bills', type: 'primary' },
+            { label: '📊 Usage Breakdown', action: 'nav', path: '/usage', type: 'secondary' }
+          ];
+        } else if (lower.includes('leak') || lower.includes('pipe') || lower.includes('issue') || lower.includes('support') || lower.includes('ticket')) {
+          botResponseText = `Hi **${displayName}**, if you notice an urgent leak or water supply issue in House **${houseNo}**:\n\n1. Turn off main stop-cock valve if necessary.\n2. Raise a high-priority ticket on the Support Desk for community maintenance.`;
+          botActions = [
+            { label: '🛠️ Report Issue', action: 'nav', path: '/support', type: 'danger' },
+            { label: '🌊 Water Tips', action: 'nav', path: '/tips', type: 'secondary' }
+          ];
+        } else if (lower.includes('tip') || lower.includes('save') || lower.includes('reduce') || lower.includes('excess')) {
+          botResponseText = `Here are actionable ways to lower your monthly bill:\n\n• **Aerators**: Fit faucet aerators to save up to 30% water.\n• **Flush Leaks**: Check toilet tank flappers for hidden trickles.\n• **Track Usage**: Check daily graphs under My Usage.`;
+          botActions = [
+            { label: '🌊 Water Tips', action: 'nav', path: '/tips', type: 'primary' },
+            { label: '💳 Bills History', action: 'nav', path: '/bills', type: 'secondary' }
+          ];
+        } else {
+          // Polite fallback for off-topic or irrelevant questions
+          botResponseText = `I appreciate your question, **${displayName}**! 😊\n\nWhile I am specialized specifically as your **AquaTrack Water Assistant** for House **${houseNo}**, I'd be glad to help you with:\n\n` +
+            `• 📊 **Water Usage Logs & History** (e.g. *"my water logs of January"*)\n` +
+            `• 💳 **Current & Past Monthly Bills** (e.g. *"my current bill"* or *"bills for February"*)\n` +
+            `• 🛠️ **Reporting Pipe Leaks & Support Tickets**\n` +
+            `• 💧 **Water Consumption Limits & Conservation Tips**\n\n` +
+            `How can I assist you with your water account today?`;
+          botActions = getContextualActions(location.pathname);
+        }
       }
 
       const botMsgId = Date.now() + 1;

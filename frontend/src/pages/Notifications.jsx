@@ -142,28 +142,30 @@ export default function Notifications() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-text">Notifications</h1>
-          <p className="text-text-muted mt-1">Stay updated with your consumption reports and bills.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-text">Notifications</h1>
+          <p className="text-text-muted mt-1 text-xs sm:text-sm">Stay updated with your consumption reports and bills.</p>
         </div>
-        <div className="flex items-center gap-3">
+        
+        {/* Responsive action buttons toolbar for mobile & desktop */}
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
           {notifications.some(n => !n.isRead) && (
             <button
               onClick={handleMarkAllAsRead}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/15 hover:bg-primary/25 text-primary rounded-xl text-sm font-semibold transition-all cursor-pointer border border-primary/25"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-primary/15 hover:bg-primary/25 active:scale-95 text-primary rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer border border-primary/30 shadow-sm whitespace-nowrap"
             >
-              <Check className="w-4 h-4" />
-              Mark all read
+              <Check className="w-4 h-4 shrink-0 font-bold" />
+              <span>Mark all read</span>
             </button>
           )}
           {notifications.length > 0 && (
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 text-red-400 rounded-xl text-sm font-semibold transition-all cursor-pointer border border-red-500/25"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-red-500/15 hover:bg-red-500/25 active:scale-95 text-red-700 dark:text-red-300 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer border border-red-500/30 shadow-sm whitespace-nowrap"
             >
-              <Trash2 className="w-4 h-4" />
-              Delete all
+              <Trash2 className="w-4 h-4 shrink-0" />
+              <span>Delete all</span>
             </button>
           )}
         </div>
@@ -291,12 +293,12 @@ export default function Notifications() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 pt-5 border-t border-border/40">
+              <div className="flex flex-col-reverse sm:flex-row items-center gap-3 sm:gap-4 pt-5 border-t border-border/40">
                 <button
                   type="button"
                   onClick={() => setShowDeleteConfirm(false)}
                   disabled={deletingAll}
-                  className="flex-1 py-3 px-5 rounded-2xl border border-border text-sm font-bold text-text-muted hover:text-text hover:bg-surface-lighter transition-all cursor-pointer"
+                  className="w-full sm:flex-1 py-3 px-5 rounded-2xl border border-border text-sm font-bold text-text-muted hover:text-text hover:bg-surface-lighter active:scale-95 transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -304,7 +306,7 @@ export default function Notifications() {
                   type="button"
                   onClick={confirmDeleteAll}
                   disabled={deletingAll}
-                  className="flex-1 py-3 px-5 bg-red-500 hover:bg-red-600 text-white rounded-2xl text-sm font-extrabold transition-all cursor-pointer shadow-lg shadow-red-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full sm:flex-1 py-3 px-5 bg-red-500 hover:bg-red-600 active:scale-95 text-white rounded-2xl text-sm font-extrabold transition-all cursor-pointer shadow-lg shadow-red-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {deletingAll ? 'Deleting...' : 'Yes, Delete All'}
                 </button>

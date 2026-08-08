@@ -1762,10 +1762,10 @@ Are you sure you want to finalize these bills and lock the cycle?`;
 
       {/* Bulk Bill Generation Modal */}
       {bulkGenerating && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-surface border border-border w-full max-w-sm rounded-2xl p-6 shadow-2xl relative text-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-surface border border-border w-full max-w-sm rounded-2xl p-5 sm:p-6 shadow-2xl relative text-center my-auto">
             <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-text mb-1">Generating Bills...</h3>
+            <h3 className="text-lg sm:text-xl font-bold text-text mb-1">Generating Bills...</h3>
             <p className="text-text-muted text-xs mb-4">Processing residents with unbilled water usage logs.</p>
             
             <div className="w-full bg-surface-lighter rounded-full h-2.5 mb-4 overflow-hidden border border-border">
@@ -1775,17 +1775,17 @@ Are you sure you want to finalize these bills and lock the cycle?`;
               ></div>
             </div>
             
-            <div className="flex justify-around text-sm font-semibold text-text">
+            <div className="flex justify-around text-xs sm:text-sm font-semibold text-text">
               <div>
-                <span className="block text-xs text-text-muted">Total</span>
+                <span className="block text-[11px] text-text-muted">Total</span>
                 <span>{bulkProgress.total}</span>
               </div>
               <div>
-                <span className="block text-xs text-emerald-400">Success</span>
+                <span className="block text-[11px] text-emerald-400">Success</span>
                 <span>{bulkProgress.success}</span>
               </div>
               <div>
-                <span className="block text-xs text-red-400">Failed</span>
+                <span className="block text-[11px] text-red-400">Failed</span>
                 <span>{bulkProgress.failed}</span>
               </div>
             </div>
@@ -1795,48 +1795,48 @@ Are you sure you want to finalize these bills and lock the cycle?`;
 
       {/* Bulk Preview Modal */}
       {showBulkPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-4 overflow-y-auto">
           <motion.div
             initial={{ scale: 0.96, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-surface border-2 border-border w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            className="bg-surface border-2 border-border w-full max-w-5xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] my-auto"
           >
             {/* Modal Header */}
-            <div className="px-8 py-6 border-b border-border bg-surface-lighter/30 flex items-center justify-between">
+            <div className="p-4 sm:px-8 sm:py-6 border-b border-border bg-surface-lighter/30 flex items-center justify-between">
               <div>
-                <h3 className="text-2xl font-black text-text tracking-tight">Bulk Billing Preview ({['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedBulkMonth - 1]} {selectedBulkYear})</h3>
-                <p className="text-text-muted text-sm mt-1.5 font-semibold">Review water rates, thresholds, and calculations before generating resident invoices for this billing cycle.</p>
+                <h3 className="text-lg sm:text-2xl font-black text-text tracking-tight">Bulk Billing Preview ({['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedBulkMonth - 1]} {selectedBulkYear})</h3>
+                <p className="text-text-muted text-xs sm:text-sm mt-1 font-semibold">Review water rates, thresholds, and calculations before generating resident invoices.</p>
               </div>
               <button
                 onClick={() => setShowBulkPreview(false)}
-                className="p-2 hover:bg-surface-lighter rounded-xl text-text-muted hover:text-text cursor-pointer transition-colors border border-border/45"
+                className="p-1.5 sm:p-2 hover:bg-surface-lighter rounded-xl text-text-muted hover:text-text cursor-pointer transition-colors border border-border/45 shrink-0"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="overflow-y-auto p-8 space-y-6 flex-1">
+            <div className="overflow-y-auto p-4 sm:p-8 space-y-4 sm:space-y-6 flex-1 custom-scrollbar">
               {(!tariffSettings?.baseRatePerLiter || parseFloat(tariffSettings.baseRatePerLiter) <= 0) ? (
-                <div className="flex items-start gap-4 p-5 bg-red-500/10 border-2 border-red-500/30 rounded-2xl">
-                  <AlertCircle className="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex items-start gap-3 sm:gap-4 p-4 sm:p-5 bg-red-500/10 border-2 border-red-500/30 rounded-2xl">
+                  <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-400 flex-shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold text-text text-base">Your base rate is not set, contact admin</span>
-                    <p className="mt-1 text-sm text-text-muted font-medium">
+                    <span className="font-bold text-text text-sm sm:text-base">Your base rate is not set, contact admin</span>
+                    <p className="mt-1 text-xs sm:text-sm text-text-muted font-medium">
                       A base rate must be configured by the Super Admin before bills can be calculated and generated. Please contact your administrator.
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="bg-blue-500/10 border border-blue-500/30 p-5 rounded-2xl flex gap-4 text-sm text-text">
-                  <Info className="w-6 h-6 text-primary flex-shrink-0 mt-0.5" />
+                <div className="bg-blue-500/10 border border-blue-500/30 p-4 sm:p-5 rounded-2xl flex gap-3 sm:gap-4 text-xs sm:text-sm text-text">
+                  <Info className="w-5 h-5 sm:w-6 sm:h-6 text-primary flex-shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold text-text text-base">Calculation Formula:</span>
-                    <p className="mt-1 text-sm text-text-muted font-medium">
-                      Charges are calculated using the safe threshold limit (<strong className="text-text font-bold">{parseFloat(tariffSettings.monthlyLimitLiters || 10000).toLocaleString()} Liters</strong>) set in settings:
+                    <span className="font-bold text-text text-sm sm:text-base">Calculation Formula:</span>
+                    <p className="mt-1 text-xs sm:text-sm text-text-muted font-medium">
+                      Charges are calculated using safe threshold (<strong className="text-text font-bold">{parseFloat(tariffSettings.monthlyLimitLiters || 10000).toLocaleString()} L</strong>):
                     </p>
-                    <div className="mt-2.5">
-                      <code className="bg-surface border border-primary/30 text-primary font-mono text-xs md:text-sm font-black px-3.5 py-1.5 rounded-xl inline-block shadow-sm">
+                    <div className="mt-2">
+                      <code className="bg-surface border border-primary/30 text-primary font-mono text-[11px] sm:text-xs md:text-sm font-black p-2 sm:px-3.5 sm:py-1.5 rounded-xl block sm:inline-block shadow-sm overflow-x-auto">
                         water used within limit * base rate + overused water * tariff rate = total
                       </code>
                     </div>
@@ -1845,34 +1845,34 @@ Are you sure you want to finalize these bills and lock the cycle?`;
               )}
 
               {/* Resident Billing Table */}
-              <div className="border border-border rounded-2xl overflow-hidden bg-surface-lighter/20 shadow-inner">
-                <table className="w-full text-sm text-left">
+              <div className="border border-border rounded-2xl overflow-hidden bg-surface-lighter/20 shadow-inner overflow-x-auto">
+                <table className="w-full text-xs sm:text-sm text-left min-w-[600px]">
                   <thead>
-                    <tr className="border-b border-border bg-surface-lighter text-text text-xs md:text-sm font-bold uppercase tracking-wider">
-                      <th className="px-6 py-4">Flat / House</th>
-                      <th className="px-6 py-4">Resident Name</th>
-                      <th className="px-6 py-4">Meter ID / No</th>
-                      <th className="px-6 py-4 text-right">Water Log</th>
-                      <th className="px-6 py-4 text-right">Calculation Formula</th>
-                      <th className="px-6 py-4 text-right">Total Amount</th>
+                    <tr className="border-b border-border bg-surface-lighter text-text text-xs font-bold uppercase tracking-wider">
+                      <th className="px-4 py-3 sm:px-6 sm:py-4">Flat / House</th>
+                      <th className="px-4 py-3 sm:px-6 sm:py-4">Resident Name</th>
+                      <th className="px-4 py-3 sm:px-6 sm:py-4">Meter ID / No</th>
+                      <th className="px-4 py-3 sm:px-6 sm:py-4 text-right">Water Log</th>
+                      <th className="px-4 py-3 sm:px-6 sm:py-4 text-right">Calculation Formula</th>
+                      <th className="px-4 py-3 sm:px-6 sm:py-4 text-right">Total Amount</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60 bg-surface">
                     {bulkList.map((item, idx) => (
                       <tr key={idx} className="hover:bg-surface-lighter/30 transition-colors">
-                        <td className="px-6 py-4.5 font-black text-sm md:text-base text-text">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4.5 font-black text-xs sm:text-sm text-text">
                           House #{item.resident.houseNumber}
                         </td>
-                        <td className="px-6 py-4.5 text-text font-bold text-sm md:text-base">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4.5 text-text font-bold text-xs sm:text-sm">
                           {item.resident.fullName || item.resident.username}
                         </td>
-                        <td className="px-6 py-4.5 text-text-muted font-mono text-xs md:text-sm font-bold">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4.5 text-text-muted font-mono text-xs font-bold">
                           {item.resident.meterId || item.resident.meterNumber || '—'}
                         </td>
-                        <td className="px-6 py-4.5 text-right font-black text-blue-500 text-sm md:text-base whitespace-nowrap">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4.5 text-right font-black text-blue-500 text-xs sm:text-sm whitespace-nowrap">
                           {item.totalL.toLocaleString()} Liters
                         </td>
-                        <td className="px-6 py-4.5 text-right text-text-muted text-xs md:text-sm font-mono whitespace-nowrap">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4.5 text-right text-text-muted text-xs font-mono whitespace-nowrap">
                           <span className="text-primary font-bold">{item.withinLimit.toLocaleString()}L</span> × ₹{item.baseRate.toFixed(3)}
                           {item.overused > 0 && (
                             <>
@@ -1880,7 +1880,7 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                             </>
                           )}
                         </td>
-                        <td className="px-6 py-4.5 text-right font-black text-emerald-500 text-base md:text-lg whitespace-nowrap">
+                        <td className="px-4 py-3 sm:px-6 sm:py-4.5 text-right font-black text-emerald-500 text-sm sm:text-base whitespace-nowrap">
                           ₹{item.amount.toFixed(2)}
                         </td>
                       </tr>
@@ -1891,21 +1891,21 @@ Are you sure you want to finalize these bills and lock the cycle?`;
             </div>
 
             {/* Modal Footer */}
-            <div className="p-6 border-t border-border bg-surface-lighter/30 flex items-center justify-between gap-4">
-              <span className="text-sm md:text-base font-bold text-text-muted">
+            <div className="p-4 sm:p-6 border-t border-border bg-surface-lighter/30 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+              <span className="text-xs sm:text-sm font-bold text-text-muted text-center sm:text-left">
                 Total Residents: <strong className="text-text font-black">{bulkList.length}</strong>
               </span>
-              <div className="flex gap-4">
+              <div className="flex flex-col-reverse sm:flex-row gap-2.5 sm:gap-4">
                 <button
                   onClick={() => setShowBulkPreview(false)}
-                  className="px-6 py-3 bg-surface border border-border hover:border-text-muted text-text font-bold text-sm rounded-xl transition-all cursor-pointer"
+                  className="w-full sm:w-auto px-5 py-2.5 sm:px-6 sm:py-3 bg-surface border border-border hover:border-text-muted text-text font-bold text-xs sm:text-sm rounded-xl transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={executeBulkGeneration}
                   disabled={!tariffSettings?.baseRatePerLiter || parseFloat(tariffSettings.baseRatePerLiter) <= 0}
-                  className="px-7 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:from-gray-500 disabled:to-gray-650 disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold text-sm md:text-base rounded-xl transition-all shadow-lg cursor-pointer"
+                  className="w-full sm:w-auto px-6 py-2.5 sm:px-7 sm:py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:from-gray-500 disabled:to-gray-650 disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold text-xs sm:text-sm rounded-xl transition-all shadow-lg cursor-pointer"
                 >
                   ⚡ Finalize & Generate Bills
                 </button>
@@ -1917,16 +1917,16 @@ Are you sure you want to finalize these bills and lock the cycle?`;
 
       {/* Create Billing Cycle Modal */}
       {billingCycleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-surface border border-border w-full max-w-md rounded-2xl p-6 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-surface border border-border w-full max-w-md rounded-2xl p-4 sm:p-6 shadow-2xl relative my-auto max-h-[90vh] overflow-y-auto custom-scrollbar">
             <button
               onClick={() => setBillingCycleModalOpen(false)}
-              className="absolute top-4 right-4 text-text-muted hover:text-text cursor-pointer p-1.5 hover:bg-surface-lighter rounded-lg border border-border/40"
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 text-text-muted hover:text-text cursor-pointer p-1.5 hover:bg-surface-lighter rounded-lg border border-border/40"
             >
               <X className="w-5 h-5" />
             </button>
-            <h3 className="text-xl font-bold text-text mb-4">Create Billing Cycle</h3>
-            <form onSubmit={handleCreateBillingCycle} className="space-y-4">
+            <h3 className="text-lg sm:text-xl font-bold text-text mb-3 sm:mb-4">Create Billing Cycle</h3>
+            <form onSubmit={handleCreateBillingCycle} className="space-y-3.5 sm:space-y-4">
               <div>
                 <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Cycle Name</label>
                 <input
@@ -1934,17 +1934,17 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                   placeholder="e.g. June 2026 Cycle"
                   value={billingCycleForm.cycleName}
                   onChange={e => setBillingCycleForm(prev => ({ ...prev, cycleName: e.target.value }))}
-                  className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60"
+                  className="w-full bg-surface border border-border rounded-xl px-3.5 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Start Date</label>
                   <input
                     type="date" required
                     value={billingCycleForm.startDate}
                     onChange={e => setBillingCycleForm(prev => ({ ...prev, startDate: e.target.value }))}
-                    className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer"
+                    className="w-full bg-surface border border-border rounded-xl px-3.5 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer"
                   />
                 </div>
                 <div>
@@ -1953,7 +1953,7 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                     type="date" required
                     value={billingCycleForm.endDate}
                     onChange={e => setBillingCycleForm(prev => ({ ...prev, endDate: e.target.value }))}
-                    className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer"
+                    className="w-full bg-surface border border-border rounded-xl px-3.5 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer"
                   />
                 </div>
               </div>
@@ -1964,7 +1964,7 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                     required
                     value={billingCycleForm.apartmentId}
                     onChange={e => setBillingCycleForm(prev => ({ ...prev, apartmentId: e.target.value }))}
-                    className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer"
+                    className="w-full bg-surface border border-border rounded-xl px-3.5 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer"
                   >
                     <option value="">Select Colony</option>
                     {apartments.map(apt => (
@@ -1976,7 +1976,7 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                     type="text"
                     disabled
                     value={apartments.find(apt => apt.id === parseInt(billingCycleForm.apartmentId))?.name || localStorage.getItem('colonyName') || 'My Colony'}
-                    className="w-full bg-surface-lighter/50 border border-border rounded-xl px-3 py-2.5 text-sm text-text-muted cursor-not-allowed"
+                    className="w-full bg-surface-lighter/50 border border-border rounded-xl px-3.5 py-2.5 text-sm text-text-muted cursor-not-allowed"
                   />
                 )}
               </div>
@@ -1988,14 +1988,14 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                     placeholder="e.g. Block A (Leave empty for all)"
                     value={billingCycleForm.apartmentBlock}
                     onChange={e => setBillingCycleForm(prev => ({ ...prev, apartmentBlock: e.target.value }))}
-                    className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60"
+                    className="w-full bg-surface border border-border rounded-xl px-3.5 py-2.5 text-sm text-text focus:outline-none focus:border-primary/60"
                   />
                 ) : (
                   <input
                     type="text"
                     disabled
                     value={billingCycleForm.apartmentBlock || block || 'N/A'}
-                    className="w-full bg-surface-lighter/50 border border-border rounded-xl px-3 py-2.5 text-sm text-text-muted cursor-not-allowed"
+                    className="w-full bg-surface-lighter/50 border border-border rounded-xl px-3.5 py-2.5 text-sm text-text-muted cursor-not-allowed"
                   />
                 )}
               </div>
@@ -2013,7 +2013,7 @@ Are you sure you want to finalize these bills and lock the cycle?`;
       {/* Custom Confirm Alert Modal */}
       <AnimatePresence>
         {confirmModal.isOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
@@ -2037,25 +2037,25 @@ Are you sure you want to finalize these bills and lock the cycle?`;
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative w-full max-w-lg p-8 rounded-3xl shadow-2xl z-10 space-y-5 border border-border bg-surface text-text"
+              className="relative w-full max-w-lg p-5 sm:p-8 rounded-2xl sm:rounded-3xl shadow-2xl z-10 space-y-4 sm:space-y-5 border border-border bg-surface text-text my-auto max-h-[90vh] overflow-y-auto custom-scrollbar"
             >
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center shrink-0 shadow-lg">
-                  <ShieldAlert className="w-6 h-6 animate-pulse" />
+              <div className="flex items-start gap-3 sm:gap-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center shrink-0 shadow-lg">
+                  <ShieldAlert className="w-5 h-5 sm:w-6 sm:h-6 animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black uppercase tracking-wide text-red-500">{confirmModal.title}</h3>
-                  <p className="text-sm font-semibold mt-2.5 whitespace-pre-line leading-relaxed text-text-muted">
+                  <h3 className="text-base sm:text-lg font-black uppercase tracking-wide text-red-500">{confirmModal.title}</h3>
+                  <p className="text-xs sm:text-sm font-semibold mt-2 whitespace-pre-line leading-relaxed text-text-muted">
                     {confirmModal.message}
                   </p>
                 </div>
               </div>
               
-              <div className="flex justify-end gap-3.5 pt-3">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2.5 sm:gap-3.5 pt-2 sm:pt-3">
                 <button
                   type="button"
                   onClick={() => setConfirmModal(f => ({ ...f, isOpen: false }))}
-                  className="px-5 py-2.5 bg-surface-lighter hover:bg-surface border border-border rounded-xl text-xs font-bold transition-all cursor-pointer text-text shadow-sm"
+                  className="w-full sm:w-auto px-5 py-2.5 bg-surface-lighter hover:bg-surface border border-border rounded-xl text-xs font-bold transition-all cursor-pointer text-text shadow-sm"
                 >
                   Cancel
                 </button>
@@ -2065,7 +2065,7 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                     if (confirmModal.onConfirm) confirmModal.onConfirm();
                     setConfirmModal(f => ({ ...f, isOpen: false }));
                   }}
-                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black transition-all cursor-pointer shadow-md"
+                  className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black transition-all cursor-pointer shadow-md"
                 >
                   Finalize & Lock
                 </button>

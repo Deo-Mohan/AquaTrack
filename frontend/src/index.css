@@ -1,6 +1,98 @@
 @import "tailwindcss";
 
+@keyframes waterFillWaveMove {
+  0% {
+    background-position: 0% 100%;
+  }
+  50% {
+    background-position: 100% 30%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+.water-fill-text {
+  font-family: var(--heading-font), 'Fraunces', serif !important;
+  font-weight: 900;
+  text-transform: uppercase;
+  background: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #38bdf8 30%,
+    #06b6d4 60%,
+    #1d4ed8 100%
+  );
+  background-size: 100% 250%;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  animation: waterFillWaveMove 6s ease-in-out infinite alternate;
+  filter: drop-shadow(0px 4px 20px rgba(6, 182, 212, 0.7));
+}
+
+/* SVG Gentle Parallax Wave Animations */
+@keyframes move-forever {
+  0% {
+    transform: translate3d(-90px, 0, 0);
+  }
+  100% {
+    transform: translate3d(85px, 0, 0);
+  }
+}
+
+.parallax > use {
+  animation: move-forever 25s cubic-bezier(.55, .5, .45, .5) infinite;
+}
+.parallax > use:nth-child(1) {
+  animation-delay: -2s;
+  animation-duration: 7s;
+}
+.parallax > use:nth-child(2) {
+  animation-delay: -3s;
+  animation-duration: 10s;
+}
+.parallax > use:nth-child(3) {
+  animation-delay: -4s;
+  animation-duration: 13s;
+}
+.parallax > use:nth-child(4) {
+  animation-delay: -5s;
+  animation-duration: 20s;
+}
+
 @variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  --heading-font: 'Fraunces', serif;
+  --body-font: 'IBM Plex Sans', sans-serif;
+  --mono-font: 'JetBrains Mono', monospace;
+}
+
+body {
+  font-family: var(--body-font) !important;
+}
+
+h1, h2, h3, h4, h5, h6, .heading {
+  font-family: var(--heading-font);
+}
+
+.body-text {
+  font-family: var(--body-font);
+}
+
+.font-mono, code, pre, .mono-text {
+  font-family: var(--mono-font) !important;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
 
 @theme {
   --color-primary: #3b82f6;
@@ -12,12 +104,29 @@
   --color-text-muted: #94a3b8;
   --color-border: #1e3b66;
   --color-panel-bg: rgba(13, 30, 54, 0.45);
-  --font-sans: 'Plus Jakarta Sans', 'Outfit', system-ui, -apple-system, sans-serif;
-  --font-display: 'Outfit', 'Syne', sans-serif;
+  --font-sans: var(--body-font);
+  --font-display: var(--heading-font);
+  --font-mono: var(--mono-font);
 }
 
 .font-display {
-  font-family: 'Outfit', 'Syne', sans-serif;
+  font-family: var(--heading-font);
+}
+
+/* Feral Blob Speech Cloud padding & responsive sizing override */
+.blob-bubble {
+  min-width: 160px !important;
+  max-width: 360px !important;
+  padding: 0 16px !important;
+}
+
+.blob-bubble-textwrap {
+  padding: 0 20px !important;
+}
+
+.blob-bubble-text {
+  font-size: 0.95rem !important;
+  letter-spacing: -0.01em !important;
 }
 
 .font-outfit {
@@ -142,6 +251,54 @@ iframe.skiptranslate {
     0 4px 30px rgba(0, 0, 0, 0.2),
     0 20px 50px rgba(0, 0, 0, 0.3);
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Print Styles for Executive Reports & Clean Printing */
+@media print {
+  /* Hide non-printable navigation, sidebar, headers & Chatbot floating widgets */
+  aside,
+  header,
+  nav,
+  button,
+  .print\:hidden,
+  [class*="Chatbot"],
+  [class*="chatbot"],
+  div[style*="position: fixed"][style*="bottom"],
+  .fixed.bottom-6,
+  .fixed.bottom-4 {
+    display: none !important;
+  }
+
+  /* Reset body & main content container overflow and heights for full printout */
+  body, html, #root, main, div {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  body, html {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Ensure report cards print cleanly without dark background clipping */
+  .glass-card {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+
+  /* Ensure page breaks inside long tables are handled cleanly */
+  table {
+    page-break-inside: auto !important;
+  }
+  tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
 }
 
 [data-theme='light'] .glass-card {
@@ -416,13 +573,25 @@ iframe.skiptranslate {
   }
 }
 
+@keyframes skeletonShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
 .skeleton-pulse {
-  animation: skeletonPulse 1.8s ease-in-out infinite;
-  background-color: var(--color-surface-lighter);
+  background: linear-gradient(90deg, var(--color-surface-lighter) 25%, rgba(59, 130, 246, 0.15) 50%, var(--color-surface-lighter) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.6s ease-in-out infinite;
 }
 
 [data-theme='light'] .skeleton-pulse {
-  background-color: rgba(0, 0, 0, 0.08);
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.06) 25%, rgba(14, 165, 233, 0.2) 50%, rgba(0, 0, 0, 0.06) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.6s ease-in-out infinite;
 }
 
 .nav-item {
@@ -509,12 +678,12 @@ iframe.skiptranslate {
 }
 
 .loader.loader-responsive {
-  width: 120px;
-  height: 34px;
+  width: 140px;
+  height: 38px;
 }
 
 .loader.loader-responsive > span {
-  font-size: 18px;
+  font-size: 21px;
   letter-spacing: 0.5px;
 }
 

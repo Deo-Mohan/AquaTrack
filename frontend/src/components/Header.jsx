@@ -316,12 +316,12 @@ export default function Header({ toggleSidebar }) {
     <motion.header 
       initial={{ y: -50, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="h-16 lg:h-24 flex items-center justify-between px-4 lg:px-8 border-b border-border/50 bg-surface/50 backdrop-blur-xl relative z-30"
+      className="h-14 lg:h-16 flex items-center justify-between px-3 lg:px-6 border-b border-border/50 bg-surface/50 backdrop-blur-xl relative z-30"
     >
       {/* Hidden Google Translate container */}
       <div id="google_translate_element" className="hidden" />
 
-      <div className="flex items-center gap-2 lg:gap-4">
+      <div className="flex items-center gap-2 lg:gap-3">
         <button 
           onClick={toggleSidebar} 
           className="p-1.5 text-text-muted hover:text-text hover:bg-surface-lighter rounded-lg lg:hidden"
@@ -329,8 +329,8 @@ export default function Header({ toggleSidebar }) {
           <Menu className="w-5 h-5" />
         </button>
         <div className="flex items-center gap-2 lg:gap-3">
-          <div className="w-10 h-10 lg:w-20 lg:h-20 rounded-full overflow-hidden shadow-lg shadow-primary/20 border border-primary/20 flex items-center justify-center bg-surface flex-shrink-0">
-            <img src="/logo.png" alt="AquaTrack Logo" className="w-full h-full object-cover scale-110" />
+          <div className="w-9 h-9 lg:w-11 lg:h-11 rounded-full overflow-hidden shadow-md shadow-primary/20 border border-primary/20 flex items-center justify-center bg-surface flex-shrink-0">
+            <img src="/logo.png" alt="AquaTrack Logo" className="w-full h-full object-cover scale-105" />
           </div>
           <div className="loader loader-responsive">
             <span className="outline-layer">AquaTrack</span>

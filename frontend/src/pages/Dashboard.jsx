@@ -70,7 +70,7 @@ const StatCard = ({ title, value, subtitle, infoNote, icon: Icon, svgSrc, color,
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay, duration: 0.4 }}
-    className="glass-card p-6 relative overflow-hidden group flex flex-col justify-between"
+    className="glass-card p-4 sm:p-5 min-h-[105px] relative overflow-hidden group flex flex-col justify-between"
   >
     <div>
       <div className="flex justify-between items-start mb-3">

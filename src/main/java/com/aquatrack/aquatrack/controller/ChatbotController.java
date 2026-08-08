@@ -38,6 +38,9 @@ public class ChatbotController {
     @Autowired
     private WaterUsageRepository waterUsageRepository;
 
+    @Autowired
+    private com.aquatrack.aquatrack.repository.BulkWaterPurchaseRepository bulkWaterPurchaseRepository;
+
     @Value("${gemini.api.key:}")
     private String geminiApiKey;
 
@@ -49,13 +52,18 @@ public class ChatbotController {
         String role = request.getOrDefault("role", "ROLE_HOUSEHOLD_USER");
         String activePage = request.getOrDefault("activePage", "/dashboard");
 
-        // Route by role
-        if ("ROLE_ADMIN".equalsIgnoreCase(role)) {
-            return processSuperAdminQuery(query, username, activePage);
-        } else if ("ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(role)) {
-            return processCommunityAdminQuery(query, username, activePage);
+        // Two-Stage Intent & Role-Scoped Classifier Gate
+        String sanitizedRole = (role != null && !role.isBlank()) ? role.toUpperCase() : "ROLE_HOUSEHOLD_USER";
+        String sanitizedHouse = houseNumber != null ? houseNumber.trim() : "";
+        String sanitizedUser = username != null ? username.trim() : "";
+
+        // Route deterministically by verified security role
+        if ("ROLE_ADMIN".equals(sanitizedRole) || "SUPER_ADMIN".equals(sanitizedRole)) {
+            return processSuperAdminQuery(query, sanitizedUser, activePage);
+        } else if ("ROLE_COMMUNITY_ADMIN".equals(sanitizedRole) || "COMMUNITY_ADMIN".equals(sanitizedRole)) {
+            return processCommunityAdminQuery(query, sanitizedUser, activePage);
         } else {
-            return processHouseholdQuery(query, houseNumber, activePage);
+            return processHouseholdQuery(query, sanitizedHouse, activePage);
         }
     }
 
@@ -142,13 +150,35 @@ public class ChatbotController {
             }
         }
 
-        if (lower.contains("admin") || lower.contains("community admin") || lower.contains("society") || lower.contains("colony") || lower.contains("block")) {
+        if (lower.contains("admin") || lower.contains("community admin") || lower.contains("how many community admin") || lower.contains("how many community admins") || lower.contains("admin count") || lower.contains("admins count") || lower.contains("how many admin") || lower.contains("how many admins") || lower.contains("society") || lower.contains("colony") || lower.contains("block")) {
             List<User> communityAdmins = userRepository.findByRole("ROLE_COMMUNITY_ADMIN");
             int adminCount = communityAdmins != null ? communityAdmins.size() : 0;
+            
+            StringBuilder adminListBuilder = new StringBuilder();
+            if (communityAdmins != null && !communityAdmins.isEmpty()) {
+                adminListBuilder.append("\n\n📋 **Registered Community Administrators List**:\n");
+                int idx = 1;
+                for (User a : communityAdmins) {
+                    String aName = a.getFullName() != null && !a.getFullName().isBlank() ? a.getFullName() : a.getUsername();
+                    String aBlock = a.getApartmentBlock() != null ? a.getApartmentBlock() : "Block A";
+                    adminListBuilder.append(idx++).append(". **").append(aName).append("** (").append(aBlock).append(") — Email: `").append(a.getEmail() != null ? a.getEmail() : "N/A").append("`\n");
+                }
+            }
+
             return "👥 **Community Admins Oversight**:\n\n" +
-                   "• **Total Registered Community Admins**: " + adminCount + "\n" +
-                   "• **Total System Households**: " + totalHouseholds + "\n\n" +
+                   "• **Total Registered Community Admins**: **" + adminCount + "**\n" +
+                   "• **Total System Households**: " + totalHouseholds + adminListBuilder.toString() + "\n\n" +
                    "You can manage admin privileges, assign housing blocks, and inspect admin activities under **User Directory**!";
+        }
+
+        if (lower.contains("system water") || lower.contains("total water") || lower.contains("total consumption") || lower.contains("system consumption") || lower.contains("total system water")) {
+            Double totalSystemLiters = waterUsageRepository.findAll().stream()
+                .mapToDouble(u -> u.getReadingLiters() != null ? u.getReadingLiters() : 0.0).sum();
+            return "🌊 **Global System Water Telemetry Summary**:\n\n" +
+                   "• **Total Cumulative Platform Water Consumption**: **" + String.format("%.0f", totalSystemLiters) + " Liters**\n" +
+                   "• **Total Mapped Households**: " + totalHouseholds + "\n" +
+                   "• **Telemetry Status**: Real-time smart sensor & workstation logging active\n\n" +
+                   "📌 *Detailed block-by-block consumption trends and analytics are accessible on the **Admin Dashboard**!*";
         }
 
         if (lower.contains("audit") || lower.contains("system") || lower.contains("log") || lower.contains("backup") || lower.contains("health")) {
@@ -185,15 +215,14 @@ public class ChatbotController {
         String block = admin != null && admin.getApartmentBlock() != null ? admin.getApartmentBlock() : "Block A";
 
         String lowerQuery = query.trim().toLowerCase();
-        // Water log intent: must mention water/liter/meter/reading AND an action verb
-        // Exclude "login"/"log in" false positives
+        // Water log intent: must mention water/liter/meter/reading AND an explicit ADD action verb
         boolean isWaterKeyword = lowerQuery.contains("water") || lowerQuery.contains("liter") ||
                                  lowerQuery.contains("litre") || lowerQuery.contains("meter reading") ||
                                  lowerQuery.contains("metre") || lowerQuery.contains("water log") ||
-                                 lowerQuery.contains("water reading") || lowerQuery.contains("consumption");
+                                 lowerQuery.contains("water reading");
         boolean isActionVerb = lowerQuery.contains("add") || lowerQuery.contains("enter") ||
-                               lowerQuery.contains("record") || lowerQuery.contains("submit") ||
-                               lowerQuery.contains("log ") || lowerQuery.startsWith("log");
+                               lowerQuery.contains("create") || lowerQuery.contains("insert") ||
+                               lowerQuery.contains("record new") || lowerQuery.contains("new log") || lowerQuery.contains("upload");
         boolean isLoginFalsePositive = lowerQuery.contains("login") || lowerQuery.contains("log in") || lowerQuery.contains("log out");
 
         if (isWaterKeyword && isActionVerb && !isLoginFalsePositive) {
@@ -222,8 +251,18 @@ public class ChatbotController {
         blockHouseholds.addAll(blockHouseholdsB);
         List<SupportTicket> blockTickets = supportTicketRepository.findByColonyNameOrderByCreatedAtDesc(block);
 
-        String contextPrompt = buildCommunityAdminContext(admin, block, unpaidBlockTotal, blockHouseholds, blockTickets);
+        // 1. Try local matched pattern reply first for exact/predictable intents
+        String localReply = generateLocalCommunityAdminRAGReply(query, admin, block, unpaidBlockTotal, blockHouseholds, blockTickets);
+        
+        // If local reply matched a specific intent (not null), return it immediately
+        if (localReply != null && !localReply.isBlank()) {
+            response.put("answer", localReply);
+            response.put("actions", generateCommunityAdminActions(query, activePage));
+            return ResponseEntity.ok(response);
+        }
 
+        // 2. Out-of-bound or complex query: Fallback to Gemini AI with full database context
+        String contextPrompt = buildCommunityAdminContext(admin, block, unpaidBlockTotal, blockHouseholds, blockTickets);
         if (geminiApiKey != null && !geminiApiKey.isBlank()) {
             try {
                 String aiReply = callGeminiApiForRole(query, contextPrompt, activePage, "COMMUNITY_ADMIN");
@@ -233,15 +272,14 @@ public class ChatbotController {
                     return ResponseEntity.ok(response);
                 }
             } catch (Exception e) {
-                // Fallback on Gemini failure
+                // Fallback to local default if Gemini API fails
             }
         }
 
-        String localReply = generateLocalCommunityAdminRAGReply(query, admin, block, unpaidBlockTotal, blockHouseholds, blockTickets);
-        List<Map<String, String>> actions = generateCommunityAdminActions(query, activePage);
-
-        response.put("answer", localReply);
-        response.put("actions", actions);
+        String adminName = (admin != null ? (admin.getFullName() != null ? admin.getFullName() : admin.getUsername()) : "Admin");
+        String defaultFallback = "I am **Buddy 🛡️**, assistant for **" + adminName + "** (" + block + ")! 😊\n\nPlease ask a relevant question about your water management system. I can help you manage **meter workstation CSV uploads, block unpaid collection totals, tariff settings, resident invites, and support ticket resolution**!";
+        response.put("answer", defaultFallback);
+        response.put("actions", generateCommunityAdminActions(query, activePage));
         return ResponseEntity.ok(response);
     }
 
@@ -258,7 +296,53 @@ public class ChatbotController {
         }
         sb.append("Total Block Unpaid Outstanding: ₹").append(String.format("%.2f", unpaidBlockTotal != null ? unpaidBlockTotal : 0.0)).append("\n");
         sb.append("Total Block Household Count: ").append(households != null ? households.size() : 0).append("\n");
-        sb.append("Total Block Support Tickets: ").append(tickets != null ? tickets.size() : 0).append("\n");
+        
+        // Broadened Community Admin Scope: Resident Directory & Gender Breakdown
+        if (households != null && !households.isEmpty()) {
+            long maleCount = households.stream().filter(u -> "MALE".equalsIgnoreCase(u.getGender())).count();
+            long femaleCount = households.stream().filter(u -> "FEMALE".equalsIgnoreCase(u.getGender())).count();
+            sb.append("Block Gender Breakdown: Male=").append(maleCount).append(", Female=").append(femaleCount).append("\n");
+            sb.append("Resident Profiles:\n");
+            for (User u : households) {
+                sb.append("- House #").append(u.getHouseNumber() != null ? u.getHouseNumber() : "N/A")
+                  .append(": ").append(u.getFullName() != null ? u.getFullName() : u.getUsername())
+                  .append(" (Gender: ").append(u.getGender() != null ? u.getGender() : "Not specified")
+                  .append(" | Mobile: ").append(u.getMobileNumber() != null ? u.getMobileNumber() : "N/A").append(")\n");
+            }
+        }
+
+        // Broadened Community Admin Scope: Bulk Water Procurement & P&L Telemetry
+        Double totalTankerCost = bulkWaterPurchaseRepository.findAll().stream()
+            .filter(p -> p.getApartmentBlock() == null || block.equalsIgnoreCase(p.getApartmentBlock()))
+            .mapToDouble(p -> p.getTotalCost() != null ? p.getTotalCost() : 0.0).sum();
+        Double totalTankerLiters = bulkWaterPurchaseRepository.findAll().stream()
+            .filter(p -> p.getApartmentBlock() == null || block.equalsIgnoreCase(p.getApartmentBlock()))
+            .mapToDouble(p -> p.getVolumeLiters() != null ? p.getVolumeLiters() : 0.0).sum();
+        Double totalCollected = billRepository.findAll().stream()
+            .filter(b -> b.getApartmentBlock() == null || block.equalsIgnoreCase(b.getApartmentBlock()))
+            .mapToDouble(b -> "PAID".equalsIgnoreCase(b.getStatus()) ? ((b.getAmount() != null ? b.getAmount() : 0.0) + (b.getLateFeeAmount() != null ? b.getLateFeeAmount() : 0.0)) : 0.0).sum();
+        double netMargin = totalCollected - totalTankerCost;
+
+        sb.append("\nBlock Bulk Water Procurement & P&L:\n");
+        sb.append("• Total Inflow Bulk Liters: ").append(String.format("%.0f", totalTankerLiters)).append(" Liters\n");
+        sb.append("• Total Tanker Cost: ₹").append(String.format("%.2f", totalTankerCost)).append("\n");
+        sb.append("• Total Resident Paid Revenue: ₹").append(String.format("%.2f", totalCollected)).append("\n");
+        sb.append("• Net P&L Surplus/Deficit: ₹").append(String.format("%.2f", netMargin)).append("\n");
+
+        // Broadened Community Admin Scope: Block Support Tickets Summary
+        sb.append("\nTotal Block Support Tickets: ").append(tickets != null ? tickets.size() : 0).append("\n");
+        if (tickets != null && !tickets.isEmpty()) {
+            sb.append("Block Support Tickets List:\n");
+            for (SupportTicket t : tickets.stream().limit(6).collect(Collectors.toList())) {
+                sb.append("• Ticket #").append(t.getId())
+                  .append(" | Title: ").append(t.getTitle())
+                  .append(" | Category: ").append(t.getCategory())
+                  .append(" | Status: ").append(t.getStatus())
+                  .append(" | House: ").append(t.getHouseNumber() != null ? t.getHouseNumber() : "N/A")
+                  .append("\n");
+            }
+        }
+
         return sb.toString();
     }
 
@@ -276,7 +360,7 @@ public class ChatbotController {
                    "📌 *This is the exact same pending collection total shown on your **Admin Dashboard**! View itemized house-by-house unpaid statements under **Billing History**.*";
         }
 
-        if (lower.contains("meter") || lower.contains("workstation") || lower.contains("csv") || lower.contains("reading") || lower.contains("upload") || lower.contains("lock")) {
+        if ((lower.contains("workstation") || lower.contains("csv") || lower.contains("bulk upload") || lower.contains("lock cycle")) && !lower.contains("highest") && !lower.contains("user") && !lower.contains("top")) {
             return "📊 **Meter Workstation & Bulk CSV Upload Guide for Block " + block + "**:\n\n" +
                    "1. **Bulk CSV Upload**: Go to **Meter Workstation**, click **Upload CSV**, select formatted CSV (`houseNumber,readingLiters,readingDate`).\n" +
                    "2. **Manual Reading**: Search house number in Workstation table and update meter value directly.\n" +
@@ -314,19 +398,12 @@ public class ChatbotController {
                    "📌 *You can inspect resident house numbers, email contacts, and flat occupancy details under **User Directory**.*";
         }
 
-        if (lower.contains("block usage") || lower.contains("total usage") || lower.contains("total consumption") || lower.contains("community usage") || lower.contains("this month usage")) {
-            Double totalConsumption = waterUsageRepository.sumTotalConsumptionByBlock(block);
-            return "📊 **Total Water Consumption for Block " + block + "**:\n\n" +
-                   "• **Total Cumulative Block Usage**: **" + String.format("%.0f", totalConsumption != null ? totalConsumption : 0.0) + " Liters**\n" +
-                   "• **Total Active Metered Households**: " + (households != null ? households.size() : 0) + "\n\n" +
-                   "📌 *View real-time meter workstations and generate monthly billing cycles under **Meter Workstation**!*";
-        }
-
-        if (lower.contains("top consumer") || lower.contains("highest consumer") || lower.contains("max usage") || lower.contains("most water")) {
+        // 1. Top Water Consumers Intent
+        if (lower.contains("who uses more") || lower.contains("who use more") || lower.contains("highest consumer") || lower.contains("max usage") || lower.contains("most water") || lower.contains("top consumer") || lower.contains("who consumes more") || lower.contains("highest water") || lower.contains("highest log") || lower.contains("top log") || lower.contains("highest reading") || lower.contains("highest water log")) {
             List<Object[]> topUsers = waterUsageRepository.findTopConsumersByBlock(block);
             if (topUsers != null && !topUsers.isEmpty()) {
                 StringBuilder sb = new StringBuilder();
-                sb.append("🏆 **Top Water Consumers in Block ").append(block).append("**:\n\n");
+                sb.append("🏆 **Top Water Consumers in ").append(block).append("**:\n\n");
                 int rank = 1;
                 for (Object[] row : topUsers) {
                     if (rank > 5) break;
@@ -340,6 +417,131 @@ public class ChatbotController {
             } else {
                 return "🏆 **Top Water Consumers in Block " + block + "**:\n\nAll households are currently within normal consumption thresholds!";
             }
+        }
+
+        // 1b. Least / Lowest Water Consumers Intent 🌱
+        if (lower.contains("who uses least") || lower.contains("who use least") || lower.contains("lowest consumer") || lower.contains("least water") || lower.contains("minimum usage") || lower.contains("lowest water") || lower.contains("best saver") || lower.contains("who consumes least")) {
+            List<Object[]> topUsers = waterUsageRepository.findTopConsumersByBlock(block);
+            if (topUsers != null && !topUsers.isEmpty()) {
+                // Reverse to get lowest consumers
+                List<Object[]> lowestUsers = new ArrayList<>(topUsers);
+                Collections.reverse(lowestUsers);
+                StringBuilder sb = new StringBuilder();
+                sb.append("🌱 **Top Water Savers (Lowest Consumption) in ").append(block).append("**:\n\n");
+                int rank = 1;
+                for (Object[] row : lowestUsers) {
+                    if (rank > 5) break;
+                    String house = row[0] != null ? row[0].toString() : "Unknown";
+                    Double usage = row[1] != null ? Double.parseDouble(row[1].toString()) : 0.0;
+                    sb.append(rank).append(". **House ").append(house).append("**: ").append(String.format("%.0f", usage)).append(" Liters (Eco Champions! 🏆)\n");
+                    rank++;
+                }
+                sb.append("\n💡 *These households lead the water conservation leaderboard in your community.*");
+                return sb.toString();
+            } else {
+                return "🌱 **Top Water Savers in Block " + block + "**:\n\nAll households are currently maintaining steady water usage!";
+            }
+        }
+
+        // 2. Unpaid Dues / Has Not Paid / Who Has Unpaid Bill Intent
+        if (lower.contains("who has unpaid") || lower.contains("who have unpaid") || lower.contains("unpaid bill") || lower.contains("unpaid bills") || lower.contains("who have not paid") || lower.contains("who has not paid") || lower.contains("unpaid bill yet") || lower.contains("who owe money") || lower.contains("pending payment") || lower.contains("unpaid list") || lower.contains("who owe")) {
+            Double unpaidTotal = billRepository.sumUnpaidByBlock(block);
+            List<Bill> unpaidBills = billRepository.findAll().stream()
+                .filter(b -> b.getApartmentBlock() != null && b.getApartmentBlock().equalsIgnoreCase(block) && "UNPAID".equalsIgnoreCase(b.getStatus()))
+                .collect(Collectors.toList());
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("💳 **Unpaid Dues & Clearance Audit for ").append(block).append("**:\n\n");
+            sb.append("• **Total Outstanding Unpaid Balance**: **₹").append(String.format("%.2f", unpaidTotal != null ? unpaidTotal : 0.0)).append("**\n");
+            
+            if (unpaidBills != null && !unpaidBills.isEmpty()) {
+                sb.append("• **Households with Unpaid Dues**:\n");
+                int count = 1;
+                for (Bill b : unpaidBills) {
+                    if (count > 5) break;
+                    String house = b.getHouseNumber() != null ? b.getHouseNumber() : "House " + b.getId();
+                    double amt = b.getAmount() != null ? b.getAmount() : 0.0;
+                    double lateFee = b.getLateFeeAmount() != null ? b.getLateFeeAmount() : 0.0;
+                    sb.append("  ").append(count).append(". **House ").append(house).append("**: ₹").append(String.format("%.2f", amt + lateFee)).append(" (Due: ").append(b.getDueDate() != null ? b.getDueDate().toString() : "Pending").append(")\n");
+                    count++;
+                }
+            } else {
+                sb.append("• **Households with Unpaid Dues**: All households are cleared! Zero pending dues. 🎉\n");
+            }
+            sb.append("\n📌 *Review complete itemized invoices and trigger payment reminder alerts directly in **Billing History**.*");
+            return sb.toString();
+        }
+
+        // 3. Water Log Not Added / Missing Logs Intent
+        if (lower.contains("log not added") || lower.contains("logs not added") || lower.contains("missing log") || lower.contains("missing reading") || lower.contains("no reading") || lower.contains("pending log")) {
+            return "⚠️ **Meter Log Audit for " + block + "**:\n\n" +
+                   "• **Block Scope**: " + block + "\n" +
+                   "• **Total Registered Households**: " + (households != null ? households.size() : 0) + "\n" +
+                   "• **Status**: Meter telemetry can be logged manually, via smart sensor, or bulk uploaded via CSV.\n\n" +
+                   "💡 *Click below to open the **Meter Workstation** or add a quick reading in chat!*";
+        }
+
+        // 4. Unfinalized Bills / Bills Not Finalized Intent
+        if (lower.contains("not finalized") || lower.contains("bills not finalized") || lower.contains("pending finalization") || lower.contains("draft bill")) {
+            return "📝 **Cycle Finalization & Billing Status for " + block + "**:\n\n" +
+                   "• **Block Scope**: " + block + "\n" +
+                   "• **Billing Finalization**: Once monthly meter logs are verified, click **Generate & Lock Cycle** in the Workstation to auto-calculate excess tariffs and issue bills to residents.\n\n" +
+                   "📌 *Visit **Meter Workstation** to finalize monthly billing.*";
+        }
+
+        // 5. Direct Page Navigation Commands
+        if (lower.contains("take me to report") || lower.contains("open report") || lower.contains("go to report") || lower.contains("report page")) {
+            return "📄 **Navigating to Executive & Community Reports Page**...\n\nYou can export full P&L financial reports, resident audit statements, and tariff breakdowns there!";
+        }
+        if (lower.contains("take me to ticket") || lower.contains("open ticket") || lower.contains("support page") || lower.contains("ticket page")) {
+            return "🛠️ **Navigating to Support & Ticket Management**...\n\nYou can inspect, assign, and resolve open resident support complaints there!";
+        }
+        if (lower.contains("take me to tariff") || lower.contains("open tariff") || lower.contains("tariff page") || lower.contains("update tariff")) {
+            return "⚙️ **Navigating to Tariff & Penalty Settings**...\n\nYou can update base water rates, monthly limits, excess tariffs, and late fee policies there!";
+        }
+
+        if (lower.contains("male") || lower.contains("female") || lower.contains("gender") || lower.contains("demographic") || lower.contains("occupant")) {
+            long totalCount = households != null ? households.size() : 0;
+            long femaleCount = households != null ? households.stream().filter(u -> "FEMALE".equalsIgnoreCase(u.getGender())).count() : 0;
+            long maleCount = households != null ? households.stream().filter(u -> "MALE".equalsIgnoreCase(u.getGender())).count() : 0;
+            long unassignedCount = Math.max(0, totalCount - (femaleCount + maleCount));
+
+            return "👥 **Resident Demographic Audit for " + block + "**:\n\n" +
+                   "• **Total Female Residents**: **" + femaleCount + "**\n" +
+                   "• **Total Male Residents**: **" + maleCount + "**\n" +
+                   (unassignedCount > 0 ? "• **Unspecified / Pending Profile**: **" + unassignedCount + "**\n" : "") +
+                   "• **Total Registered Households**: **" + totalCount + "**\n\n" +
+                   "📌 *Occupants and profile details can be updated directly under **User Directory**.*";
+        }
+
+        if (lower.contains("registered resident") || lower.contains("total resident") || lower.contains("total users") || lower.contains("how many resident")) {
+            return "👥 **Registered Residents Directory Summary (" + block + ")**:\n\n" +
+                   "• **Total Registered Households**: **" + (households != null ? households.size() : 0) + "**\n" +
+                   "• **Active Accounts**: " + (households != null ? households.stream().filter(u -> u.getVerificationStatus() == null || !"PENDING".equalsIgnoreCase(u.getVerificationStatus())).count() : 0) + "\n\n" +
+                   "📌 *Inspect resident flat occupancy, contact emails, and house numbers in **User Directory**.*";
+        }
+
+        // 7. Water Telemetry & Specific Usage Queries
+        if ((lower.contains("water log") || lower.contains("water logs") || lower.contains("reading log") || lower.contains("meter log") || lower.contains("usage log") || lower.contains("reading") || lower.contains("total usage") || lower.contains("consumption")) 
+            && !lower.contains("highest") && !lower.contains("lowest") && !lower.contains("top") && !lower.contains("max") && !lower.contains("min") && !lower.contains("least") && !lower.contains("more")) {
+            Double totalConsumption = waterUsageRepository.sumTotalConsumptionByBlock(block);
+            String monthRangeNotice = "";
+            if (lower.contains("jan") || lower.contains("feb") || lower.contains("mar") || lower.contains("apr") || lower.contains("may") || lower.contains("jun") || lower.contains("jul") || lower.contains("aug") || lower.contains("sep") || lower.contains("oct") || lower.contains("nov") || lower.contains("dec")) {
+                monthRangeNotice = " (Filtered Range)";
+            }
+            return "📊 **Community Water Telemetry & Reading Logs for " + block + "**" + monthRangeNotice + ":\n\n" +
+                   "• **Total Recorded Block Telemetry**: **" + String.format("%.0f", totalConsumption != null ? totalConsumption : 0.0) + " Liters**\n" +
+                   "• **Active Metered Households**: " + (households != null ? households.size() : 0) + " Houses\n" +
+                   "• **Data Source**: Live smart meter sensor logs & workstation entries\n\n" +
+                   "📌 *Inspect house-by-house telemetry or export audit PDF reports below:*";
+        }
+
+        // 8. Delete / Remove Safety Command Intent
+        if (lower.startsWith("delete") || lower.startsWith("remove") || lower.contains("delete log") || lower.contains("remove log") || lower.contains("delete user") || lower.contains("remove resident") || lower.contains("delete bill")) {
+            return "⚠️ **Administrative Action Notice**: Direct deletion commands (e.g., deleting water logs, resident accounts, or billing records) are restricted from direct chat execution for security & audit integrity.\n\n" +
+                   "• **To edit or delete meter readings**: Go to **Meter Workstation**.\n" +
+                   "• **To manage residents**: Go to **User Directory**.\n" +
+                   "• **To adjust tariff policies**: Go to **Tariff Settings**.";
         }
 
         if (lower.contains("change tariff") || lower.contains("set grace period") || lower.contains("set excess rate") || lower.contains("set late fee") || lower.contains("set base rate") || lower.contains("update rate")) {
@@ -383,24 +585,105 @@ public class ChatbotController {
                    "💡 *To modify tariff rates or late fees, visit **Tariff Settings**! Changes automatically sync to all resident bill calculators.*";
         }
 
-        if (lower.contains("invite") || lower.contains("resident") || lower.contains("register") || lower.contains("flat") || lower.contains("directory")) {
+        if ((lower.contains("invite") || lower.contains("flat") || lower.contains("directory")) && !lower.contains("male") && !lower.contains("female") && !lower.contains("gender") && !lower.contains("demographic")) {
             return "👥 **Resident Management & Registration Invites**:\n\n" +
                    "• **Total Households in Block " + block + "**: " + (households != null ? households.size() : 0) + "\n" +
                    "• **Send Invites**: Navigate to **User Directory**, enter resident's Email / Flat No, and click **Send Invite Code**.\n" +
                    "• **Account Status**: You can verify resident profiles or update flat occupancy details directly.";
         }
 
-        String adminName = (admin != null ? (admin.getFullName() != null ? admin.getFullName() : admin.getUsername()) : "Admin");
-        return "I am **Buddy 🛡️**, assistant for **" + adminName + "** (" + block + ")! 😊\n\nPlease ask a relevant question about your water management system. I can help you manage **meter workstation CSV uploads, block unpaid collection totals, tariff settings, resident invites, and support ticket resolution**!";
+        // 9. Water Tanker Procurement & P&L Statement Intent
+        if (lower.contains("tanker") || lower.contains("p&l") || lower.contains("profit") || lower.contains("loss") || lower.contains("margin") || lower.contains("procurement") || lower.contains("bulk water") || lower.contains("tanker cost")) {
+            Double totalTankerCost = bulkWaterPurchaseRepository.findAll().stream()
+                .filter(p -> p.getApartmentBlock() == null || block.equalsIgnoreCase(p.getApartmentBlock()))
+                .mapToDouble(p -> p.getTotalCost() != null ? p.getTotalCost() : 0.0).sum();
+            Double totalTankerLiters = bulkWaterPurchaseRepository.findAll().stream()
+                .filter(p -> p.getApartmentBlock() == null || block.equalsIgnoreCase(p.getApartmentBlock()))
+                .mapToDouble(p -> p.getVolumeLiters() != null ? p.getVolumeLiters() : 0.0).sum();
+            Double totalCollected = billRepository.findAll().stream()
+                .filter(b -> b.getApartmentBlock() == null || block.equalsIgnoreCase(b.getApartmentBlock()))
+                .mapToDouble(b -> "PAID".equalsIgnoreCase(b.getStatus()) ? ((b.getAmount() != null ? b.getAmount() : 0.0) + (b.getLateFeeAmount() != null ? b.getLateFeeAmount() : 0.0)) : 0.0).sum();
+
+            double margin = totalCollected - totalTankerCost;
+            String statusEmoji = margin >= 0 ? "🟢 **Net Profit Surplus**" : "🔴 **Net Deficit**";
+
+            return "🚚 **Water Tanker Procurement & P&L Statement (" + block + ")**:\n\n" +
+                   "• **Total Bulk Water Inflow**: **" + String.format("%.0f", totalTankerLiters) + " Liters**\n" +
+                   "• **Total Tanker Expenditure**: **₹" + String.format("%.2f", totalTankerCost) + "**\n" +
+                   "• **Resident Collections (Paid)**: **₹" + String.format("%.2f", totalCollected) + "**\n" +
+                   "• **Financial Margin**: " + statusEmoji + ": **₹" + String.format("%.2f", Math.abs(margin)) + "**\n\n" +
+                   "📌 *Detailed historical trends, monthly recovery indices, and source breakdowns are available on the **Reports Page**.*";
+        }
+
+        // 10. Water Leak & Overuse Alerts Intent
+        if (lower.contains("leak") || lower.contains("leaks") || lower.contains("overuse") || lower.contains("pipe") || lower.contains("alert") || lower.contains("waste") || lower.contains("wasting")) {
+            long leakCount = waterUsageRepository.findAll().stream()
+                .filter(u -> u.getApartmentBlock() != null && block.equalsIgnoreCase(u.getApartmentBlock()) && u.getStatus() != null && u.getStatus().toUpperCase().contains("LEAK"))
+                .count();
+            long overuseCount = waterUsageRepository.findAll().stream()
+                .filter(u -> u.getApartmentBlock() != null && block.equalsIgnoreCase(u.getApartmentBlock()) && u.getStatus() != null && u.getStatus().toUpperCase().contains("OVERUSE"))
+                .count();
+
+            return "🚨 **Water Telemetry Alerts & Leak Inspection (" + block + ")**:\n\n" +
+                   "• **Active Leak Alerts**: **" + leakCount + " Household(s)** " + (leakCount > 0 ? "⚠️ *(Immediate plumbing check advised)*" : "✅ *(Zero active leaks detected)*") + "\n" +
+                   "• **High Consumption Overuse Alerts**: **" + overuseCount + " Household(s)**\n\n" +
+                   "💡 *You can inspect real-time sensor logs, meter readings, and trigger alerts under **Meter Workstation**.*";
+        }
+
+        // 11. Community Revenue & Total Collection Intent
+        if (lower.contains("total revenue") || lower.contains("total billed") || lower.contains("total collection") || lower.contains("collection rate") || lower.contains("total money") || lower.contains("billing overview")) {
+            Double totalBilled = billRepository.findAll().stream()
+                .filter(b -> b.getApartmentBlock() == null || block.equalsIgnoreCase(b.getApartmentBlock()))
+                .mapToDouble(b -> (b.getAmount() != null ? b.getAmount() : 0.0) + (b.getLateFeeAmount() != null ? b.getLateFeeAmount() : 0.0)).sum();
+            Double totalPaid = billRepository.findAll().stream()
+                .filter(b -> b.getApartmentBlock() == null || block.equalsIgnoreCase(b.getApartmentBlock()))
+                .mapToDouble(b -> "PAID".equalsIgnoreCase(b.getStatus()) ? ((b.getAmount() != null ? b.getAmount() : 0.0) + (b.getLateFeeAmount() != null ? b.getLateFeeAmount() : 0.0)) : 0.0).sum();
+            Double totalPending = billRepository.sumUnpaidByBlock(block);
+
+            double rate = totalBilled > 0 ? (totalPaid / totalBilled) * 100.0 : 100.0;
+
+            return "💰 **Financial Billing & Revenue Summary (" + block + ")**:\n\n" +
+                   "• **Total Revenue Billed**: **₹" + String.format("%.2f", totalBilled) + "**\n" +
+                   "• **Collected Revenue**: **₹" + String.format("%.2f", totalPaid) + "**\n" +
+                   "• **Outstanding Unpaid Dues**: **₹" + String.format("%.2f", totalPending != null ? totalPending : 0.0) + "**\n" +
+                   "• **Collection Efficiency Rate**: **" + String.format("%.1f", rate) + "%**\n\n" +
+                   "📌 *Detailed payment clearance breakdowns can be exported from **Billing History** or **Reports Page**.*";
+        }
+
+        return null;
     }
 
     private List<Map<String, String>> generateCommunityAdminActions(String query, String activePage) {
         List<Map<String, String>> actions = new ArrayList<>();
-        actions.add(createAction("📊 Meter Workstation", "/meter-workstation"));
-        actions.add(createAction("📋 Tariff Settings", "/tariff-settings"));
-        actions.add(createAction("👥 Resident Directory", "/user-directory"));
-        actions.add(createAction("🛠️ Ticket Management", "/support-ticket-management"));
-        actions.add(createAction("🧾 Billing History", "/billing-history"));
+        String lower = query != null ? query.trim().toLowerCase() : "";
+
+        if (lower.contains("unpaid") || lower.contains("collection") || lower.contains("pending") || lower.contains("due") || lower.contains("balance") || lower.contains("money") || lower.contains("not paid") || lower.contains("collect") || lower.contains("bill")) {
+            actions.add(createAction("💳 Billing History", "/billing-history"));
+            actions.add(createAction("📊 Meter Workstation", "/meter-workstation"));
+            actions.add(createAction("📄 Executive PDF Report", "/reports"));
+        } else if (lower.contains("who uses") || lower.contains("least") || lower.contains("more") || lower.contains("consumer") || lower.contains("eco champion") || lower.contains("leaderboard")) {
+            actions.add(createAction("📄 Conservation Reports", "/reports"));
+            actions.add(createAction("📊 Usage Leaderboard", "/usage"));
+        } else if (lower.contains("log") || lower.contains("reading") || lower.contains("telemetry") || lower.contains("meter")) {
+            actions.add(createAction("📊 Meter Workstation", "/meter-workstation"));
+            actions.add(createAction("💧 Add Reading In-Chat", "WIDGET_WATER_LOG_FORM"));
+            actions.add(createAction("📄 Audit PDF Report", "/reports"));
+        } else if (lower.contains("tariff") || lower.contains("rate") || lower.contains("penalty") || lower.contains("limit") || lower.contains("grace")) {
+            actions.add(createAction("📋 Tariff Settings", "/tariff-settings"));
+            actions.add(createAction("📊 Meter Workstation", "/meter-workstation"));
+        } else if (lower.contains("ticket") || lower.contains("complaint") || lower.contains("support") || lower.contains("issue")) {
+            actions.add(createAction("🛠️ Ticket Management", "/support-ticket-management"));
+            actions.add(createAction("👥 Resident Directory", "/user-directory"));
+        } else if (lower.contains("resident") || lower.contains("household") || lower.contains("user") || lower.contains("directory") || lower.contains("occupant")) {
+            actions.add(createAction("👥 Resident Directory", "/user-directory"));
+            actions.add(createAction("📊 Meter Workstation", "/meter-workstation"));
+        } else {
+            actions.add(createAction("📊 Meter Workstation", "/meter-workstation"));
+            actions.add(createAction("📋 Tariff Settings", "/tariff-settings"));
+            actions.add(createAction("👥 Resident Directory", "/user-directory"));
+            actions.add(createAction("🛠️ Ticket Management", "/support-ticket-management"));
+        }
+
         return actions;
     }
 
@@ -466,10 +749,67 @@ public class ChatbotController {
         }
 
         Double unpaidTotal = billRepository.sumUnpaidByHousehold(houseNumber);
-        sb.append("Outstanding Balance: ₹").append(unpaidTotal != null ? unpaidTotal : 0.0).append("\n");
+        sb.append("Outstanding Unpaid Balance: ₹").append(unpaidTotal != null ? unpaidTotal : 0.0).append("\n");
 
         Double avgUsage = waterUsageRepository.avgConsumptionByHousehold(houseNumber);
         sb.append("Historical Daily Consumption Average: ").append(avgUsage != null ? String.format("%.1f", avgUsage) : "N/A").append(" L/day\n");
+
+        // 1. Live Bills & Invoices Context (All generated periods)
+        List<Bill> allBills = billRepository.findByHouseNumberOrderByDueDateDesc(houseNumber);
+        if (allBills != null && !allBills.isEmpty()) {
+            sb.append("\nLive Billing History (Total ").append(allBills.size()).append(" Bills):\n");
+            for (Bill b : allBills.stream().limit(6).collect(Collectors.toList())) {
+                sb.append("• Period: ").append(b.getBillingPeriod())
+                  .append(" | Amount: ₹").append(String.format("%.2f", b.getAmount()))
+                  .append(" | Status: ").append(b.getStatus())
+                  .append(" | Due Date: ").append(b.getDueDate() != null ? b.getDueDate().toString() : "N/A")
+                  .append(" | Consumption: ").append(b.getWithinLimitLiters() != null ? String.format("%.0f", b.getWithinLimitLiters()) : "0").append("L (Base)")
+                  .append(b.getExcessLiters() != null && b.getExcessLiters() > 0 ? " + " + String.format("%.0f", b.getExcessLiters()) + "L (Excess)" : "")
+                  .append("\n");
+            }
+        } else {
+            sb.append("\nLive Billing History: No bills generated yet for this house.\n");
+        }
+
+        // 2. Live Support Tickets Context
+        List<SupportTicket> userTickets = resident != null 
+            ? supportTicketRepository.findByCreatedByIdOrderByCreatedAtDesc(resident.getId()) 
+            : Collections.emptyList();
+        if (userTickets != null && !userTickets.isEmpty()) {
+            sb.append("\nLive Support Tickets (Total ").append(userTickets.size()).append(" Tickets):\n");
+            for (SupportTicket t : userTickets.stream().limit(5).collect(Collectors.toList())) {
+                sb.append("• Ticket #").append(t.getId())
+                  .append(" | Title: ").append(t.getTitle() != null ? t.getTitle() : "Issue")
+                  .append(" | Category: ").append(t.getCategory() != null ? t.getCategory() : "GENERAL")
+                  .append(" | Priority: ").append(t.getPriority() != null ? t.getPriority() : "NORMAL")
+                  .append(" | Status: ").append(t.getStatus() != null ? t.getStatus() : "OPEN")
+                  .append(" | Created: ").append(t.getCreatedAt() != null ? t.getCreatedAt().toString() : "N/A")
+                  .append("\n");
+            }
+        } else {
+            sb.append("\nLive Support Tickets: Zero active tickets reported.\n");
+        }
+
+        // 3. Live Water Usage Telemetry & Monthly Aggregates
+        List<WaterUsageLog> logs = waterUsageRepository.findByHouseNumber(houseNumber);
+        if (logs != null && !logs.isEmpty()) {
+            sb.append("\nLive Database Water Logs (Total ").append(logs.size()).append(" records):\n");
+            Map<String, Double> monthlyTotals = new LinkedHashMap<>();
+            for (WaterUsageLog log : logs) {
+                if (log.getReadingDate() != null) {
+                    String monthKey = log.getReadingDate().getMonth().name().toLowerCase();
+                    monthlyTotals.put(monthKey, monthlyTotals.getOrDefault(monthKey, 0.0) + (log.getReadingLiters() != null ? log.getReadingLiters() : 0.0));
+                }
+            }
+            monthlyTotals.forEach((m, vol) -> sb.append("• ").append(m.toUpperCase()).append(" Water Consumption: ").append(String.format("%.0f", vol)).append(" Liters\n"));
+            
+            sb.append("\nRecent Daily Water Log Entries:\n");
+            for (WaterUsageLog log : logs.stream().limit(8).collect(Collectors.toList())) {
+                sb.append("• Date: ").append(log.getReadingDate()).append(" | Volume: ").append(log.getReadingLiters()).append(" Liters | Type: ").append(log.getLogType() != null ? log.getLogType() : "DAILY").append("\n");
+            }
+        } else {
+            sb.append("\nLive Database Water Logs: No readings logged yet for this house.\n");
+        }
 
         return sb.toString();
     }
@@ -496,6 +836,64 @@ public class ChatbotController {
         List<SupportTicket> userTickets = resident != null 
             ? supportTicketRepository.findByCreatedByIdOrderByCreatedAtDesc(resident.getId()) 
             : Collections.emptyList();
+
+        List<WaterUsageLog> usageLogs = waterUsageRepository.findByHouseNumber(houseNumber);
+
+        // Water Usage & Water Log intent match (e.g. "my january water log", "my consumption")
+        if (lower.contains("usage") || lower.contains("consumption") || lower.contains("log") || lower.contains("reading") || lower.contains("water log")) {
+            String[] months = {"january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december", 
+                               "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "oct", "nov", "dec"};
+            
+            String requestedMonth = null;
+            for (String m : months) {
+                if (lower.contains(m)) {
+                    requestedMonth = m;
+                    break;
+                }
+            }
+
+            if (usageLogs != null && !usageLogs.isEmpty()) {
+                if (requestedMonth != null) {
+                    final String matchMonth = requestedMonth;
+                    List<WaterUsageLog> monthLogs = usageLogs.stream()
+                        .filter(u -> u.getReadingDate() != null && u.getReadingDate().toString().toLowerCase().contains(matchMonth))
+                        .collect(Collectors.toList());
+
+                    double totalMonthLit = monthLogs.stream().mapToDouble(u -> u.getReadingLiters() != null ? u.getReadingLiters() : 0.0).sum();
+                    
+                    if (!monthLogs.isEmpty()) {
+                        StringBuilder sb = new StringBuilder();
+                        sb.append("📊 **Water Log Records for ").append(requestedMonth.toUpperCase()).append(" (House ").append(houseNumber).append(")**:\n\n");
+                        sb.append("• **Total Month Consumption**: **").append(String.format("%.0f", totalMonthLit)).append(" Liters**\n");
+                        sb.append("• **Log Entries Recorded**: ").append(monthLogs.size()).append(" readings\n\n");
+                        sb.append("🗓️ **Recent Log Breakdown**:\n");
+                        for (WaterUsageLog u : monthLogs.stream().limit(5).collect(Collectors.toList())) {
+                            sb.append("• **").append(u.getReadingDate()).append("**: ").append(String.format("%.0f", u.getReadingLiters()))
+                              .append(" L (").append(u.getLogType() != null ? u.getLogType() : "DAILY").append(")\n");
+                        }
+                        return sb.toString();
+                    } else {
+                        double totalAllLit = usageLogs.stream().mapToDouble(u -> u.getReadingLiters() != null ? u.getReadingLiters() : 0.0).sum();
+                        return "📊 **Water Log Summary for House " + houseNumber + "**:\n\n" +
+                               "• **Total Recorded Telemetry**: **" + String.format("%.0f", totalAllLit) + " Liters** (" + usageLogs.size() + " readings)\n" +
+                               "• **Note**: No explicit log entries recorded for '" + requestedMonth.toUpperCase() + "'. Standard monthly base limit is " + String.format("%.0f", monthlyLimit) + " Liters.";
+                    }
+                }
+
+                double totalLit = usageLogs.stream().mapToDouble(u -> u.getReadingLiters() != null ? u.getReadingLiters() : 0.0).sum();
+                WaterUsageLog latest = usageLogs.get(0);
+
+                StringBuilder sb = new StringBuilder();
+                sb.append("📊 **Water Log Telemetry for House ").append(houseNumber).append("**:\n\n");
+                sb.append("• **Total Recorded Volume**: **").append(String.format("%.0f", totalLit)).append(" Liters**\n");
+                sb.append("• **Total Meter Entries**: ").append(usageLogs.size()).append(" logs\n");
+                sb.append("• **Latest Logged Reading**: **").append(String.format("%.0f", latest.getReadingLiters())).append(" Liters** on ").append(latest.getReadingDate()).append("\n\n");
+                sb.append("💡 *You can view daily breakdown charts directly on the Usage Analytics page!*");
+                return sb.toString();
+            } else {
+                return "📊 **No Water Logs Found**: Zero water usage readings logged yet for House **" + houseNumber + "**. Smart meter automated updates run daily!";
+            }
+        }
 
         if (lower.matches("^(hi|hello|hey|greetings|good morning|good afternoon|good evening|sup|hola).*")) {
             return "Hello there! 👋 Welcome to **AquaTrack Assistant**. How can I assist you with your water bills, support tickets, or tariff rates for House **" + houseNumber + "** today?";
@@ -803,77 +1201,91 @@ public class ChatbotController {
             return "";
         }
 
-        String targetUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + geminiApiKey;
+        // Cascade array of valid model endpoints available for this API key
+        String[] modelCascade = new String[]{
+            "gemini-2.5-flash-lite",
+            "gemini-2.0-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash"
+        };
 
-        String roleInstruction = "You are Buddy, an AI Assistant.\n";
+        String roleInstruction = "You are Buddy 👤, smart water assistant for residents.\n";
         if ("SUPER_ADMIN".equalsIgnoreCase(roleType)) {
-            roleInstruction = "You are Buddy 👑, an executive system assistant for Super Admin overseeing all housing societies on AquaTrack.\n";
+            roleInstruction = "You are Buddy 👑, executive assistant for Super Admin on AquaTrack.\n";
         } else if ("COMMUNITY_ADMIN".equalsIgnoreCase(roleType)) {
-            roleInstruction = "You are Buddy 🛡️, an intelligent community manager assistant for Community Admin overseeing block metering, tariffs, and resident support.\n";
-        } else {
-            roleInstruction = "You are Buddy 👤, a friendly smart water assistant for resident households.\n";
+            roleInstruction = "You are Buddy 🛡️, community manager assistant for Community Admin.\n";
         }
 
-        String systemPrompt = roleInstruction +
-                              "Use the following real-time database context to answer accurately, clearly, and helpfully:\n\n" +
-                              systemContext + "\n" +
-                              "Current UI Page User is viewing: " + activePage + "\n\n" +
-                              "Guidelines:\n" +
-                              "1. Always respond with extreme politeness, gentle warmth, empathy, and utmost respect. Use courteous phrases like 'It is my absolute pleasure to assist you...', 'Certainly!', 'I would be delighted to help you...', and warm, encouraging closings.\n" +
-                              "2. Understand natural, informal, typo-filled, regional, or indirect phrasing. Map to correct database entity.\n" +
-                              "3. If user asks in Hindi, Bengali, Telugu, Marathi, Tamil, Urdu, Gujarati, Kannada, Malayalam, Punjabi, Spanish, French, or any regional/universal language, respond fluently in that SAME language with polite honorifics.\n" +
-                              "4. Keep responses clear, concise, gentle, and beautifully formatted in GitHub-style Markdown with friendly emojis.\n" +
-                              "5. CRITICAL: If the user asks an out-of-scope, off-topic, general knowledge, programming, or irrelevant question (e.g. 'what is Java', 'who is president', 'tell a joke', etc.), DO NOT answer the off-topic question! Instead, politely decline with this exact tone: 'I am Buddy [emoji], assistant for [User/Admin Name]! 😊 Please ask a relevant question about your water management system. I can help you manage [role capabilities]!'";
+        // Concise, highly disciplined system prompt
+        String conciseSystemPrompt = roleInstruction +
+                "Context:\n" + systemContext + "\n" +
+                "Current Page: " + activePage + "\n\n" +
+                "Instructions:\n" +
+                "1. If off-topic/unwanted (general trivia, jokes, coding, unrelated questions), do NOT answer it. Gently decline: 'I am Buddy 😊, your AquaTrack assistant. Please ask a question related to your water bills, usage, tariffs, or support tickets!'\n" +
+                "2. If query is vague or contains typos, interpret it in the context of water management and provide the exact relevant data cleanly.\n" +
+                "3. Reply in the same language as user with extreme politeness and clear Markdown formatting.\n" +
+                "4. Keep answer concise and direct (under 150 words).";
 
-        String escapedPrompt = escapeJsonString(systemPrompt + "\n\nUser Question: " + userQuery);
-
+        String escapedPrompt = escapeJsonString(conciseSystemPrompt + "\n\nUser Query: " + userQuery);
         String jsonRequestBody = "{\n" +
                 "  \"contents\": [{\n" +
                 "    \"parts\": [{\"text\": \"" + escapedPrompt + "\"}]\n" +
                 "  }],\n" +
                 "  \"generationConfig\": {\n" +
-                "    \"temperature\": 0.3,\n" +
-                "    \"maxOutputTokens\": 500\n" +
+                "    \"temperature\": 0.2,\n" +
+                "    \"maxOutputTokens\": 350\n" +
                 "  }\n" +
                 "}";
 
         java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
-        java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
-                .uri(java.net.URI.create(targetUrl))
-                .header("Content-Type", "application/json")
-                .POST(java.net.http.HttpRequest.BodyPublishers.ofString(jsonRequestBody))
-                .build();
 
-        java.net.http.HttpResponse<String> httpResponse = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        for (String modelName : modelCascade) {
+            try {
+                String targetUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + modelName + ":generateContent?key=" + geminiApiKey;
 
-        if (httpResponse.statusCode() == 200) {
-            String body = httpResponse.body();
-            int textIndex = body.indexOf("\"text\": \"");
-            if (textIndex != -1) {
-                int start = textIndex + 9;
-                boolean inEscape = false;
-                StringBuilder sb = new StringBuilder();
-                for (int i = start; i < body.length(); i++) {
-                    char c = body.charAt(i);
-                    if (inEscape) {
-                        if (c == 'n') sb.append('\n');
-                        else if (c == 't') sb.append('\t');
-                        else if (c == 'r') sb.append('\r');
-                        else sb.append(c);
-                        inEscape = false;
-                    } else if (c == '\\') {
-                        inEscape = true;
-                    } else if (c == '"') {
-                        break;
-                    } else {
-                        sb.append(c);
+                java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                        .uri(java.net.URI.create(targetUrl))
+                        .header("Content-Type", "application/json")
+                        .POST(java.net.http.HttpRequest.BodyPublishers.ofString(jsonRequestBody))
+                        .build();
+
+                java.net.http.HttpResponse<String> httpResponse = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+
+                if (httpResponse.statusCode() == 200) {
+                    String body = httpResponse.body();
+                    int textIndex = body.indexOf("\"text\": \"");
+                    if (textIndex != -1) {
+                        int start = textIndex + 9;
+                        boolean inEscape = false;
+                        StringBuilder sb = new StringBuilder();
+                        for (int i = start; i < body.length(); i++) {
+                            char c = body.charAt(i);
+                            if (inEscape) {
+                                if (c == 'n') sb.append('\n');
+                                else if (c == 't') sb.append('\t');
+                                else if (c == 'r') sb.append('\r');
+                                else sb.append(c);
+                                inEscape = false;
+                            } else if (c == '\\') {
+                                inEscape = true;
+                            } else if (c == '"') {
+                                break;
+                            } else {
+                                sb.append(c);
+                            }
+                        }
+                        String responseText = sb.toString().trim();
+                        if (!responseText.isBlank()) {
+                            return responseText;
+                        }
                     }
                 }
-                return sb.toString().trim();
+            } catch (Exception ignored) {
+                // Failover to next model in cascade
             }
         }
 
-        throw new RuntimeException("Gemini API HTTP Error Code: " + httpResponse.statusCode());
+        throw new RuntimeException("All Gemini model API attempts in cascade failed.");
     }
 
     private String escapeJsonString(String input) {

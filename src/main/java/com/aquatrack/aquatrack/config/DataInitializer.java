@@ -46,8 +46,8 @@ public class DataInitializer implements CommandLineRunner {
             admin.setPassword(passwordEncoder.encode(ADMIN_PASSWORD)); // BCrypt only runs once
             admin.setRole("ROLE_ADMIN");
             admin.setHouseNumber("313");
-            admin.setColonyName("KRISHNA");
-            admin.setApartmentBlock("Block B");
+            admin.setColonyName(null);
+            admin.setApartmentBlock(null);
             admin.setGender("Male");
             admin.setFullName("Krishna");
             admin.setMobileNumber("9876543210");
@@ -67,8 +67,10 @@ public class DataInitializer implements CommandLineRunner {
             if (!"APPROVED".equals(admin.getStatus()))       { admin.setStatus("APPROVED");      changed = true; }
             if (!"ROLE_ADMIN".equals(admin.getRole()))       { admin.setRole("ROLE_ADMIN");       changed = true; }
             if (!ADMIN_EMAIL.equalsIgnoreCase(admin.getEmail())) { admin.setEmail(ADMIN_EMAIL);   changed = true; }
+            if (admin.getColonyName() != null)               { admin.setColonyName(null);         changed = true; }
+            if (admin.getApartmentBlock() != null)           { admin.setApartmentBlock(null);     changed = true; }
             if (changed) userRepository.save(admin);
-            System.out.println("[AquaTrack] Super Admin verified and password updated: " + ADMIN_USERNAME);
+            System.out.println("[AquaTrack] Super Admin verified (Global Scope): " + ADMIN_USERNAME);
         }
     }
 }

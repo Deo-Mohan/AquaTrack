@@ -357,8 +357,7 @@ export default function WaterBillingHistory() {
         <head>
           <title>${reportTitle}</title>
           <style>
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
-            body { font-family: 'Inter', sans-serif; color: #0f172a; padding: 32px; margin: 0; background: #ffffff; }
+            body { font-family: system-ui, -apple-system, sans-serif; color: #0f172a; padding: 32px; margin: 0; background: #ffffff; }
             .header-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0284c7; padding-bottom: 16px; margin-bottom: 24px; }
             .logo-title { font-size: 24px; font-weight: 900; color: #0284c7; letter-spacing: -0.5px; }
             .meta-text { font-size: 12px; color: #64748b; margin-top: 4px; }

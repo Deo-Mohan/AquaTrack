@@ -26,30 +26,55 @@ const WaterPurchase = lazy(() => import('./pages/WaterPurchase'));
 const MeterWorkstation = lazy(() => import('./pages/MeterWorkstation'));
 const WaterBillingHistory = lazy(() => import('./pages/WaterBillingHistory'));
 const FeaturesPage = lazy(() => import('./pages/FeaturesPage'));
+const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 
-// Beautiful premium Glassmorphism page loader during lazy chunks fetching
+
+// Water-filling text wave animation with SVG Parallax Wave Background for website loading
 const PageLoader = () => (
-  <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#0b0f19] relative overflow-hidden">
-    {/* Ambient background glows */}
-    <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-blue-500/10 blur-[120px] pointer-events-none" />
-    <div className="absolute bottom-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-cyan-500/5 blur-[120px] pointer-events-none" />
-    
-    <div className="flex flex-col items-center gap-4 z-10">
-      <div className="relative w-16 h-16 flex items-center justify-center">
-        {/* Pulsing glow ring */}
-        <div className="absolute inset-0 rounded-full border border-blue-500/30 animate-ping duration-[1.5s]" />
-        {/* Spinning gradient ring */}
-        <div className="absolute inset-0 rounded-full border-t-2 border-r-2 border-transparent border-t-blue-500 border-r-cyan-400 animate-spin" />
-        {/* Droplet icon */}
-        <div className="text-blue-500 animate-bounce">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S12 3 12 3s-4.5 4.03-4.5 9 2.015 9 4.5 9zm0-11.25a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z" />
-          </svg>
-        </div>
+  <div className="min-h-screen w-full flex flex-col justify-between items-center bg-[#071120] dark:bg-[#050b14] relative overflow-hidden font-sans select-none">
+    {/* Ambient Water Radial Glow */}
+    <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] sm:w-[600px] h-[320px] sm:h-[600px] rounded-full bg-gradient-to-tr from-cyan-500/20 via-blue-600/25 to-sky-400/20 blur-[90px] sm:blur-[150px] pointer-events-none animate-pulse" />
+
+    {/* Upper Content (AquaTrack Round Logo + AQUATRACK Water Fill Text, z-30) */}
+    <div className="flex-1 flex flex-col items-center justify-center z-30 text-center px-4 pt-6">
+      {/* AquaTrack Circular Brand Logo */}
+      <div className="relative mb-4">
+        <div className="absolute inset-0 rounded-full bg-cyan-500/20 blur-md animate-pulse" />
+        <img
+          src="/logo.png"
+          alt="AquaTrack Logo"
+          className="relative w-20 h-20 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full object-cover bg-slate-900/80 border-2 border-cyan-400/50 p-2 shadow-[0_0_25px_rgba(6,182,212,0.4)]"
+        />
       </div>
-      <p className="text-blue-200/60 text-xs font-semibold tracking-widest uppercase animate-pulse mt-2">AquaTrack</p>
+
+      {/* AQUATRACK Water Fill Brand Text */}
+      <h1 className="water-fill-text text-5xl sm:text-7xl md:text-8xl font-black tracking-widest select-none my-2 drop-shadow-md">
+        AQUATRACK
+      </h1>
+    </div>
+
+    {/* Lower Half Waves Container (Full height wave view on all mobile & desktop viewports) */}
+    <div className="w-full h-[40vh] relative z-10 flex flex-col justify-end overflow-hidden leading-none bg-gradient-to-b from-transparent to-[#071120]">
+      <svg
+        className="w-full h-full min-h-[160px]"
+        xmlns="http://www.w3.org/2000/svg"
+        xmlnsXlink="http://www.w3.org/1999/xlink"
+        viewBox="0 24 150 28"
+        preserveAspectRatio="none"
+        shapeRendering="auto"
+      >
+        <defs>
+          <path id="gentle-wave" d="M-160 44c30 0 58-18 88-18s 58 18 88 18 58-18 88-18 58 18 88 18 v44h-352z" />
+        </defs>
+        <g className="parallax">
+          <use xlinkHref="#gentle-wave" x="48" y="0" fill="rgba(6, 182, 212, 0.4)" />
+          <use xlinkHref="#gentle-wave" x="48" y="3" fill="rgba(59, 130, 246, 0.5)" />
+          <use xlinkHref="#gentle-wave" x="48" y="5" fill="rgba(14, 165, 233, 0.7)" />
+          <use xlinkHref="#gentle-wave" x="48" y="7" fill="#071120" />
+        </g>
+      </svg>
     </div>
   </div>
 );
@@ -123,6 +148,7 @@ function App() {
           {/* Protected Routes (wrapping in AuthLayout & ProtectedRoute) */}
           <Route path="/dashboard" element={<ProtectedRoute><AuthLayout><Dashboard /></AuthLayout></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute><AuthLayout><AdminDashboard /></AuthLayout></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute><AuthLayout><ReportsPage /></AuthLayout></ProtectedRoute>} />
           <Route path="/bills" element={<ProtectedRoute><AuthLayout><Bills /></AuthLayout></ProtectedRoute>} />
           <Route path="/invoices" element={<ProtectedRoute><AuthLayout><Invoices /></AuthLayout></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><AuthLayout><Notifications /></AuthLayout></ProtectedRoute>} />

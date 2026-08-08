@@ -259,8 +259,7 @@ export default function WaterPurchase() {
         <head>
           <title>AquaTrack Water Purchase & P&L Statement - ${selectedMonth}</title>
           <style>
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
-            body { font-family: 'Inter', sans-serif; color: #0f172a; padding: 32px; margin: 0; background: #ffffff; }
+            body { font-family: system-ui, -apple-system, sans-serif; color: #0f172a; padding: 32px; margin: 0; background: #ffffff; }
             .header-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0284c7; padding-bottom: 16px; margin-bottom: 24px; }
             .logo-title { font-size: 24px; font-weight: 900; color: #0284c7; letter-spacing: -0.5px; }
             .meta-text { font-size: 12px; color: #64748b; margin-top: 4px; }
@@ -1053,21 +1052,21 @@ export default function WaterPurchase() {
       {/* Log Purchase Modal */}
       <AnimatePresence>
         {modalOpen && (
-          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="glass-card p-6 max-w-lg w-full shadow-2xl border border-border relative overflow-hidden"
+              className="glass-card p-4 sm:p-6 max-w-lg w-full shadow-2xl border border-border relative overflow-hidden my-auto max-h-[90vh] overflow-y-auto custom-scrollbar"
             >
-              <div className="flex justify-between items-center mb-5 pb-3 border-b border-border">
+              <div className="flex justify-between items-center mb-4 sm:mb-5 pb-3 border-b border-border">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-primary/10 text-primary">
                     <Truck className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-text text-base">Log Bulk Water Purchase</h3>
-                    <p className="text-xs text-text-muted">Enter tanker or municipal water invoice details</p>
+                    <h3 className="font-bold text-text text-sm sm:text-base">Log Bulk Water Purchase</h3>
+                    <p className="text-[11px] sm:text-xs text-text-muted">Enter tanker or municipal water invoice details</p>
                   </div>
                 </div>
                 <button
@@ -1085,11 +1084,11 @@ export default function WaterPurchase() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-3.5 sm:space-y-4">
                 {/* Source Selection */}
                 <div>
                   <label className="block text-xs font-semibold text-text-muted mb-1.5">Water Source Type</label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {SOURCE_OPTIONS.map(opt => (
                       <button
                         type="button"
@@ -1101,7 +1100,7 @@ export default function WaterPurchase() {
                             : 'bg-surface-lighter/50 border-border text-text-muted hover:text-text'
                         }`}
                       >
-                        <opt.icon className="w-4 h-4" />
+                        <opt.icon className="w-4 h-4 shrink-0" />
                         <span>{opt.label}</span>
                       </button>
                     ))}
@@ -1109,7 +1108,7 @@ export default function WaterPurchase() {
                 </div>
 
                 {/* Volume & Cost Grid */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-text-muted mb-1.5">Volume (Liters) *</label>
                     <input
@@ -1138,7 +1137,7 @@ export default function WaterPurchase() {
                 </div>
 
                 {/* Unit Cost & Billing Month */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-text-muted mb-1.5">Rate / Liter (₹/L)</label>
                     <input
@@ -1184,7 +1183,7 @@ export default function WaterPurchase() {
                 </div>
 
                 {/* Date & Vendor */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-text-muted mb-1.5">Purchase Date</label>
                     <input
@@ -1220,18 +1219,18 @@ export default function WaterPurchase() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-3 pt-3">
+                <div className="flex flex-col-reverse sm:flex-row items-center gap-2.5 sm:gap-3 pt-3">
                   <button
                     type="button"
                     onClick={() => setModalOpen(false)}
-                    className="flex-1 px-4 py-2.5 rounded-xl border border-border text-xs font-semibold text-text-muted hover:text-text hover:bg-surface-lighter transition-all cursor-pointer"
+                    className="w-full sm:flex-1 px-4 py-2.5 rounded-xl border border-border text-xs font-semibold text-text-muted hover:text-text hover:bg-surface-lighter transition-all cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={saving}
-                    className="flex-1 btn-next text-xs py-2.5 cursor-pointer disabled:opacity-50"
+                    className="w-full sm:flex-1 btn-next text-xs py-2.5 cursor-pointer disabled:opacity-50"
                   >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Save Purchase Log'}
                   </button>

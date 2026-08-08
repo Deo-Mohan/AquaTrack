@@ -43,7 +43,11 @@ export default function PwaInstallPrompt() {
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setTimeout(() => setShowBanner(true), 1200);
+      const dismissedTime = localStorage.getItem('aquatrack_pwa_banner_dismissed');
+      const isDismissed = dismissedTime && (Date.now() - parseInt(dismissedTime, 10) < 24 * 60 * 60 * 1000);
+      if (!isDismissed) {
+        setTimeout(() => setShowBanner(true), 2500);
+      }
     };
 
     const handleAppInstalled = () => {
@@ -59,10 +63,15 @@ export default function PwaInstallPrompt() {
     const handleOpenModal = () => setShowModal(true);
     window.addEventListener('openPwaInstallModal', handleOpenModal);
 
-    // Auto show popup alert banner on site visit after 1.5s
+    // Auto show popup alert banner on site visit if not recently dismissed
+    const dismissedTime = localStorage.getItem('aquatrack_pwa_banner_dismissed');
+    const isDismissed = dismissedTime && (Date.now() - parseInt(dismissedTime, 10) < 24 * 60 * 60 * 1000); // 24hr cooldown
+
     const timer = setTimeout(() => {
-      setShowBanner(true);
-    }, 1500);
+      if (!isDismissed) {
+        setShowBanner(true);
+      }
+    }, 2500);
 
     return () => {
       clearTimeout(timer);

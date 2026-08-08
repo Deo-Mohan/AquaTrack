@@ -5,6 +5,8 @@ import { BarChart3, Users, Shield, ArrowRight, Droplet, Sparkles, CheckCircle2, 
 import SharedHeader from '../components/SharedHeader';
 
 export default function FeaturesPage() {
+  const [valveClosed, setValveClosed] = React.useState(false);
+
   const containerVariants = {
     hidden: { opacity: 0, y: 30 },
     visible: {
@@ -92,12 +94,17 @@ export default function FeaturesPage() {
         animate="visible"
         className="max-w-5xl px-6 pt-16 pb-10 text-center z-10"
       >
-        <motion.div variants={itemVariants} className="relative inline-flex items-center gap-2 px-5 py-2 rounded-full bg-primary/10 border border-primary/30 text-primary text-xs font-extrabold uppercase tracking-wider mb-6 shadow-md backdrop-blur-md overflow-hidden group">
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            <div className="absolute -top-[50%] h-[200%] w-8 bg-gradient-to-r from-transparent via-cyan-300/40 to-transparent blur-[2px] rotate-[25deg] animate-shimmer-sweep" />
+        <motion.div
+          variants={itemVariants}
+          className="relative inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold tracking-wide mb-6 bg-gradient-to-r from-blue-500/15 via-cyan-500/20 to-blue-500/15 border border-cyan-400/40 text-blue-900 dark:text-cyan-200 shadow-sm backdrop-blur-md group hover:border-cyan-400/70 transition-all duration-300"
+          whileHover={{ scale: 1.03 }}
+        >
+          <div className="flex items-center justify-center w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-600 dark:text-cyan-300">
+            <Sparkles className="w-3.5 h-3.5" />
           </div>
-          <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse relative z-10" />
-          <span className="relative z-10">Comprehensive Capabilities</span>
+          <span className="font-extrabold tracking-wider uppercase text-[11px] bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-cyan-300 dark:to-blue-400 bg-clip-text text-transparent">
+            Comprehensive Capabilities
+          </span>
         </motion.div>
         <motion.h1 variants={itemVariants} className="text-4xl sm:text-5xl md:text-6xl font-black mb-6 tracking-tight leading-tight">
           Everything You Need for <br className="hidden sm:block" />
@@ -170,24 +177,129 @@ export default function FeaturesPage() {
         })}
       </motion.section>
 
-      {/* CTA Footer Banner */}
-      <section className="w-full max-w-4xl px-6 py-16 text-center z-10">
-        <motion.div 
-          whileHover={{ scale: 1.01 }}
-          className="glass-card p-10 md:p-14 rounded-3xl border border-primary/30 shadow-2xl relative overflow-hidden bg-gradient-to-b from-surface/80 to-surface/40 backdrop-blur-2xl"
-        >
-          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-          <h2 className="text-3xl sm:text-4xl font-black mb-4 tracking-tight">Ready to Experience Next-Gen Water Management?</h2>
-          <p className="text-text/80 mb-8 max-w-xl mx-auto font-medium text-base">
-            Join modern housing societies eliminating water disputes and billing errors with AquaTrack today.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <Link to="/login" className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-primary to-cyan-500 text-white font-black text-sm uppercase tracking-wider hover:shadow-xl hover:shadow-primary/30 hover:scale-105 transition-all flex items-center gap-2">
-              Go to Portal <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </motion.div>
-      </section>
+      {/* Interactive Faucet CTA & Contact Section */}
+      <motion.section 
+        id="contact"
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.6 }}
+        className="w-full py-8 md:py-12 px-6 relative z-10 scroll-mt-24"
+      >
+        <div style={{ perspective: '1000px' }} className="max-w-4xl mx-auto w-full">
+          <motion.div 
+            whileHover={typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches ? { rotateY: -3, rotateX: 2, scale: 1.01 } : {}}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            className="footer-panel-container p-6 md:p-16 text-center relative overflow-hidden"
+          >
+            {/* Animated Blobs */}
+            <div className="blobs">
+              <span className="blob" style={{ backgroundColor: "rgba(59, 130, 246, 0.25)" }}></span>
+              <span className="blob" style={{ backgroundColor: "rgba(6, 182, 212, 0.2)" }}></span>
+              <span className="blob" style={{ backgroundColor: "rgba(99, 102, 241, 0.2)" }}></span>
+              <span className="blob" style={{ backgroundColor: "rgba(14, 165, 233, 0.2)" }}></span>
+              <span className="blob" style={{ backgroundColor: "rgba(37, 99, 235, 0.2)" }}></span>
+            </div>
+            {/* Noise filter */}
+            <svg className="noise" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+              <filter id="noise-effect-features-footer">
+                <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" seed="1" stitchTiles="stitch"></feTurbulence>
+              </filter>
+              <rect width="100%" height="100%" filter="url(#noise-effect-features-footer)"></rect>
+            </svg>
+            
+            <div className="footer-panel-content">
+              {/* Faucet/Valve Animation Container */}
+              <div className="flex flex-col items-center mb-8 relative">
+                <div className="relative w-32 h-32 flex items-center justify-center">
+                  {/* Animated Valve/Handle */}
+                  <motion.div
+                    animate={{ rotate: valveClosed ? 180 : 0 }}
+                    transition={{ type: "spring", stiffness: 120, damping: 12 }}
+                    onClick={() => setValveClosed(!valveClosed)}
+                    className="valve-handle absolute top-[12px] left-[33px] w-8 h-8 rounded-full bg-slate-800 border border-primary/80 flex items-center justify-center cursor-pointer shadow-lg hover:scale-105 active:scale-95 transition-transform z-20"
+                    title="Tap to turn faucet"
+                  >
+                    {/* Cross Handle details */}
+                    <div className="w-5 h-1 bg-primary rounded-full absolute" />
+                    <div className="w-1 h-5 bg-primary rounded-full absolute" />
+                    <div className="w-2.5 h-2.5 bg-slate-900 rounded-full border border-primary z-10" />
+                  </motion.div>
+
+                  {/* Faucet SVG Tap Shape */}
+                  <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-md z-10 pointer-events-none">
+                    <defs>
+                      <linearGradient id="chrome-features" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#f8fafc" />
+                        <stop offset="30%" stopColor="#cbd5e1" />
+                        <stop offset="70%" stopColor="#64748b" />
+                        <stop offset="100%" stopColor="#334155" />
+                      </linearGradient>
+                    </defs>
+                    <path d="M 10,32 L 15,32 L 15,68 L 10,68 Z" fill="url(#chrome-features)" />
+                    <path d="M 15,44 L 50,44 L 50,56 L 15,56 Z" fill="url(#chrome-features)" />
+                    <path d="M 34,34 L 42,34 L 42,44 L 34,44 Z" fill="url(#chrome-features)" />
+                    <path d="M 50,44 C 65,44 74,48 74,62 L 74,76 L 62,76 L 62,62 C 62,54 58,54 50,54 Z" fill="url(#chrome-features)" />
+                    <path d="M 62,76 L 74,76 L 74,80 L 62,80 Z" fill="#475569" />
+                  </svg>
+
+                  {/* Falling Droplets */}
+                  {!valveClosed && (
+                    <>
+                      <motion.div
+                        animate={{ y: [0, 60], opacity: [1, 0] }}
+                        transition={{ repeat: Infinity, duration: 1.2, ease: "easeIn" }}
+                        className="absolute left-[79px] top-[102px]"
+                      >
+                        <Droplet className="w-4 h-4 text-blue-400 fill-blue-400" />
+                      </motion.div>
+                      <motion.div
+                        animate={{ y: [0, 60], opacity: [1, 0] }}
+                        transition={{ repeat: Infinity, duration: 1.2, delay: 0.6, ease: "easeIn" }}
+                        className="absolute left-[79px] top-[102px]"
+                      >
+                        <Droplet className="w-4 h-4 text-blue-400 fill-blue-400" />
+                      </motion.div>
+                    </>
+                  )}
+                </div>
+
+                {/* Status Text indicator */}
+                <motion.p
+                  animate={{ color: valveClosed ? "#10b981" : "#f43f5e" }}
+                  className="text-xs font-semibold uppercase tracking-widest mt-2 font-mono"
+                >
+                  {valveClosed ? "Thanks for saving water!" : "Valve Open • Tap to Turn Off!"}
+                </motion.p>
+              </div>
+
+              <h2 className="heading text-3xl md:text-5xl font-bold text-text mb-2 relative z-10">Ready to stop wasting water?</h2>
+              <p className="text-xl font-bold bg-gradient-to-r from-primary to-cyan-500 bg-clip-text text-transparent mb-6 relative z-10 tracking-wide">"Water is the driving force of all nature."</p>
+              <p className="text-lg text-text/80 mb-8 max-w-2xl mx-auto relative z-10 font-medium">
+                Join modern communities that use AquaTrack to reduce their water footprint and automate complex billing cycles.
+              </p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
+                <Link to="/register">
+                  <button className="btn-loader">
+                    <div className="btn-loader-bg">
+                      <span>JOIN</span>
+                    </div>
+                    <div className="btn-loader-drops">
+                      <div className="btn-loader-drop1"></div>
+                      <div className="btn-loader-drop2"></div>
+                      <div className="btn-loader-drop3"></div>
+                    </div>
+                  </button>
+                </Link>
+              </div>
+              <div className="flex flex-wrap justify-center gap-6 mt-8 relative z-10 text-sm text-text/80 font-medium">
+                <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> No credit card required</span>
+                <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Setup in 5 minutes</span>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </motion.section>
     </div>
   );
 }

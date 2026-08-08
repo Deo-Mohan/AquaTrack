@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aquatrack-pwa-v1';
+const CACHE_NAME = 'aquatrack-pwa-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -34,6 +34,8 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  // Never intercept API or backend calls
+  if (event.request.url.includes('/api/')) return;
   
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {

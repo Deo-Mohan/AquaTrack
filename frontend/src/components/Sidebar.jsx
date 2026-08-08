@@ -21,12 +21,15 @@ import {
   BookOpen
 } from 'lucide-react';
 
+import LogoutModal from './LogoutModal';
+
 export default function Sidebar({ isOpen, setIsOpen }) {
   const navigate = useNavigate();
   const location = useLocation();
   const role = localStorage.getItem('role');
   const isAdmin = role === 'ROLE_ADMIN' || role === 'ROLE_COMMUNITY_ADMIN';
   const isCommunityAdmin = role === 'ROLE_COMMUNITY_ADMIN';
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // Persistent collapsed state for desktop
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -74,6 +77,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
   const navItems = isAdmin 
     ? [
         { icon: LayoutDashboard, label: 'Dashboard',         path: '/admin' },
+        { icon: FileText,        label: 'Community Reports', path: '/reports' },
         { icon: Users,           label: 'User Directory',    path: '/admin?tab=users' },
         { icon: Wrench,          label: 'Meter Workstation', path: '/meter-workstation' },
         { icon: BookOpen,        label: 'Water & Billing History', path: '/water-billing-history' },
@@ -97,12 +101,13 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         { icon: HelpCircle, label: 'Support', path: '/support' },
       ];
 
-  const handleLogout = () => {
+  const handleLogoutConfirm = () => {
     const savedTheme = localStorage.getItem('theme');
     localStorage.clear();
     if (savedTheme) {
       localStorage.setItem('theme', savedTheme);
     }
+    setShowLogoutModal(false);
     navigate('/');
   };
 
@@ -125,6 +130,12 @@ export default function Sidebar({ isOpen, setIsOpen }) {
 
   return (
     <>
+      <LogoutModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleLogoutConfirm}
+      />
+
       {/* Mobile Backdrop */}
       {isOpen && (
         <div 
@@ -152,7 +163,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         </div>
 
         {/* Navigation Items */}
-        <div className={`flex-1 overflow-y-auto py-6 px-3 flex flex-col gap-1.5 transition-all duration-300 ${
+        <div className={`flex-1 overflow-y-auto no-scrollbar py-6 px-3 flex flex-col gap-1.5 transition-all duration-300 ${
           isCollapsed ? 'lg:px-2' : 'lg:px-3'
         }`}>
           {navItems.map((item) => (
@@ -199,7 +210,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             <button 
               onClick={(e) => {
                 e.stopPropagation();
-                handleLogout();
+                setShowLogoutModal(true);
               }}
               className="p-3 bg-red-500 hover:bg-red-600 text-white rounded-full cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center justify-center w-11 h-11 shadow-lg shadow-red-500/25 border-none"
               title="Logout"
@@ -210,7 +221,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             <button 
               onClick={(e) => {
                 e.stopPropagation();
-                handleLogout();
+                setShowLogoutModal(true);
               }}
               className="btn-logout-animated"
             >

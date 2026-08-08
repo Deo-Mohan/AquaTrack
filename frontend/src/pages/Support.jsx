@@ -97,7 +97,7 @@ export default function Support() {
     const totalReplies = Array.isArray(ticket.replies) ? ticket.replies.length : (ticket.replyCount || 0);
 
     if (readData === undefined) {
-      return totalReplies > 0 ? totalReplies : 1;
+      return totalReplies;
     }
 
     const savedCount = typeof readData === 'object' ? (readData.count ?? 0) : readData;

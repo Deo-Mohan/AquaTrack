@@ -414,13 +414,29 @@ export default function Landing() {
                     ></path>
                   </defs>
                   <text
-                    fontSize="10"
+                    fontSize="9.5"
                     fontWeight="700"
                     fill="currentColor"
-                    letterSpacing="1.5"
+                    letterSpacing="1.2"
                   >
                     <textPath href="#circlePath" startOffset="0%">
-                      SMART WATER BILLING • INTELLIGENT ANALYTICS •
+                      {(() => {
+                        const badgeTexts = {
+                          hi: 'स्मार्ट वाटर बिलिंग • इंटेलिजेंट एनालिटिक्स • ',
+                          bn: 'স্মার্ট ওয়াটার বিলিং • ইন্টেলিজেন্ট অ্যানালিটিক্স • ',
+                          te: 'స్మార్ట్ వాటర్ బbilling • ఇంటెలిజెంట్ అనలిటిక్స్ • ',
+                          mr: 'स्मार्ट वॉटर बिलिंग • इंटेलिजंट ॲनालिटिक्स • ',
+                          ta: 'ஸ்மார்ட் வாட்டர் பில்லிங் • இன்டலிஜென்ட் அனலிடிக்ஸ் • ',
+                          ur: 'سمارٹ واٹر بلنگ • ذہین تجزیات • ',
+                          gu: 'સ્માર્ટ વોટર બિલિંગ • ઈન્ટેલિજન્ટ એનાલિટિક્સ • ',
+                          kn: 'ಸ್ಮಾರ್ಟ್ ವಾಟರ್ ಬಿಲ್ಲಿಂಗ್ • ಇಂಟೆಲಿಜೆಂಟ್ ಅನಾಲಿಟಿಕ್ಸ್ • ',
+                          ml: 'സ്മാർട്ട് വാട്ടർ ബില്ലിംഗ് • അനലിറ്റിക്സ് • ',
+                          pa: 'ਸਮਾਰਟ ਵਾਟਰ ਬਿਲਿੰਗ • ਇੰਟੈਲੀਜੈਂਟ ਐਨਾਲਿਟਿਕਸ • ',
+                          or: 'ସ୍ମାର୍ଟ ଜଳ ବିଲିଂ • ଇଣ୍ଟେଲିଜେଣ୍ଟ ଆନାଲିଟିକ୍ସ • ',
+                          as: 'স্মাৰ্ট পানী বিলিং • বুদ্ধিমত্তা বিশ্লেষণ • '
+                        };
+                        return badgeTexts[currentLang] || 'SMART WATER BILLING • INTELLIGENT ANALYTICS • ';
+                      })()}
                     </textPath>
                   </text>
                 </svg>
@@ -536,138 +552,7 @@ export default function Landing() {
 
 
 
-      {/* Footer CTA & Contact Section */}
-      <motion.section 
-        id="contact"
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true }}
-        variants={fadeUpVariants}
-        className="w-full py-4 md:py-6 px-6 mt-0 md:mt-2 relative z-10 scroll-mt-24"
-      >
-        <div style={{ perspective: '1000px' }} className="max-w-4xl mx-auto w-full">
-          <motion.div 
-            whileHover={typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches ? { rotateY: -3, rotateX: 2, scale: 1.01 } : {}}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            className="footer-panel-container p-6 md:p-16 text-center relative overflow-hidden"
-          >
-            {/* Animated Blobs */}
-            <div className="blobs">
-              <span className="blob" style={{ backgroundColor: "rgba(59, 130, 246, 0.25)" }}></span>
-              <span className="blob" style={{ backgroundColor: "rgba(6, 182, 212, 0.2)" }}></span>
-              <span className="blob" style={{ backgroundColor: "rgba(99, 102, 241, 0.2)" }}></span>
-              <span className="blob" style={{ backgroundColor: "rgba(14, 165, 233, 0.2)" }}></span>
-              <span className="blob" style={{ backgroundColor: "rgba(37, 99, 235, 0.2)" }}></span>
-            </div>
-            {/* Noise filter */}
-            <svg className="noise" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-              <filter id="noise-effect-footer">
-                <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" seed="1" stitchTiles="stitch"></feTurbulence>
-              </filter>
-              <rect width="100%" height="100%" filter="url(#noise-effect-footer)"></rect>
-            </svg>
-            
-            <div className="footer-panel-content">
-              {/* Faucet/Valve Animation Container */}
-              <div className="flex flex-col items-center mb-8 relative">
-                <div className="relative w-32 h-32 flex items-center justify-center">
-                  {/* Animated Valve/Handle */}
-                  <motion.div
-                    animate={{ rotate: valveClosed ? 180 : 0 }}
-                    transition={{ type: "spring", stiffness: 120, damping: 12 }}
-                    onClick={() => setValveClosed(!valveClosed)}
-                    className="valve-handle absolute top-[12px] left-[33px] w-8 h-8 rounded-full bg-slate-800 border border-primary/80 flex items-center justify-center cursor-pointer shadow-lg hover:scale-105 active:scale-95 transition-transform z-20"
-                    title="Tap to turn faucet"
-                  >
-                    {/* Cross Handle details */}
-                    <div className="w-5 h-1 bg-primary rounded-full absolute" />
-                    <div className="w-1 h-5 bg-primary rounded-full absolute" />
-                    <div className="w-2.5 h-2.5 bg-slate-900 rounded-full border border-primary z-10" />
-                  </motion.div>
 
-                  {/* Faucet SVG Tap Shape */}
-                  <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-md z-10 pointer-events-none">
-                    <defs>
-                      <linearGradient id="chrome" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#f8fafc" />
-                        <stop offset="30%" stopColor="#cbd5e1" />
-                        <stop offset="70%" stopColor="#64748b" />
-                        <stop offset="100%" stopColor="#334155" />
-                      </linearGradient>
-                    </defs>
-                    {/* Wall flange/mount */}
-                    <path d="M 10,32 L 15,32 L 15,68 L 10,68 Z" fill="url(#chrome)" />
-                    
-                    {/* Horizontal tap body */}
-                    <path d="M 15,44 L 50,44 L 50,56 L 15,56 Z" fill="url(#chrome)" />
-                    
-                    {/* Valve neck stem on top */}
-                    <path d="M 34,34 L 42,34 L 42,44 L 34,44 Z" fill="url(#chrome)" />
-                    
-                    {/* Curved faucet spout/neck */}
-                    <path d="M 50,44 C 65,44 74,48 74,62 L 74,76 L 62,76 L 62,62 C 62,54 58,54 50,54 Z" fill="url(#chrome)" />
-                    
-                    {/* Aerator nozzle tip */}
-                    <path d="M 62,76 L 74,76 L 74,80 L 62,80 Z" fill="#475569" />
-                  </svg>
-
-                  {/* Falling Droplets */}
-                  {!valveClosed && (
-                    <>
-                      <motion.div
-                        animate={{ y: [0, 60], opacity: [1, 0] }}
-                        transition={{ repeat: Infinity, duration: 1.2, ease: "easeIn" }}
-                        className="absolute left-[79px] top-[102px]"
-                      >
-                        <Droplet className="w-4 h-4 text-blue-400 fill-blue-400" />
-                      </motion.div>
-                      <motion.div
-                        animate={{ y: [0, 60], opacity: [1, 0] }}
-                        transition={{ repeat: Infinity, duration: 1.2, delay: 0.6, ease: "easeIn" }}
-                        className="absolute left-[79px] top-[102px]"
-                      >
-                        <Droplet className="w-4 h-4 text-blue-400 fill-blue-400" />
-                      </motion.div>
-                    </>
-                  )}
-                </div>
-
-                {/* Status Text indicator */}
-                <motion.p
-                  animate={{ color: valveClosed ? "#10b981" : "#f43f5e" }}
-                  className="text-xs font-semibold uppercase tracking-widest mt-2"
-                >
-                  {valveClosed ? "Thanks for saving water!" : "Valve Open • Tap to Turn Off!"}
-                </motion.p>
-              </div>
-
-              <h2 className="text-3xl md:text-5xl font-bold text-text mb-2 relative z-10">Ready to stop wasting water?</h2>
-              <p className="text-xl font-bold bg-gradient-to-r from-primary to-cyan-500 bg-clip-text text-transparent mb-6 relative z-10 tracking-wide">"Water is the driving force of all nature."</p>
-              <p className="text-lg text-text/80 mb-8 max-w-2xl mx-auto relative z-10 font-medium">
-                Join modern communities that use AquaTrack to reduce their water footprint and automate complex billing cycles.
-              </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
-                <Link to="/register">
-                  <button className="btn-loader">
-                    <div className="btn-loader-bg">
-                      <span>JOIN</span>
-                    </div>
-                    <div className="btn-loader-drops">
-                      <div className="btn-loader-drop1"></div>
-                      <div className="btn-loader-drop2"></div>
-                      <div className="btn-loader-drop3"></div>
-                    </div>
-                  </button>
-                </Link>
-              </div>
-              <div className="flex flex-wrap justify-center gap-6 mt-8 relative z-10 text-sm text-text/80 font-medium">
-                <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> No credit card required</span>
-                <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Setup in 5 minutes</span>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </motion.section>
 
       {/* Footer */}
       <footer className="w-full bg-white/70 dark:bg-[#071324] text-text border-t border-primary/25 backdrop-blur-xl z-10 mt-6 md:mt-10 relative pt-8 md:pt-12 pb-8 px-2 sm:px-6 shadow-lg shadow-primary/5">
