@@ -50,6 +50,26 @@ AquaTrack is a premium, full-stack smart water management, analytics, PWA, and a
 
 ---
 
+## 📄 Documentation, Guides & Screenshots
+
+* **📁 Drive Links**:
+  * [View Full Documentation (Google Drive)](https://drive.google.com/file/d/19UyIC9QZSlL6iv2NFJ4Nsbtaj11v0jJN/view?usp=drive_link)
+  * [View Website Screenshots (Google Drive)](https://drive.google.com/drive/folders/1ReU8GlKPbmXe20zk7Ece0EPwZQGVsMkc?usp=sharing)
+* **📋 Internship & Architecture Docs**:
+  * [Tasks Performed During Internship](../Task%20performed%20during%20Internship.docx)
+  * [Full Technical Documentation](../AquaTrack_Documentation.md)
+  * [Chatbot Role Architecture Diagram](./chatbot-role-architecture.pdf)
+* **📖 Technical & Feature Guides**:
+  * 🌐 [API Guide & Postman Collection](./API_GUIDE.md)
+  * 💵 [Billing Cycle & Tariff Guide](./BILLING_CYCLE_GUIDE.md)
+  * 🤖 [AI Chatbot & RAG Architecture Guide](./CHATBOT_GUIDE.md)
+  * 🌍 [Multi-language Translation & Speech Guide](./TRANSLATION_GUIDE.md)
+  * 👥 [Test Users & Demo Credentials](./USERS.md)
+  * 🔬 [Research & Chatbot Engine Notes](../researchChatbot.md)
+  * ❓ [Backend Help Guide](./HELP.md)
+
+---
+
 ## 👨‍💻 Author & Developer Details
 
 * **Lead Developer**: Krishna Mohan Kumar
