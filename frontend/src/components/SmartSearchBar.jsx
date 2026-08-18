@@ -42,6 +42,7 @@ export default function SmartSearchBar({
   blockFilter, onBlockFilterChange,
   statusFilter, onStatusFilterChange,
   genderFilter, onGenderFilterChange,
+  isSuperAdmin = false,
 }) {
   const [suggestions, setSuggestions]         = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -101,7 +102,7 @@ export default function SmartSearchBar({
 
   const activeFilterCount = [
     query,
-    blockFilter,
+    isSuperAdmin ? blockFilter : null,
     statusFilter,
     genderFilter,
     sortField !== 'fullName' || sortDir !== 'asc',
@@ -200,15 +201,17 @@ export default function SmartSearchBar({
 
         {/* Action Controls Group (Block Filter + Sort + Filter Toggle) */}
         <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-          {/* Block Filter Select */}
-          <select
-            value={blockFilter}
-            onChange={(e) => onBlockFilterChange(e.target.value)}
-            className="flex-1 sm:flex-none bg-surface border border-border rounded-xl px-2.5 sm:px-3 py-2.5 text-xs sm:text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer min-w-0 sm:min-w-[120px] truncate"
-          >
-            <option value="">All Blocks</option>
-            {blocks.map(b => <option key={b} value={b}>{b}</option>)}
-          </select>
+          {/* Block Filter Select (Super Admin Only) */}
+          {isSuperAdmin && (
+            <select
+              value={blockFilter}
+              onChange={(e) => onBlockFilterChange(e.target.value)}
+              className="flex-1 sm:flex-none bg-surface border border-border rounded-xl px-2.5 sm:px-3 py-2.5 text-xs sm:text-sm text-text focus:outline-none focus:border-primary/60 cursor-pointer min-w-0 sm:min-w-[120px] truncate"
+            >
+              <option value="">All Blocks</option>
+              {blocks.map(b => <option key={b} value={b}>{b}</option>)}
+            </select>
+          )}
 
           {/* Sort Quick Toggle */}
           <button

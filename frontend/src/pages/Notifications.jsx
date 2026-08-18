@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, Check, Trash2, Eye, EyeOff, Mail, AlertTriangle, Info, Calendar, X } from 'lucide-react';
+import { Bell, Check, Trash2, Eye, EyeOff, Mail, AlertTriangle, Info, Calendar, X, Volume2, VolumeX, Music } from 'lucide-react';
 import api from '../api';
-
+import { isSoundEnabled, setSoundEnabled, playNotificationSound } from '../utils/audioNotifier';
 import { groupNotificationsByDate, formatNotificationTime } from '../utils/dateGrouper';
+import { EmptyState } from '../components/AnimatedNumber';
 
 export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
@@ -12,6 +13,14 @@ export default function Notifications() {
   const [selectedNotif, setSelectedNotif] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [soundOn, setSoundOn] = useState(isSoundEnabled);
+
+  const toggleSound = () => {
+    const nextState = !soundOn;
+    setSoundOn(nextState);
+    setSoundEnabled(nextState);
+    if (nextState) playNotificationSound();
+  };
 
   const fetchNotifications = async () => {
     try {
@@ -148,24 +157,48 @@ export default function Notifications() {
           <p className="text-text-muted mt-1 text-xs sm:text-sm">Stay updated with your consumption reports and bills.</p>
         </div>
         
-        {/* Responsive action buttons toolbar for mobile & desktop */}
-        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+        {/* Sleek Icon-Only Action Buttons Toolbar */}
+        <div className="flex items-center gap-2">
+          {/* Sound Toggle Icon Button */}
+          <button
+            onClick={toggleSound}
+            className={`p-3 rounded-2xl border transition-all cursor-pointer shadow-sm active:scale-95 flex items-center justify-center ${
+              soundOn
+                ? 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/25'
+                : 'bg-surface text-slate-500 dark:text-slate-400 border-border hover:bg-surface-lighter'
+            }`}
+            title={soundOn ? 'Sound: ON (Click to mute notification audio)' : 'Sound: OFF (Click to enable notification audio)'}
+          >
+            {soundOn ? <Volume2 className="w-5 h-5 text-cyan-600 dark:text-cyan-300 animate-pulse" /> : <VolumeX className="w-5 h-5 text-slate-500 dark:text-slate-400" />}
+          </button>
+
+          {/* Test Chime Icon Button */}
+          {soundOn && (
+            <button
+              onClick={() => playNotificationSound()}
+              className="p-3 bg-purple-500/15 hover:bg-purple-500/25 text-purple-700 dark:text-purple-300 border border-purple-500/40 rounded-2xl transition-all cursor-pointer shadow-sm active:scale-95 flex items-center justify-center"
+              title="Test notification water bubble chime"
+            >
+              <Music className="w-5 h-5 text-purple-600 dark:text-purple-300" />
+            </button>
+          )}
+
           {notifications.some(n => !n.isRead) && (
             <button
               onClick={handleMarkAllAsRead}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-primary/15 hover:bg-primary/25 active:scale-95 text-primary rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer border border-primary/30 shadow-sm whitespace-nowrap"
+              className="p-3 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40 rounded-2xl transition-all cursor-pointer shadow-sm active:scale-95 flex items-center justify-center"
+              title="Mark all notifications as read"
             >
-              <Check className="w-4 h-4 shrink-0 font-bold" />
-              <span>Mark all read</span>
+              <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-300 font-bold" />
             </button>
           )}
           {notifications.length > 0 && (
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-red-500/15 hover:bg-red-500/25 active:scale-95 text-red-700 dark:text-red-300 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer border border-red-500/30 shadow-sm whitespace-nowrap"
+              className="p-3 bg-red-500/15 hover:bg-red-500/25 text-red-700 dark:text-red-300 border border-red-500/40 rounded-2xl transition-all cursor-pointer shadow-sm active:scale-95 flex items-center justify-center"
+              title="Delete all notifications"
             >
-              <Trash2 className="w-4 h-4 shrink-0" />
-              <span>Delete all</span>
+              <Trash2 className="w-5 h-5 text-red-600 dark:text-red-300" />
             </button>
           )}
         </div>
@@ -190,16 +223,12 @@ export default function Notifications() {
       {loading ? (
         <div className="p-8 text-center text-text-muted">Loading notifications...</div>
       ) : notifications.length === 0 ? (
-        <div className="p-12 sm:p-16 text-center flex flex-col items-center justify-center glass-card min-h-[440px]">
-          <motion.img 
-            src="/empty_state_notifications.svg" 
-            alt="No Notifications" 
-            className="w-64 sm:w-80 md:w-96 object-contain mb-6 opacity-90"
-            animate={{ y: [0, -8, 0] }}
-            transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
+        <div className="glass-card overflow-hidden">
+          <EmptyState
+            title="No Notifications Found"
+            subtitle="You're all caught up! Updates regarding bills, meter logs, and overuse alerts will appear here."
+            svgSrc="/empty_state_notifications.svg"
           />
-          <h3 className="text-text font-black text-xl mb-1.5">No notifications found</h3>
-          <p className="text-text-muted text-sm max-w-md font-medium leading-relaxed">You're all caught up! Updates regarding bills, meter logs, and alerts will appear here.</p>
         </div>
       ) : (
         <div className="space-y-6">

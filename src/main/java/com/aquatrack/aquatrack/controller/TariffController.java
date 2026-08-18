@@ -96,7 +96,7 @@ public class TariffController {
 
         // Base rate is a Super Admin-only setting — Community Admins cannot change it
         if ("ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(callerRole)) {
-            baseRate = null; // Silently reject any base rate change from CA
+            baseRate = null;
         }
 
         if (baseRate != null) admin.setWaterRatePerLiter(baseRate);

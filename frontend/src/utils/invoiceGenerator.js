@@ -16,6 +16,14 @@ export function generateInvoiceHTML(bill) {
     : Number(bill.amount || 0);
   const lateFeeAmt = Number(bill.lateFeeAmount || 0);
   const grandTotal = waterSubtotal + lateFeeAmt;
+  const generatedOn = new Date().toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
 
   return `
 <!DOCTYPE html>

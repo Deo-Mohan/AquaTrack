@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Droplet, Receipt, User, Home, Hash, CheckCircle2,
   AlertCircle, Loader2, X, ChevronRight, Zap, Calendar, Info, FileText, Plus,
-  Send, Activity, Download, Upload, AlertTriangle, ShieldAlert
+  Send, Activity, Download, Upload, AlertTriangle, ShieldAlert, Sparkles, PartyPopper
 } from 'lucide-react';
 import api from '../api';
 import MicSearchBox from '../components/MicSearchBox';
+import { triggerCelebrationConfetti } from '../utils/confetti';
 
 const levenshtein = (a, b) => {
   const m = a.length, n = b.length;
@@ -39,6 +40,7 @@ const getBillingMonthLabel = (dateStr) => {
 
 export default function MeterWorkstation() {
   const location = useLocation();
+  const navigate = useNavigate();
   const role  = localStorage.getItem('role') || 'ROLE_COMMUNITY_ADMIN';
   const block = localStorage.getItem('apartmentBlock') || '';
   const isSuperAdmin = role === 'ROLE_ADMIN';
@@ -99,6 +101,21 @@ export default function MeterWorkstation() {
   const [selectedBulkMonth, setSelectedBulkMonth] = useState(new Date().getMonth() + 1);
   const [selectedBulkYear, setSelectedBulkYear] = useState(new Date().getFullYear());
 
+  // Celebration & Status Modals
+  const [bulkSuccessModal, setBulkSuccessModal] = useState({
+    isOpen: false,
+    count: 0,
+    totalAmount: 0,
+    monthName: '',
+    year: currentYear
+  });
+
+  const [noUnbilledModal, setNoUnbilledModal] = useState({
+    isOpen: false,
+    monthName: '',
+    year: currentYear
+  });
+
   // Custom Confirm Alert Modal state
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
@@ -106,6 +123,8 @@ export default function MeterWorkstation() {
     message: '',
     onConfirm: null
   });
+
+  const hasTriggeredAutoBulkRef = useRef(false);
 
   // ── Load data ───────────────────────────────────────────────────
   useEffect(() => {
@@ -128,7 +147,10 @@ export default function MeterWorkstation() {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get('action') === 'finalize_bulk' && users.length > 0 && usageLogs.length > 0) {
+    if (params.get('action') === 'finalize_bulk' && !hasTriggeredAutoBulkRef.current && users.length > 0 && usageLogs.length > 0) {
+      hasTriggeredAutoBulkRef.current = true;
+      // Immediately clean URL search query so fetchAll or state updates will not re-trigger bulk billing
+      window.history.replaceState({}, document.title, window.location.pathname);
       const timer = setTimeout(() => {
         handleGenerateAllBills();
       }, 400);
@@ -611,6 +633,7 @@ Are you sure you want to finalize this bill and lock the cycle?`;
           }, { params: { callerRole: role } });
           setBillStatus({ type: 'success', msg: `✅ Bill of ₹${billForm.amount} generated and finalized for ${selected.fullName || selected.username}` });
           setHasLoggedNewReading(false);
+          triggerCelebrationConfetti();
           await fetchAll();
         } catch (err) {
           setBillStatus({ type: 'error', msg: err?.response?.data?.message || 'Failed to generate bill.' });
@@ -674,7 +697,11 @@ Are you sure you want to finalize this bill and lock the cycle?`;
 
     if (toBill.length === 0) {
       const monthName = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedBulkMonth - 1];
-      alert(`No residents have unbilled water logs for ${monthName} ${selectedBulkYear}.`);
+      setNoUnbilledModal({
+        isOpen: true,
+        monthName,
+        year: selectedBulkYear
+      });
       return;
     }
 
@@ -685,7 +712,8 @@ Are you sure you want to finalize this bill and lock the cycle?`;
   const executeBulkGeneration = async () => {
     if (bulkList.length === 0) return;
     
-    const message = `WARNING: Finalizing bills will permanently LOCK the billing month (${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedBulkMonth - 1]} ${selectedBulkYear}) for the ${bulkList.length} households in this list.
+    const monthName = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedBulkMonth - 1];
+    const message = `WARNING: Finalizing bills will permanently LOCK the billing month (${monthName} ${selectedBulkYear}) for the ${bulkList.length} households in this list.
 
 Once finalized, you will NOT be able to submit, edit, or delete water logs for this period.
 
@@ -704,26 +732,54 @@ Are you sure you want to finalize these bills and lock the cycle?`;
         const pad = (n) => String(n).padStart(2, '0');
         const targetGeneratedDate = `${selectedBulkYear}-${pad(selectedBulkMonth)}-28`;
 
-        for (let i = 0; i < bulkList.length; i++) {
-          const item = bulkList[i];
-          try {
-            await api.post(`/bills/create?callerRole=${role}`, {
-              houseNumber: item.resident.houseNumber,
-              apartmentBlock: item.resident.apartmentBlock,
-              amount: parseFloat(item.amount),
-              dueDate: item.dueDate || defaultDueDate,
-              status: 'UNPAID',
-              billingCycleId: item.billingCycleId || 1,
-              generatedDate: targetGeneratedDate
-            });
-            setBulkProgress(prev => ({ ...prev, current: i + 1, success: prev.success + 1 }));
-          } catch (err) {
-            setBulkProgress(prev => ({ ...prev, current: i + 1, failed: prev.failed + 1 }));
-            console.error(`Bulk generation failed for house ${item.resident.houseNumber}:`, err);
+        let totalBilledVal = 0;
+
+        const batchPayload = bulkList.map(item => {
+          totalBilledVal += (parseFloat(item.amount) || 0);
+          return {
+            houseNumber: item.resident.houseNumber,
+            apartmentBlock: item.resident.apartmentBlock,
+            amount: parseFloat(item.amount),
+            dueDate: item.dueDate || defaultDueDate,
+            status: 'UNPAID',
+            billingCycleId: item.billingCycleId || 1,
+            generatedDate: targetGeneratedDate
+          };
+        });
+
+        try {
+          // 🚀 High Performance Batch API
+          await api.post(`/bills/create-batch?callerRole=${role}`, batchPayload);
+          setBulkProgress({ current: bulkList.length, total: bulkList.length, success: bulkList.length, failed: 0 });
+        } catch (batchErr) {
+          console.warn("Batch endpoint fallback to chunked execution:", batchErr);
+          let successCount = 0;
+          let failedCount = 0;
+          const chunkSize = 10;
+          for (let i = 0; i < batchPayload.length; i += chunkSize) {
+            const chunk = batchPayload.slice(i, i + chunkSize);
+            await Promise.all(chunk.map(async (billItem) => {
+              try {
+                await api.post(`/bills/create?callerRole=${role}`, billItem);
+                successCount++;
+              } catch (err) {
+                failedCount++;
+              }
+            }));
+            setBulkProgress({ current: Math.min(i + chunkSize, batchPayload.length), total: bulkList.length, success: successCount, failed: failedCount });
           }
         }
+
         setBulkGenerating(false);
         await fetchAll();
+        triggerCelebrationConfetti();
+        setBulkSuccessModal({
+          isOpen: true,
+          count: bulkList.length,
+          totalAmount: totalBilledVal,
+          monthName,
+          year: selectedBulkYear
+        });
       }
     });
   };
@@ -2068,6 +2124,150 @@ Are you sure you want to finalize these bills and lock the cycle?`;
                   className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black transition-all cursor-pointer shadow-md"
                 >
                   Finalize & Lock
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 🎉 Bulk Success Celebration Modal */}
+      <AnimatePresence>
+        {bulkSuccessModal.isOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setBulkSuccessModal(f => ({ ...f, isOpen: false }))}
+              className="fixed inset-0 bg-slate-950/80 backdrop-blur-md"
+            />
+
+            {/* Modal Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.85, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.85, y: 20 }}
+              transition={{ type: "spring", stiffness: 350, damping: 25 }}
+              className="relative w-full max-w-md p-6 sm:p-8 rounded-3xl shadow-2xl border border-emerald-500/30 bg-surface/95 text-text my-auto space-y-6 text-center backdrop-blur-xl overflow-hidden"
+            >
+              {/* Top Decorative Glow */}
+              <div className="absolute -top-16 -left-16 w-36 h-36 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-16 -right-16 w-36 h-36 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
+
+              {/* Icon Badge */}
+              <div className="relative mx-auto w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/10">
+                <PartyPopper className="w-8 h-8 sm:w-10 sm:h-10 animate-bounce" />
+                <Sparkles className="w-5 h-5 text-amber-400 absolute -top-2 -right-2 animate-pulse" />
+              </div>
+
+              <div>
+                <h3 className="text-xl sm:text-2xl font-black text-text tracking-wide">
+                  🎉 Billing Cycle Finalized!
+                </h3>
+                <p className="text-xs sm:text-sm text-text-muted mt-2 leading-relaxed">
+                  Bulk bills generated successfully for <strong className="text-emerald-400 font-bold">{bulkSuccessModal.monthName} {bulkSuccessModal.year}</strong>.
+                </p>
+              </div>
+
+              {/* Summary Stats Grid */}
+              <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-surface-lighter/40 border border-border/60 text-left">
+                <div>
+                  <p className="text-[11px] text-text-muted font-semibold uppercase">Households Billed</p>
+                  <p className="text-lg font-black text-text mt-0.5">{bulkSuccessModal.count} Homes</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-text-muted font-semibold uppercase">Total Revenue Billed</p>
+                  <p className="text-lg font-black text-emerald-400 mt-0.5">₹{bulkSuccessModal.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-text-muted italic">
+                🔒 Water logs for {bulkSuccessModal.monthName} {bulkSuccessModal.year} are now permanently locked. Residents can view their updated statements.
+              </p>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkSuccessModal(f => ({ ...f, isOpen: false }));
+                    navigate('/water-billing-history');
+                  }}
+                  className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl font-bold text-xs sm:text-sm transition-all shadow-lg shadow-emerald-500/20 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Receipt className="w-4 h-4" />
+                  View Billing History 📜
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkSuccessModal(f => ({ ...f, isOpen: false }))}
+                  className="w-full sm:w-auto px-5 py-3 bg-surface-lighter hover:bg-surface border border-border rounded-xl text-xs font-bold transition-all text-text cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ✨ All Water Logs Already Billed Modal */}
+      <AnimatePresence>
+        {noUnbilledModal.isOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setNoUnbilledModal(f => ({ ...f, isOpen: false }))}
+              className="fixed inset-0 bg-slate-950/80 backdrop-blur-md"
+            />
+
+            {/* Modal Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 15 }}
+              className="relative w-full max-w-md p-6 sm:p-8 rounded-3xl shadow-2xl border border-cyan-500/30 bg-surface/95 text-text my-auto space-y-5 text-center backdrop-blur-xl"
+            >
+              <div className="mx-auto w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center shadow-lg">
+                <CheckCircle2 className="w-8 h-8" />
+              </div>
+
+              <div>
+                <h3 className="text-lg sm:text-xl font-bold text-text">
+                  All Water Logs Already Billed
+                </h3>
+                <p className="text-xs sm:text-sm text-text-muted mt-2 leading-relaxed">
+                  Every household with recorded water consumption for <strong className="text-cyan-400 font-bold">{noUnbilledModal.monthName} {noUnbilledModal.year}</strong> has already been billed and finalized.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-surface-lighter/40 border border-border text-xs text-text-muted">
+                No unbilled water logs are pending generation for this month.
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNoUnbilledModal(f => ({ ...f, isOpen: false }));
+                    navigate('/water-billing-history');
+                  }}
+                  className="w-full py-3 bg-primary hover:bg-primary-dark text-white rounded-xl font-bold text-xs sm:text-sm transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Receipt className="w-4 h-4" />
+                  View Billing History 📜
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNoUnbilledModal(f => ({ ...f, isOpen: false }))}
+                  className="w-full sm:w-auto px-5 py-3 bg-surface-lighter hover:bg-surface border border-border rounded-xl text-xs font-bold transition-all text-text cursor-pointer"
+                >
+                  Close
                 </button>
               </div>
             </motion.div>

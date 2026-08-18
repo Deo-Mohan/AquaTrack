@@ -76,6 +76,7 @@ public class SupportTicketController {
         ticket.setCreatedByRole(user.getRole());
         ticket.setHouseNumber(user.getHouseNumber());
         ticket.setColonyName(user.getColonyName());
+        ticket.setApartmentBlock(user.getApartmentBlock());
         ticket.setCreatedAt(LocalDateTime.now());
         ticket.setUpdatedAt(LocalDateTime.now());
 
@@ -159,9 +160,14 @@ public class SupportTicketController {
             rawTickets = ticketRepository.findForSuperAdmin();
         } else if (role.contains("COMMUNITY_ADMIN")) {
             String community = user.getColonyName();
-            rawTickets = (community != null && !community.isEmpty())
-                    ? ticketRepository.findByColonyNameOrderByCreatedAtDesc(community)
-                    : ticketRepository.findByCreatedByIdOrderByCreatedAtDesc(user.getId());
+            String block = user.getApartmentBlock();
+            if (block != null && !block.trim().isEmpty()) {
+                rawTickets = ticketRepository.findForCommunityAdminByBlockAndColony(block, community != null ? community : "", user.getId());
+            } else if (community != null && !community.isEmpty()) {
+                rawTickets = ticketRepository.findByColonyNameOrderByCreatedAtDesc(community);
+            } else {
+                rawTickets = ticketRepository.findByCreatedByIdOrderByCreatedAtDesc(user.getId());
+            }
         } else {
             rawTickets = ticketRepository.findByCreatedByIdOrderByCreatedAtDesc(user.getId());
         }
@@ -396,5 +402,42 @@ public class SupportTicketController {
         }
 
         return ResponseEntity.ok(updated);
+    }
+
+    // 7. Delete Ticket (Only allowed if status is RESOLVED or CLOSED)
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteTicket(
+            @PathVariable Long id,
+            @RequestParam String callerUsername) {
+
+        User user = resolveUser(callerUsername);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Unauthorized"));
+        }
+
+        Optional<SupportTicket> ticketOpt = ticketRepository.findById(id);
+        if (ticketOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Ticket not found"));
+        }
+
+        SupportTicket ticket = ticketOpt.get();
+        String status = ticket.getStatus() != null ? ticket.getStatus().toUpperCase() : "";
+
+        // Check if ticket is RESOLVED or CLOSED
+        if (!"RESOLVED".equals(status) && !"CLOSED".equals(status)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Only resolved or closed tickets can be deleted."));
+        }
+
+        String role = user.getRole() != null ? user.getRole().toUpperCase() : "";
+        boolean isCreator = ticket.getCreatedBy() != null && user.getId().equals(ticket.getCreatedBy().getId());
+        boolean isCreatorByUsername = callerUsername.equalsIgnoreCase(ticket.getCreatedByEmail()) || callerUsername.equalsIgnoreCase(ticket.getCreatedByName());
+        boolean isAdmin = role.contains("COMMUNITY_ADMIN") || role.contains("SUPER_ADMIN") || role.equals("ROLE_ADMIN");
+
+        if (!isCreator && !isCreatorByUsername && !isAdmin) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "You do not have permission to delete this ticket."));
+        }
+
+        ticketRepository.delete(ticket);
+        return ResponseEntity.ok(Map.of("message", "Ticket deleted successfully"));
     }
 }

@@ -989,6 +989,8 @@ export default function ReportsPage() {
                     <YAxis stroke="#94a3b8" fontSize={10} />
                     <Tooltip 
                       contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '0.75rem', color: 'var(--color-text)', fontSize: '12px' }}
+                      itemStyle={{ color: 'var(--color-text)', fontWeight: 600 }}
+                      labelStyle={{ color: 'var(--color-text)', fontWeight: 800 }}
                       formatter={(val) => [`${val.toLocaleString()} Liters`, 'Consumption']}
                     />
                     <Bar dataKey="usage" radius={[6, 6, 0, 0]}>
@@ -1030,7 +1032,11 @@ export default function ReportsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                     <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} angle={-25} textAnchor="end" />
                     <YAxis stroke="#94a3b8" fontSize={10} />
-                    <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '0.75rem', color: 'var(--color-text)', fontSize: '12px' }} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '0.75rem', color: 'var(--color-text)', fontSize: '12px' }}
+                      itemStyle={{ color: 'var(--color-text)', fontWeight: 600 }}
+                      labelStyle={{ color: 'var(--color-text)', fontWeight: 800 }}
+                    />
                     <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '5px' }} />
                     <Bar dataKey="Paid" fill="#10b981" stackId="a" radius={[0, 0, 4, 4]} />
                     <Bar dataKey="Pending" fill="#ef4444" stackId="a" radius={[4, 4, 0, 0]} />
@@ -1071,7 +1077,11 @@ export default function ReportsPage() {
                     <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} />
                     <YAxis yAxisId="left" stroke="#3b82f6" fontSize={10} />
                     <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={10} />
-                    <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '0.75rem', color: 'var(--color-text)', fontSize: '12px' }} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '0.75rem', color: 'var(--color-text)', fontSize: '12px' }}
+                      itemStyle={{ color: 'var(--color-text)', fontWeight: 600 }}
+                      labelStyle={{ color: 'var(--color-text)', fontWeight: 800 }}
+                    />
                     <Legend wrapperStyle={{ fontSize: '11px' }} />
                     <Line yAxisId="left" type="monotone" dataKey="Liters" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} />
                     <Line yAxisId="right" type="monotone" dataKey="Collected" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} />
@@ -1115,7 +1125,11 @@ export default function ReportsPage() {
                       <Cell key={`pie-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '0.75rem', color: 'var(--color-text)', fontSize: '12px' }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '0.75rem', color: 'var(--color-text)', fontSize: '12px' }}
+                    itemStyle={{ color: 'var(--color-text)', fontWeight: 600 }}
+                    labelStyle={{ color: 'var(--color-text)', fontWeight: 800 }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>

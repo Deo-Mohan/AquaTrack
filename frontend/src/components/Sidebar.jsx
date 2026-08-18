@@ -18,7 +18,8 @@ import {
   Users,
   Wrench,
   ShoppingCart,
-  BookOpen
+  BookOpen,
+  AlertTriangle
 } from 'lucide-react';
 
 import LogoutModal from './LogoutModal';
@@ -86,6 +87,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
           { icon: ShoppingCart, label: 'Water Purchase', path: '/water-purchase' }
         ] : []),
         { icon: Bell,            label: 'Notifications',     path: '/notifications' },
+        { icon: AlertTriangle,   label: 'Leak Detection & Alerts', path: '/leak-detection' },
         { icon: User,            label: 'Profile',           path: '/profile' },
         { icon: HelpCircle,      label: 'Support',           path: '/support', badge: openTicketsCount },
       ]
@@ -96,6 +98,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         { icon: Receipt, label: 'My Bills', path: '/bills' },
         { icon: FileText, label: 'My Invoices', path: '/invoices' },
         { icon: Bell, label: 'Notifications', path: '/notifications' },
+        { icon: AlertTriangle, label: 'Leak Detection', path: '/leak-detection' },
         { icon: Lightbulb, label: 'Water Tips', path: '/tips' },
         { icon: User, label: 'Profile', path: '/profile' },
         { icon: HelpCircle, label: 'Support', path: '/support' },

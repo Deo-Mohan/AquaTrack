@@ -228,20 +228,22 @@ export default function Landing() {
         <div className="flex-1 text-center lg:text-left">
           <motion.h1
             variants={itemVariants}
-            className={`font-display font-black text-text tracking-tight mb-8 ${
+            className={`tracking-tight mb-6 ${
               currentLang === 'en'
-                ? 'lg:leading-[1.1] text-4xl sm:text-5xl md:text-6xl lg:text-7xl'
-                : 'leading-[1.6] text-3xl sm:text-4xl md:text-5xl lg:text-6xl'
+                ? 'leading-[1.1] text-3xl sm:text-4xl md:text-5xl lg:text-[3.25rem] xl:text-[4rem]'
+                : 'leading-[1.6] text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-display font-black text-text'
             }`}
           >
             {currentLang === 'en' ? (
               <>
-                Smart Water Management <br className="hidden lg:block" />
-                <span className="notranslate inline-flex flex-wrap items-baseline">
-                  <span className="bg-gradient-to-r from-blue-700 via-primary to-cyan-600 dark:from-primary dark:via-blue-400 dark:to-cyan-300 bg-clip-text text-transparent drop-shadow-sm mr-3 sm:mr-4">
+                <span className="block font-bonny bg-gradient-to-r from-slate-950 via-blue-950 to-slate-900 dark:from-white dark:via-slate-100 dark:to-blue-100 bg-clip-text text-transparent drop-shadow-sm pb-1 sm:pb-2">
+                  Smart Water Management
+                </span>
+                <span className="notranslate inline-flex flex-wrap items-baseline font-dancing text-[1.15em] leading-tight pt-1">
+                  <span className="bg-gradient-to-r from-blue-700 via-primary to-cyan-600 dark:from-sky-400 dark:via-blue-400 dark:to-cyan-300 bg-clip-text text-transparent drop-shadow-sm mr-3 sm:mr-4">
                     For
                   </span>
-                  <span className="inline-flex items-baseline bg-gradient-to-r from-blue-700 via-primary to-cyan-600 dark:from-primary dark:via-blue-400 dark:to-cyan-300 bg-clip-text text-transparent drop-shadow-sm">
+                  <span className="inline-flex items-baseline bg-gradient-to-r from-blue-700 via-primary to-cyan-600 dark:from-sky-400 dark:via-blue-400 dark:to-cyan-300 bg-clip-text text-transparent drop-shadow-sm">
                     <span>C</span>
                     <motion.span
                       animate={{ y: [0, -2, 0], scale: [1, 1.04, 1] }}
@@ -270,7 +272,7 @@ export default function Landing() {
                         <ellipse cx="48" cy="22" rx="4" ry="5" fill="#ffffff" opacity="0.9" transform="rotate(-15 48 22)" />
                       </svg>
                     </motion.span>
-                    <span>mmunities</span>
+                    <span>mmunities..</span>
                   </span>
                 </span>
               </>
@@ -342,7 +344,7 @@ export default function Landing() {
             )}
           </motion.h1>
 
-          <motion.p variants={itemVariants} className="text-base sm:text-lg md:text-xl text-text/90 mb-12 max-w-2xl mx-auto lg:mx-0 leading-relaxed px-4 lg:px-0">
+          <motion.p variants={itemVariants} className="font-jakarta text-base sm:text-lg md:text-xl text-text/85 dark:text-slate-300 font-medium mb-10 max-w-2xl mx-auto lg:mx-0 leading-relaxed tracking-wide px-4 lg:px-0">
             Monitor household consumption, allocate shared costs fairly, and conserve water with our intelligent analytics and automated billing platform.
           </motion.p>
 
@@ -361,35 +363,28 @@ export default function Landing() {
               </button>
             </Link>
             <Link to="/login" className="w-full sm:w-52">
-              <button className="btn-liquid-bubble w-full">
-                <span className="btn-liquid-bubble-text">Sign In</span>
-                <div className="btn-liquid-bubble-liquid">
-                  <div className="btn-liquid-bubble-bubble"></div>
-                  <div className="btn-liquid-bubble-bubble"></div>
-                  <div className="btn-liquid-bubble-bubble"></div>
-                  <div className="btn-liquid-bubble-bubble"></div>
-                  <div className="btn-liquid-bubble-bubble"></div>
-                  <div className="btn-liquid-bubble-bubble"></div>
-                </div>
+              <button className="h-[58px] min-h-[58px] w-full px-10 rounded-[40px] font-bold text-[16px] uppercase tracking-[1px] text-text bg-white/25 dark:bg-surface-lighter/50 border-2 border-primary/40 hover:border-primary backdrop-blur-xl transition-all duration-300 shadow-lg hover:shadow-primary/25 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 group cursor-pointer">
+                <span>Sign In</span>
+                <ArrowRight className="w-4 h-4 text-primary group-hover:translate-x-1 transition-transform" />
               </button>
             </Link>
           </motion.div>
         </div>
 
-        <motion.div variants={itemVariants} className="flex-1 w-full max-w-xl lg:max-w-none perspective-1000 relative">
+        <motion.div variants={itemVariants} className="flex-1 w-full max-w-lg lg:max-w-[500px] mx-auto lg:mx-0 perspective-1000 relative">
           <motion.div 
             whileHover={{ rotateY: -5, rotateX: 5, scale: 1.02 }}
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
             className="w-full rounded-2xl overflow-hidden glass-card p-2 border-primary/20 shadow-2xl shadow-primary/20 relative z-10"
           >
-            <div className="relative overflow-hidden rounded-xl">
+            <div className="relative overflow-hidden rounded-xl max-h-[380px] sm:max-h-[400px]">
               <img 
                 src="/water_conserve.webp" 
                 alt="Dashboard Animation" 
-                className="w-full h-auto object-cover"
+                className="w-full h-full object-cover object-center"
               />
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/45 to-transparent pt-10 pb-4 text-center">
-                <span className="text-white text-sm sm:text-base md:text-lg font-extrabold tracking-widest uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-8 pb-3 text-center">
+                <span className="text-white text-xs sm:text-sm md:text-base font-extrabold tracking-widest uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
                   Save Water • Save Nature
                 </span>
               </div>
@@ -555,61 +550,23 @@ export default function Landing() {
 
 
       {/* Footer */}
-      <footer className="w-full bg-white/70 dark:bg-[#071324] text-text border-t border-primary/25 backdrop-blur-xl z-10 mt-6 md:mt-10 relative pt-8 md:pt-12 pb-8 px-2 sm:px-6 shadow-lg shadow-primary/5">
-        <div className="w-full px-4 sm:px-8 lg:px-12 hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
-          {/* Logo & Description */}
-          <div className="flex flex-col gap-3.5">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl overflow-hidden border border-primary/40 bg-surface shadow-md shadow-primary/20 flex items-center justify-center">
+      <footer className="w-full bg-white/70 dark:bg-[#071324] text-text border-t border-primary/25 backdrop-blur-xl z-10 mt-6 md:mt-10 relative py-6 px-4 sm:px-8 lg:px-12 shadow-lg shadow-primary/5">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6">
+          {/* Logo & Copyright */}
+          <div className="flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl overflow-hidden border border-primary/40 bg-surface shadow-md shadow-primary/20 flex items-center justify-center">
                 <img src="/logo.png" alt="AquaTrack Logo" className="w-full h-full object-cover scale-110" />
               </div>
-              <span className="text-xl font-black tracking-tight text-text">
+              <span className="text-lg font-black tracking-tight text-text">
                 Aqua<span className="text-primary font-black">Track</span>
               </span>
             </div>
-            <p className="text-xs text-text-muted leading-relaxed font-medium">
-              Smart water tracking and automated billing infrastructure for modern communities. Saving water, simplifying payments.
+            <span className="hidden sm:inline text-text-muted/60">•</span>
+            <p className="text-xs text-text-muted font-medium">
+              © {new Date().getFullYear()} AquaTrack Systems. All rights reserved.
             </p>
           </div>
-
-          {/* Product Links */}
-          <div className="flex flex-col gap-2.5">
-            <h4 className="text-xs font-black text-text tracking-widest uppercase">Product</h4>
-            <ul className="flex flex-col gap-2 text-xs text-text-muted font-medium">
-              <li><Link to="/features" className="hover:text-primary transition-colors">Features</Link></li>
-              <li><Link to="/pricing" className="hover:text-primary transition-colors">Pricing</Link></li>
-              <li><Link to="/security" className="hover:text-primary transition-colors">Security</Link></li>
-              <li><Link to="/api" className="hover:text-primary transition-colors">Developer API</Link></li>
-            </ul>
-          </div>
-
-          {/* Resources Links */}
-          <div className="flex flex-col gap-2.5">
-            <h4 className="text-xs font-black text-text tracking-widest uppercase">Resources</h4>
-            <ul className="flex flex-col gap-2 text-xs text-text-muted font-medium">
-              <li><Link to="/docs" className="hover:text-primary transition-colors">Documentation</Link></li>
-              <li><Link to="/guides" className="hover:text-primary transition-colors">Guides</Link></li>
-              <li><Link to="/status" className="hover:text-primary transition-colors">System Status</Link></li>
-              <li><Link to="/contact" className="hover:text-primary transition-colors">Contact Support</Link></li>
-            </ul>
-          </div>
-
-          {/* Legal Links */}
-          <div className="flex flex-col gap-2.5">
-            <h4 className="text-xs font-black text-text tracking-widest uppercase">Legal</h4>
-            <ul className="flex flex-col gap-2 text-xs text-text-muted font-medium">
-              <li><Link to="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
-              <li><Link to="/terms" className="hover:text-primary transition-colors">Terms of Service</Link></li>
-              <li><Link to="/license" className="hover:text-primary transition-colors">Licensing</Link></li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Separator and Bottom area */}
-        <div className="w-full px-4 sm:px-8 lg:px-12 pt-6 border-t border-border/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-text-muted font-medium">
-            © {new Date().getFullYear()} AquaTrack Systems. All rights reserved.
-          </p>
 
           {/* Background Control Segmented Widget */}
           <div className="hidden md:flex relative items-center p-1 rounded-full bg-surface-lighter/40 border border-border/20 backdrop-blur-md shadow-lg">

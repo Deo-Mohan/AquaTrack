@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Home, Droplet, AlertCircle, Server, Settings, Database, Activity, 
   Plus, Trash2, Edit, Send, Receipt, Search, FileText, CheckCircle2, X, Info, Loader2, ShieldAlert,
-  Building2, MapPin, Upload, Download, Mail, Zap, BarChart3, Lightbulb, Coins, Truck, Printer
+  Building2, MapPin, Upload, Download, Mail, Zap, BarChart3, Lightbulb, Coins, Truck, Printer, Gauge
 } from 'lucide-react';
 
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -512,16 +512,21 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleApproveReject = async (userId, actionStatus) => {
+  const [approvalModalReq, setApprovalModalReq] = useState(null);
+  const [approvalWaterRate, setApprovalWaterRate] = useState('');
+
+  const handleApproveReject = async (userId, actionStatus, waterRateVal = null) => {
     setLoading(true);
     try {
-      await api.put(`/admin/users/approvals/${userId}/action`, null, {
-        params: {
-          callerRole: role,
-          callerBlock: block,
-          status: actionStatus
-        }
-      });
+      const params = {
+        callerRole: role,
+        callerBlock: block,
+        status: actionStatus
+      };
+      if (waterRateVal !== null && waterRateVal !== undefined && waterRateVal !== '') {
+        params.waterRatePerLiter = waterRateVal;
+      }
+      await api.put(`/admin/users/approvals/${userId}/action`, null, { params });
       setStatusMessage(`User registration request has been ${actionStatus.toLowerCase()} successfully.`);
       fetchPendingApprovals();
       fetchUsers();
@@ -636,17 +641,20 @@ export default function AdminDashboard() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    fetchStats();
-    fetchUsers();
-    fetchUsageLogs();
-    fetchBills();
-    fetchPendingApprovals();
-    fetchBillingCycles();
-    fetchApartments();
-    fetchPendingVerifications();
-    if (isSuperAdmin) fetchColonies();
-    fetchCommunityAdminRate();
-    fetchWaterPurchasedStats();
+    // Parallelized non-blocking batch request for mobile performance
+    Promise.allSettled([
+      fetchStats(),
+      fetchUsers(),
+      fetchUsageLogs(),
+      fetchBills(),
+      fetchPendingApprovals(),
+      fetchBillingCycles(),
+      fetchApartments(),
+      fetchPendingVerifications(),
+      ...(isSuperAdmin ? [fetchColonies()] : []),
+      fetchCommunityAdminRate(),
+      fetchWaterPurchasedStats()
+    ]);
   }, [isSuperAdmin, block]);
 
 
@@ -1954,6 +1962,48 @@ export default function AdminDashboard() {
         </motion.div>
       )}
 
+      {/* First-Time Login / Tariff Setup Required Banner for Community Admins */}
+      {(() => {
+        // Prevent 1-second flash on mount while backend stats are loading
+        if (stats === null) return null;
+
+        const isTariffConfigured = Boolean(
+          (adminUsername && localStorage.getItem(`tariff_configured_${adminUsername}`) === 'true') ||
+          (stats?.waterRatePerLiter && stats.waterRatePerLiter > 0) ||
+          (stats?.excessRatePerLiter && stats.excessRatePerLiter > 0) ||
+          (stats?.monthlyLimitLiters && stats.monthlyLimitLiters > 0)
+        );
+        if (isSuperAdmin || isTariffConfigured) return null;
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-yellow-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 backdrop-blur-md mb-6"
+          >
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-amber-500/20 rounded-xl text-amber-500 shrink-0 mt-0.5">
+                <AlertCircle className="w-6 h-6 animate-bounce" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-sm sm:text-base text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                  <span>⚠️ Action Required: Configure Tariff & Base/Excess Water Rates First!</span>
+                </h4>
+                <p className="text-xs sm:text-sm text-amber-800 dark:text-amber-300/90 mt-0.5">
+                  Welcome to AquaTrack! Water rate and excess consumption rules have not been configured for your block (<strong className="underline decoration-amber-400 font-bold">{block || 'assigned block'}</strong>). Please set up your tariff rules first before logging usage or issuing bills.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/tariff')}
+              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold rounded-xl text-xs sm:text-sm transition-all shadow-md hover:scale-105 shrink-0 flex items-center gap-2 cursor-pointer"
+            >
+              <Gauge className="w-4 h-4" />
+              Set Up Tariff Now
+            </button>
+          </motion.div>
+        );
+      })()}
+
       {/* Custom Tabs & Glowing Bulb Help */}
       {activeTab !== 'users' && (
         <div className="flex items-center justify-between border-b border-border mb-6">
@@ -2421,6 +2471,7 @@ export default function AdminDashboard() {
                     onStatusFilterChange={setStatusFilter}
                     genderFilter={genderFilter}
                     onGenderFilterChange={setGenderFilter}
+                    isSuperAdmin={isSuperAdmin}
                   />
                 </div>
                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -2481,6 +2532,61 @@ export default function AdminDashboard() {
               </div>
             )}
 
+            {/* Approval Water Rate Modal for Super Admin approving Community Admin */}
+            {approvalModalReq && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
+                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-surface border border-border w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl my-auto">
+                  <div className="flex items-center gap-2 mb-2 text-emerald-400">
+                    <CheckCircle2 className="w-5 h-5" />
+                    <h3 className="text-base sm:text-lg font-bold text-text">Approve Community Admin</h3>
+                  </div>
+                  <p className="text-text-muted text-xs sm:text-sm mb-3">
+                    Approving: <strong className="text-text">{approvalModalReq.fullName || approvalModalReq.username}</strong> ({approvalModalReq.apartmentBlock} - {approvalModalReq.colonyName || 'Community'})
+                  </p>
+
+                  <div className="p-3.5 bg-blue-500/10 border border-blue-500/20 rounded-xl mb-4 space-y-2">
+                    <label className="block text-xs font-bold text-blue-400">💧 Set Base Water Rate (₹ / Liter)</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-text font-bold text-base">₹</span>
+                      <input
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        value={approvalWaterRate}
+                        onChange={(e) => setApprovalWaterRate(e.target.value)}
+                        placeholder="e.g. 0.05"
+                        className="flex-1 bg-surface-lighter border border-border rounded-xl px-3 py-2 text-sm text-text font-bold focus:outline-none focus:border-primary"
+                      />
+                      <span className="text-text-muted text-xs font-semibold">/ Liter</span>
+                    </div>
+                    <p className="text-[11px] text-text-muted">
+                      💡 <strong>Super Admin Note:</strong> Set the rate now so Super Admin doesn't forget. This rate will automatically propagate to all households under this block.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
+                    <button
+                      onClick={() => { setApprovalModalReq(null); setApprovalWaterRate(''); }}
+                      className="px-4 py-2 text-xs font-semibold text-text-muted hover:text-text cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleApproveReject(approvalModalReq.id, 'APPROVED', approvalWaterRate);
+                        setApprovalModalReq(null);
+                        setApprovalWaterRate('');
+                      }}
+                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors shadow-sm flex items-center justify-center gap-1.5"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Approve & Set Rate
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
             {isSuperAdmin ? (
               /* ===== SUPER ADMIN: Grouped expandable view ===== */
               <div className="space-y-4">
@@ -2514,102 +2620,143 @@ export default function AdminDashboard() {
                         </div>
                       )}
 
-                      {/* Community admins with expandable households */}
-                      {communityAdmins.length > 0 ? communityAdmins.map(admin => {
-                        const blockHH = households.filter(h => h.apartmentBlock?.trim().toLowerCase() === admin.apartmentBlock?.trim().toLowerCase());
-                        const isExpanded = !!expandedAdmins[admin.apartmentBlock];
-                        const hasRate = admin.waterRatePerLiter != null;
-                        return (
-                          <div key={admin.id} className={`glass-card overflow-hidden ${!hasRate ? 'border-amber-500/40' : 'border-emerald-500/20'}`}>
-                            <div
-                              onClick={() => toggleExpandAdmin(admin.apartmentBlock)}
-                              className={`px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none transition-colors ${!hasRate ? 'bg-amber-500/5 hover:bg-amber-500/10' : 'bg-emerald-500/5 hover:bg-emerald-500/10'}`}
-                            >
-                              {/* Left: Avatar + Name */}
-                              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                                <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full shrink-0 flex items-center justify-center font-bold text-sm ${!hasRate ? 'bg-amber-500/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-400'}`}>
-                                  {(admin.fullName||admin.username)?.[0]?.toUpperCase()}
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <p className="font-bold text-text text-sm sm:text-base">{admin.fullName || admin.username}</p>
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap">Community Admin</span>
-                                  </div>
-                                  <p className="text-text-muted text-[11px] sm:text-xs mt-0.5 truncate">{admin.apartmentBlock} · {admin.email}</p>
-                                </div>
+                      {/* Community admins grouped by Colony/Community */}
+                      {(() => {
+                        const groupedByColony = communityAdmins.reduce((acc, admin) => {
+                          const colony = admin.colonyName?.trim() || 'General Community';
+                          if (!acc[colony]) acc[colony] = [];
+                          acc[colony].push(admin);
+                          return acc;
+                        }, {});
+
+                        const colonyEntries = Object.entries(groupedByColony);
+
+                        if (colonyEntries.length === 0) {
+                          return <div className="glass-card p-8 text-center text-text-muted">No community admins found.</div>;
+                        }
+
+                        return colonyEntries.map(([colonyName, adminsInColony]) => (
+                          <div key={colonyName} className="space-y-3 pt-2 first:pt-0">
+                            {/* Community / Colony Label Header */}
+                            <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-blue-500/10 dark:bg-blue-500/15 border border-blue-500/20 rounded-2xl shadow-xs">
+                              <div className="flex items-center gap-2">
+                                <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                                <span className="text-xs sm:text-sm font-bold text-text">
+                                  Community: <span className="text-blue-600 dark:text-blue-400 font-extrabold">{colonyName}</span>
+                                </span>
                               </div>
-                              {/* Right: Actions row */}
-                              <div className="flex items-center gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
-                                {hasRate ? (
-                                  <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold">₹{admin.waterRatePerLiter}/L</span>
-                                ) : (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); setQuickRateUser(admin); setQuickRateValue(''); }}
-                                    className="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs font-bold animate-pulse hover:animate-none hover:bg-amber-500/25 cursor-pointer"
-                                  >⚠️ Set Rate!</button>
-                                )}
-                                <span className="text-text-muted text-[10px] sm:text-xs whitespace-nowrap">{blockHH.length} household(s)</span>
-                                <button onClick={(e) => { e.stopPropagation(); handleOpenEditUser(admin); }} className="p-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20 rounded-lg cursor-pointer"><Edit className="w-3.5 h-3.5" /></button>
-                                <button onClick={(e) => { e.stopPropagation(); handleOpenNotify(admin.username); }} className="p-1.5 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/25 border border-yellow-500/20 rounded-lg cursor-pointer"><Send className="w-3.5 h-3.5" /></button>
-                                <button onClick={(e) => { e.stopPropagation(); handleDeleteUser(admin.id); }} className="p-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/25 border border-red-500/20 rounded-lg cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
-                                <span
-                                  className={`text-text-muted transition-transform duration-200 select-none ${isExpanded ? 'rotate-180' : ''}`}
-                                  style={{display:'inline-block'}}
-                                  onClick={() => toggleExpandAdmin(admin.apartmentBlock)}
-                                >▼</span>
-                              </div>
+                              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/30">
+                                {adminsInColony.length} Admin{adminsInColony.length > 1 ? 's' : ''}
+                              </span>
                             </div>
-                            {isExpanded && (
-                              <div className="border-t border-border overflow-x-auto">
-                                {blockHH.length > 0 ? (
-                                  <table className="w-full text-left border-collapse min-w-[480px]">
-                                    <thead>
-                                      <tr className="bg-blue-500/5 border-b border-blue-500/10">
-                                        <th className="px-5 py-3 text-xs font-bold text-blue-400 uppercase">House #</th>
-                                        <th className="px-5 py-3 text-xs font-bold text-blue-400 uppercase">Full Name</th>
-                                        <th className="px-5 py-3 text-xs font-bold text-blue-400 uppercase">Email</th>
-                                        <th className="px-5 py-3 text-xs font-bold text-blue-400 uppercase">Mobile</th>
-                                        <th className="px-5 py-3 text-xs font-bold text-blue-400 uppercase">Rate</th>
-                                        <th className="px-5 py-3 text-xs font-bold text-blue-400 uppercase text-right">Actions</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border/40">
-                                      {blockHH.map(hu => (
-                                        <tr key={hu.id} className="hover:bg-blue-500/5 transition-colors">
-                                          <td className="px-5 py-3 font-semibold text-text text-sm">{hu.houseNumber || '—'}</td>
-                                          <td className="px-5 py-3 text-sm">
-                                            <div className="font-semibold text-text">{hu.fullName || hu.username}</div>
-                                            {hu.meterId && <div className="text-text-muted text-[11px] mt-0.5">Meter: {hu.meterId}</div>}
-                                          </td>
-                                          <td className="px-5 py-3 text-text-muted text-sm">{hu.email}</td>
-                                          <td className="px-5 py-3 text-text-muted text-sm">{hu.mobileNumber || '—'}</td>
-                                          <td className="px-5 py-3 text-sm">
-                                            {hu.waterRatePerLiter != null
-                                              ? <span className="text-emerald-400 font-semibold">₹{hu.waterRatePerLiter}/L</span>
-                                              : <span className="text-amber-400 text-xs italic">Inherits on rate set</span>}
-                                          </td>
-                                          <td className="px-5 py-3 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                              <button onClick={() => handleOpenAddUsage(hu.houseNumber)} title="Log Usage" className="p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/25 border border-blue-500/20 rounded-lg cursor-pointer"><Droplet className="w-3.5 h-3.5" /></button>
-                                              <button onClick={() => handleOpenCreateBill(hu.houseNumber)} title="Bill" className="p-1.5 bg-purple-500/10 text-purple-400 hover:bg-purple-500/25 border border-purple-500/20 rounded-lg cursor-pointer"><Receipt className="w-3.5 h-3.5" /></button>
-                                              <button onClick={() => handleOpenEditUser(hu)} title="Edit" className="p-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20 rounded-lg cursor-pointer"><Edit className="w-3.5 h-3.5" /></button>
-                                              <button onClick={() => handleDeleteUser(hu.id)} title="Delete" className="p-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/25 border border-red-500/20 rounded-lg cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
-                                            </div>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                ) : (
-                                  <div className="px-6 py-6 text-center text-text-muted text-sm">No household users in {admin.apartmentBlock} yet.</div>
-                                )}
-                              </div>
-                            )}
+
+                            {/* Community Admins Cards in this Colony */}
+                            <div className="space-y-3">
+                              {adminsInColony.map(admin => {
+                                const blockHH = households.filter(h => h.apartmentBlock?.trim().toLowerCase() === admin.apartmentBlock?.trim().toLowerCase());
+                                const isExpanded = !!expandedAdmins[admin.apartmentBlock];
+                                const hasRate = admin.waterRatePerLiter != null;
+                                return (
+                                  <div key={admin.id} className={`glass-card overflow-hidden ${!hasRate ? 'border-amber-500/40' : 'border-emerald-500/20'}`}>
+                                    <div
+                                      onClick={() => toggleExpandAdmin(admin.apartmentBlock)}
+                                      className={`px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none transition-colors ${!hasRate ? 'bg-amber-500/5 hover:bg-amber-500/10' : 'bg-emerald-500/5 hover:bg-emerald-500/10'}`}
+                                    >
+                                      {/* Left: Avatar + Name + Community Badge */}
+                                      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                                        <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full shrink-0 flex items-center justify-center font-bold text-sm ${!hasRate ? 'bg-amber-500/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-400'}`}>
+                                          {(admin.fullName||admin.username)?.[0]?.toUpperCase()}
+                                        </div>
+                                        <div className="min-w-0">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <p className="font-bold text-text text-sm sm:text-base">{admin.fullName || admin.username}</p>
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap">Community Admin</span>
+                                            {admin.colonyName && (
+                                              <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/20 whitespace-nowrap flex items-center gap-1">
+                                                <Building2 className="w-3 h-3" />
+                                                {admin.colonyName}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <p className="text-text-muted text-[11px] sm:text-xs mt-0.5 truncate">
+                                            Building: <strong className="text-text">{admin.apartmentBlock}</strong> · {admin.email}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      {/* Right: Actions row */}
+                                      <div className="flex items-center gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
+                                        {hasRate ? (
+                                          <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold">₹{admin.waterRatePerLiter}/L</span>
+                                        ) : (
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); setQuickRateUser(admin); setQuickRateValue(''); }}
+                                            className="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs font-bold animate-pulse hover:animate-none hover:bg-amber-500/25 cursor-pointer"
+                                          >⚠️ Set Rate!</button>
+                                        )}
+                                        <span className="text-text-muted text-[10px] sm:text-xs whitespace-nowrap">{blockHH.length} household(s)</span>
+                                        <button onClick={(e) => { e.stopPropagation(); handleOpenEditUser(admin); }} className="p-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20 rounded-lg cursor-pointer"><Edit className="w-3.5 h-3.5" /></button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleOpenNotify(admin.username); }} className="p-1.5 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/25 border border-yellow-500/20 rounded-lg cursor-pointer"><Send className="w-3.5 h-3.5" /></button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteUser(admin.id); }} className="p-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/25 border border-red-500/20 rounded-lg cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                                        <span
+                                          className={`text-text-muted transition-transform duration-200 select-none ${isExpanded ? 'rotate-180' : ''}`}
+                                          style={{display:'inline-block'}}
+                                          onClick={() => toggleExpandAdmin(admin.apartmentBlock)}
+                                        >▼</span>
+                                      </div>
+                                    </div>
+                                    {isExpanded && (
+                                      <div className="border-t border-border overflow-x-auto">
+                                        {blockHH.length > 0 ? (
+                                          <table className="w-full text-left border-collapse min-w-[480px]">
+                                            <thead>
+                                              <tr className="bg-blue-500/5 border-b border-blue-500/10">
+                                                <th className="px-5 py-3 text-xs font-bold text-blue-400 uppercase">House #</th>
+                                                <th className="px-5 py-3 text-xs font-bold text-blue-400 uppercase">Full Name</th>
+                                                <th className="px-5 py-3 text-xs font-bold text-blue-400 uppercase">Email</th>
+                                                <th className="px-5 py-3 text-xs font-bold text-blue-400 uppercase">Mobile</th>
+                                                <th className="px-5 py-3 text-xs font-bold text-blue-400 uppercase">Rate</th>
+                                                <th className="px-5 py-3 text-xs font-bold text-blue-400 uppercase text-right">Actions</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-border/40">
+                                              {blockHH.map(hu => (
+                                                <tr key={hu.id} className="hover:bg-blue-500/5 transition-colors">
+                                                  <td className="px-5 py-3 font-semibold text-text text-sm">{hu.houseNumber || '—'}</td>
+                                                  <td className="px-5 py-3 text-sm">
+                                                    <div className="font-semibold text-text">{hu.fullName || hu.username}</div>
+                                                    {hu.meterId && <div className="text-text-muted text-[11px] mt-0.5">Meter: {hu.meterId}</div>}
+                                                  </td>
+                                                  <td className="px-5 py-3 text-text-muted text-sm">{hu.email}</td>
+                                                  <td className="px-5 py-3 text-text-muted text-sm">{hu.mobileNumber || '—'}</td>
+                                                  <td className="px-5 py-3 text-sm">
+                                                    {hu.waterRatePerLiter != null
+                                                      ? <span className="text-emerald-400 font-semibold">₹{hu.waterRatePerLiter}/L</span>
+                                                      : <span className="text-amber-400 text-xs italic">Inherits on rate set</span>}
+                                                  </td>
+                                                  <td className="px-5 py-3 text-right">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                      <button onClick={() => handleOpenAddUsage(hu.houseNumber)} title="Log Usage" className="p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/25 border border-blue-500/20 rounded-lg cursor-pointer"><Droplet className="w-3.5 h-3.5" /></button>
+                                                      <button onClick={() => handleOpenCreateBill(hu.houseNumber)} title="Bill" className="p-1.5 bg-purple-500/10 text-purple-400 hover:bg-purple-500/25 border border-purple-500/20 rounded-lg cursor-pointer"><Receipt className="w-3.5 h-3.5" /></button>
+                                                      <button onClick={() => handleOpenEditUser(hu)} title="Edit" className="p-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20 rounded-lg cursor-pointer"><Edit className="w-3.5 h-3.5" /></button>
+                                                      <button onClick={() => handleDeleteUser(hu.id)} title="Delete" className="p-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/25 border border-red-500/20 rounded-lg cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                    </div>
+                                                  </td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        ) : (
+                                          <div className="px-6 py-6 text-center text-text-muted text-sm">No household users in {admin.apartmentBlock} yet.</div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                        );
-                      }) : (
-                        <div className="glass-card p-8 text-center text-text-muted">No community admins found.</div>
-                      )}
+                        ));
+                      })()}
                     </>
                   );
                 })()}
@@ -2769,7 +2916,14 @@ export default function AdminDashboard() {
                                 <td className="px-6 py-4 text-right">
                                   <div className="flex items-center justify-end gap-3">
                                     <button
-                                      onClick={() => handleApproveReject(req.id, 'APPROVED')}
+                                      onClick={() => {
+                                        if (req.role === 'ROLE_COMMUNITY_ADMIN') {
+                                          setApprovalModalReq(req);
+                                          setApprovalWaterRate('');
+                                        } else {
+                                          handleApproveReject(req.id, 'APPROVED');
+                                        }
+                                      }}
                                       title="Approve Request"
                                       className="px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20 rounded-lg cursor-pointer text-xs font-semibold flex items-center gap-1"
                                     >
@@ -3094,92 +3248,88 @@ export default function AdminDashboard() {
                       </select>
                     </div>
 
-                    <div className="col-span-1">
-                      <label className="block text-sm font-medium text-text-muted mb-1.5">Colony Name <span className="text-red-400">*</span></label>
-                      {apartments.length === 0 ? (
-                        <div className="w-full bg-surface-lighter/50 border border-amber-500/30 rounded-xl px-3 py-2.5 text-sm text-amber-400">
-                          No colonies found. Please add colonies first.
+                    {/* Colony & Building Section: Interactive Selects for Super Admin, Auto-Assigned Info Badge for Community Admin */}
+                    {isSuperAdmin ? (
+                      <>
+                        <div className="col-span-1">
+                          <label className="block text-sm font-medium text-text-muted mb-1.5">Colony Name <span className="text-red-400">*</span></label>
+                          {apartments.length === 0 ? (
+                            <div className="w-full bg-surface-lighter/50 border border-amber-500/30 rounded-xl px-3 py-2.5 text-sm text-amber-400">
+                              No colonies found. Please add colonies first.
+                            </div>
+                          ) : (
+                            <select
+                              required
+                              value={userForm.colonyName}
+                              onChange={(e) => {
+                                const nextColony = e.target.value;
+                                const matchedApt = apartments.find(apt => apt.name === nextColony);
+                                const firstBuilding = matchedApt?.buildings?.[0]?.buildingName || '';
+                                setUserForm({
+                                  ...userForm,
+                                  colonyName: nextColony,
+                                  apartmentBlock: firstBuilding
+                                });
+                              }}
+                              className="w-full bg-surface-lighter border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary cursor-pointer"
+                            >
+                              <option value="" disabled>-- Select Colony --</option>
+                              {apartments.map(apt => (
+                                <option key={apt.id} value={apt.name}>{apt.name}</option>
+                              ))}
+                            </select>
+                          )}
                         </div>
-                      ) : (
-                        <select
-                          required
-                          value={userForm.colonyName}
-                          onChange={(e) => {
-                            const nextColony = e.target.value;
-                            const matchedApt = apartments.find(apt => apt.name === nextColony);
-                            const firstBuilding = matchedApt?.buildings?.[0]?.buildingName || '';
-                            setUserForm({
-                              ...userForm,
-                              colonyName: nextColony,
-                              apartmentBlock: isSuperAdmin ? firstBuilding : block
-                            });
-                          }}
-                          disabled={!isSuperAdmin}
-                          className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary transition-all ${
-                            isSuperAdmin
-                              ? 'bg-surface-lighter border-border text-text cursor-pointer'
-                              : 'bg-surface-lighter/50 border-border text-text-muted cursor-not-allowed'
-                          }`}
-                        >
-                          <option value="" disabled>-- Select Colony --</option>
-                          {isSuperAdmin
-                            ? apartments.map(apt => (
-                                <option key={apt.id} value={apt.name}>{apt.name}</option>
-                              ))
-                            : apartments.map(apt => (
-                                <option key={apt.id} value={apt.name}>{apt.name}</option>
-                              ))
-                          }
-                        </select>
-                      )}
-                    </div>
 
-                    <div className="col-span-1">
-                      <label className="block text-sm font-medium text-text-muted mb-1.5">Building Name / Block</label>
-                      {isSuperAdmin ? (
-                        (apartments.find(apt => apt.name === userForm.colonyName)?.buildings || []).length > 0 ? (
-                          <select
-                            required
-                            value={userForm.apartmentBlock}
-                            onChange={(e) => setUserForm({ ...userForm, apartmentBlock: e.target.value })}
-                            className="w-full bg-surface-lighter border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
-                          >
-                            <option value="" disabled>-- Select Building --</option>
-                            {(apartments.find(apt => apt.name === userForm.colonyName)?.buildings || [])
-                              .filter(b => {
-                                if (userForm.role !== 'COMMUNITY_ADMIN') return true;
-                                const hasAdmin = users.some(u => 
-                                  u.role === 'ROLE_COMMUNITY_ADMIN' && 
-                                  u.colonyName === userForm.colonyName && 
-                                  u.apartmentBlock === b.buildingName &&
-                                  (!editingUser || u.username !== editingUser.username)
-                                );
-                                return !hasAdmin;
-                              })
-                              .map(b => (
-                                <option key={b.id} value={b.buildingName}>{b.buildingName}</option>
-                              ))
-                            }
-                          </select>
-                        ) : (
-                          <input
-                            type="text"
-                            required
-                            value={userForm.apartmentBlock}
-                            onChange={(e) => setUserForm({ ...userForm, apartmentBlock: e.target.value })}
-                            placeholder="E.g. Akash Block or Block A"
-                            className="w-full bg-surface-lighter border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
-                          />
-                        )
-                      ) : (
-                        <input
-                          type="text"
-                          disabled
-                          value={block}
-                          className="w-full bg-surface-lighter/50 border border-border rounded-xl px-3 py-2.5 text-sm text-text-muted"
-                        />
-                      )}
-                    </div>
+                        <div className="col-span-1">
+                          <label className="block text-sm font-medium text-text-muted mb-1.5">Building Name / Block</label>
+                          {(apartments.find(apt => apt.name === userForm.colonyName)?.buildings || []).length > 0 ? (
+                            <select
+                              required
+                              value={userForm.apartmentBlock}
+                              onChange={(e) => setUserForm({ ...userForm, apartmentBlock: e.target.value })}
+                              className="w-full bg-surface-lighter border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary cursor-pointer"
+                            >
+                              <option value="" disabled>-- Select Building --</option>
+                              {(apartments.find(apt => apt.name === userForm.colonyName)?.buildings || [])
+                                .filter(b => {
+                                  if (userForm.role !== 'COMMUNITY_ADMIN') return true;
+                                  const hasAdmin = users.some(u => 
+                                    u.role === 'ROLE_COMMUNITY_ADMIN' && 
+                                    u.colonyName === userForm.colonyName && 
+                                    u.apartmentBlock === b.buildingName &&
+                                    (!editingUser || u.username !== editingUser.username)
+                                  );
+                                  return !hasAdmin;
+                                })
+                                .map(b => (
+                                  <option key={b.id} value={b.buildingName}>{b.buildingName}</option>
+                                ))
+                              }
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              required
+                              value={userForm.apartmentBlock}
+                              onChange={(e) => setUserForm({ ...userForm, apartmentBlock: e.target.value })}
+                              placeholder="E.g. Akash Block or Block A"
+                              className="w-full bg-surface-lighter border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
+                            />
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="col-span-1 sm:col-span-2 p-3.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs sm:text-sm flex items-center justify-between text-blue-400 font-semibold">
+                        <span className="flex items-center gap-1.5">
+                          <MapPin className="w-4 h-4 text-blue-400 shrink-0" />
+                          <span>Auto-Assigned Scope:</span>
+                        </span>
+                        <span className="font-bold text-text bg-blue-500/15 px-3 py-1 rounded-lg border border-blue-500/30">
+                          {userForm.colonyName || 'Your Community'} — {block}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="col-span-1">
                       <label className="block text-sm font-medium text-text-muted mb-1.5">House Number</label>

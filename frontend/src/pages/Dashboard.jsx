@@ -7,6 +7,7 @@ import {
 } from 'recharts';
 import api from '../api';
 import ErrorBoundary from '../components/ErrorBoundary';
+import { AnimatedNumber } from '../components/AnimatedNumber';
 
 const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#f43f5e', '#06b6d4', '#6366f1', '#f97316'];
 
@@ -65,7 +66,7 @@ const getGreeting = () => {
   return 'Good evening';
 };
 
-const StatCard = ({ title, value, subtitle, infoNote, icon: Icon, svgSrc, color, delay }) => (
+const StatCard = ({ title, numericValue, prefix = '', suffix = '', decimals = 0, rawDisplay = null, subtitle, infoNote, icon: Icon, svgSrc, color, delay }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -76,7 +77,13 @@ const StatCard = ({ title, value, subtitle, infoNote, icon: Icon, svgSrc, color,
       <div className="flex justify-between items-start mb-3">
         <div>
           <p className="text-text-muted text-sm font-medium mb-1">{title}</p>
-          <h3 className="text-3xl font-bold text-text tracking-tight">{value}</h3>
+          <h3 className="text-3xl font-bold text-text tracking-tight">
+            {rawDisplay ? (
+              rawDisplay
+            ) : (
+              <AnimatedNumber value={numericValue} prefix={prefix} suffix={suffix} decimals={decimals} />
+            )}
+          </h3>
         </div>
         {svgSrc ? (
           <motion.img 
@@ -760,7 +767,8 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Latest Meter Reading"
-          value={`${stats.latestReading} L`}
+          numericValue={stats.latestReading}
+          suffix=" L"
           subtitle={stats.latestReadingDate !== 'N/A' ? `Logged: ${stats.latestReadingDate}` : "No usage logs"}
           svgSrc="/empty_state_meter_reading.svg"
           color="blue"
@@ -768,7 +776,9 @@ export default function Dashboard() {
         />
         <StatCard
           title="Current Bill (Est)"
-          value={`₹${stats.unpaidBillAmount.toFixed(2)}`}
+          numericValue={stats.unpaidBillAmount}
+          prefix="₹"
+          decimals={2}
           subtitle={stats.unpaidBillAmount > 0 ? "Pending Payment" : "No Unpaid Bills"}
           infoNote={`Pay within ${gracePeriodDays} days of bill generation to avoid late fee penalties.`}
           svgSrc="/empty_state_generate_bill.svg"

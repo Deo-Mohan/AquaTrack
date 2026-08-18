@@ -154,9 +154,6 @@ export default function SharedHeader({ activeTab = 'home' }) {
       >
         {/* Brand Section at Very Left */}
         <Link to="/" className="flex items-center gap-2 sm:gap-3.5 group">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 flex-shrink-0 rounded-full overflow-hidden shadow-lg shadow-primary/20 border border-primary/30 bg-surface/80 group-hover:scale-105 transition-transform backdrop-blur-md">
-            <img src="/logo.png" alt="AquaTrack Logo" className="w-full h-full object-cover scale-110" />
-          </div>
           <div className="loader loader-responsive">
             <span className="outline-layer">AquaTrack</span>
             <span className="fill-layer">AquaTrack</span>

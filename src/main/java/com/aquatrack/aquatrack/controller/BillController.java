@@ -305,6 +305,124 @@ public class BillController {
         return ResponseEntity.ok(savedBill);
     }
 
+    // POST: Create multiple bills in a single bulk transaction (High Performance Batching)
+    @PostMapping("/create-batch")
+    public ResponseEntity<?> createBatchBills(
+            @Valid @RequestBody List<Bill> bills,
+            @RequestParam(required = false) String callerRole) {
+        
+        List<Bill> savedBillsList = new java.util.ArrayList<>();
+        List<Notification> notificationsToSave = new java.util.ArrayList<>();
+
+        for (Bill bill : bills) {
+            if (bill.getGeneratedDate() == null) {
+                bill.setGeneratedDate(java.time.LocalDate.now());
+            }
+            if (bill.getDueDate() == null) {
+                int graceDays = 20;
+                if (bill.getHouseNumber() != null) {
+                    java.util.Optional<com.aquatrack.aquatrack.model.User> residentOpt = userRepository.findByHouseNumber(bill.getHouseNumber());
+                    if (residentOpt.isPresent() && residentOpt.get().getGracePeriodDays() != null) {
+                        graceDays = residentOpt.get().getGracePeriodDays();
+                    }
+                }
+                bill.setDueDate(bill.getGeneratedDate().plusDays(graceDays));
+            }
+
+            if (bill.getHouseNumber() != null) {
+                java.util.Optional<com.aquatrack.aquatrack.model.User> residentOpt = userRepository.findByHouseNumber(bill.getHouseNumber());
+                if (residentOpt.isPresent()) {
+                    com.aquatrack.aquatrack.model.User resUser = residentOpt.get();
+                    if ("ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(resUser.getRole()) && !"ROLE_ADMIN".equalsIgnoreCase(callerRole)) {
+                        continue;
+                    }
+                    bill.setMeterId(resUser.getMeterId());
+
+                    // Auto-calculate tiered breakdown if not pre-calculated
+                    List<com.aquatrack.aquatrack.model.WaterUsageLog> allLogs = waterUsageRepository.findByHouseNumber(bill.getHouseNumber());
+                    int targetYear = bill.getGeneratedDate().getYear();
+                    int targetMonth = bill.getGeneratedDate().getMonthValue();
+                    
+                    List<com.aquatrack.aquatrack.model.WaterUsageLog> monthLogs = allLogs.stream()
+                            .filter(log -> log.getReadingDate() != null 
+                                    && log.getReadingDate().getYear() == targetYear 
+                                    && log.getReadingDate().getMonthValue() == targetMonth)
+                            .collect(java.util.stream.Collectors.toList());
+
+                    double totalLiters = monthLogs.stream()
+                            .mapToDouble(log -> log.getReadingLiters() != null ? log.getReadingLiters() : 0.0)
+                            .sum();
+
+                    Double waterRate = resUser.getWaterRatePerLiter();
+                    Double monthlyLimit = resUser.getMonthlyLimitLiters();
+                    Double excessRate = resUser.getExcessRatePerLiter();
+                    if ((waterRate == null || waterRate <= 0) || monthlyLimit == null || excessRate == null) {
+                        String blk = resUser.getApartmentBlock();
+                        if (blk != null && !blk.trim().isEmpty()) {
+                            List<com.aquatrack.aquatrack.model.User> admins = userRepository.findByRoleAndApartmentBlock("ROLE_COMMUNITY_ADMIN", blk);
+                            for (com.aquatrack.aquatrack.model.User adm : admins) {
+                                if ((waterRate == null || waterRate <= 0) && adm.getWaterRatePerLiter() != null && adm.getWaterRatePerLiter() > 0) waterRate = adm.getWaterRatePerLiter();
+                                if (monthlyLimit == null && adm.getMonthlyLimitLiters() != null) monthlyLimit = adm.getMonthlyLimitLiters();
+                                if (excessRate == null && adm.getExcessRatePerLiter() != null) excessRate = adm.getExcessRatePerLiter();
+                                if (waterRate != null && waterRate > 0 && monthlyLimit != null && excessRate != null) break;
+                            }
+                        }
+                    }
+
+                    if (totalLiters > 0 && waterRate != null && waterRate > 0) {
+                        double withinLimit = totalLiters;
+                        double excessLiters = 0.0;
+                        double excessCharge = 0.0;
+                        if (monthlyLimit != null && monthlyLimit > 0 && excessRate != null && totalLiters > monthlyLimit) {
+                            withinLimit = monthlyLimit;
+                            excessLiters = totalLiters - monthlyLimit;
+                            excessCharge = excessLiters * excessRate;
+                        }
+                        double baseCharge = withinLimit * waterRate;
+                        double computedAmount = Math.round((baseCharge + excessCharge) * 100.0) / 100.0;
+
+                        bill.setConsumptionLiters(totalLiters);
+                        bill.setWithinLimitLiters(withinLimit);
+                        bill.setExcessLiters(excessLiters);
+                        bill.setBaseRatePerLiter(waterRate);
+                        bill.setExcessRatePerLiter(excessRate != null ? excessRate : 0.0);
+                        bill.setMonthlyLimitLiters(monthlyLimit != null ? monthlyLimit : 0.0);
+                        bill.setBaseCharge(baseCharge);
+                        bill.setExcessCharge(excessCharge);
+                        if (bill.getBillingPeriod() == null || bill.getBillingPeriod().trim().isEmpty()) {
+                            String bpl = bill.getGeneratedDate().getMonth().getDisplayName(
+                                java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH)
+                                + " " + bill.getGeneratedDate().getYear();
+                            bill.setBillingPeriod(bpl);
+                        }
+                        bill.setAmount(computedAmount);
+                    }
+
+                    // Prepare notification
+                    String title = "New Water Bill Generated";
+                    String message = String.format(
+                        "A new water bill of ₹%.2f has been generated for your household (%s). Due Date: %s.",
+                        bill.getAmount(), bill.getHouseNumber(), bill.getDueDate()
+                    );
+                    Notification notif = new Notification(resUser.getUsername(), "BILL_GENERATED", title, message);
+                    notif.setReferenceType("BILL");
+                    notificationsToSave.add(notif);
+                }
+            }
+            savedBillsList.add(bill);
+        }
+
+        List<Bill> persistedBills = repository.saveAll(savedBillsList);
+        if (!notificationsToSave.isEmpty()) {
+            for (int i = 0; i < Math.min(persistedBills.size(), notificationsToSave.size()); i++) {
+                notificationsToSave.get(i).setReferenceId(persistedBills.get(i).getId());
+            }
+            notificationRepository.saveAll(notificationsToSave);
+        }
+
+        return ResponseEntity.ok(persistedBills);
+    }
+
     // POST: Recalculate an existing bill's consumption and amount from its generatedDate month logs
     // This fixes bills that were created with stale/incorrect breakdown data
     @PostMapping("/{id}/recalculate")

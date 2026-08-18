@@ -71,6 +71,13 @@ public class DashboardStatsService {
         Double pendingCollections = billRepository.sumUnpaidByBlock(apartmentBlock);
         stats.put("pendingCollections", pendingCollections != null ? pendingCollections : 0.0);
 
+        // Community Admin's configured water rate per liter
+        var adminOpt = userRepository.findAll().stream()
+                .filter(u -> "ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(u.getRole()) && apartmentBlock.equalsIgnoreCase(u.getApartmentBlock()))
+                .findFirst();
+        Double rate = adminOpt.map(u -> u.getWaterRatePerLiter()).orElse(null);
+        stats.put("waterRatePerLiter", rate);
+
         return stats;
     }
 

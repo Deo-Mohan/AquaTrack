@@ -1,7 +1,7 @@
 package com.aquatrack.aquatrack.config;
 
 import com.aquatrack.aquatrack.model.User;
-import com.aquatrack.aquatrack.repository.*;
+import com.aquatrack.aquatrack.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -13,7 +13,6 @@ import java.util.Optional;
 public class DataInitializer implements CommandLineRunner {
 
     private final UserRepository userRepository;
-
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     // Admin credentials — only used when seeding for the first time

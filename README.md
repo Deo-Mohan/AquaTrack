@@ -57,10 +57,9 @@ AquaTrack is a premium, full-stack smart water management, analytics, PWA, and a
   * [View Website Screenshots (Google Drive)](https://drive.google.com/drive/folders/1ReU8GlKPbmXe20zk7Ece0EPwZQGVsMkc?usp=sharing)
 * **📋 Internship & Architecture Docs**:
   * [Tasks Performed During Internship](../Task%20performed%20during%20Internship.docx)
-  * [Full Technical Documentation](../AquaTrack_Documentation.md)
-  * [Chatbot Role Architecture Diagram](./chatbot-role-architecture.pdf)
-* **📖 Technical & Feature Guides**:
-  * 🌐 [API Guide & Postman Collection](./API_GUIDE.md)
+- 📄 **Full Technical Documentation:** [AquaTrack_Documentation.md](./AquaTrack_Documentation.md) or [AquaTrack_Documentation.md (Parent Workspace)](../AquaTrack_Documentation.md)
+- 📝 **Tasks Performed During Internship Report:** [Tasks performed during Internship.md](./Tasks%20performed%20during%20Internship.md)
+- 🔌 **REST API Specification:** [API_GUIDE.md](./API_GUIDE.md)
   * 💵 [Billing Cycle & Tariff Guide](./BILLING_CYCLE_GUIDE.md)
   * 🤖 [AI Chatbot & RAG Architecture Guide](./CHATBOT_GUIDE.md)
   * 🌍 [Multi-language Translation & Speech Guide](./TRANSLATION_GUIDE.md)

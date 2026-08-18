@@ -13,6 +13,7 @@
     "@stomp/stompjs": "^7.3.0",
     "@tanstack/react-query": "^5.101.4",
     "axios": "^1.18.1",
+    "canvas-confetti": "^1.9.4",
     "feral-blob": "^0.1.0",
     "framer-motion": "^12.42.2",
     "html2canvas": "^1.4.1",

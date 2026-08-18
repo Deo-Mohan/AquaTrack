@@ -63,13 +63,18 @@ export default function TariffSettings() {
         lateFeePerMonth: parseFloat(tariff.lateFeePerMonth) || 0,
         gracePeriodDays: parseInt(tariff.gracePeriodDays, 10) || 20,
       };
-      // Only Super Admin can send baseRatePerLiter
       if (isSuperAdmin) {
         payload.baseRatePerLiter = parseFloat(tariff.baseRatePerLiter) || 0;
       }
       await api.put('/tariff', payload, {
         params: { callerUsername: username, callerRole: role, callerBlock: block }
       });
+
+      // Mark tariff setup completed for this admin account
+      if (username) {
+        localStorage.setItem(`tariff_configured_${username}`, 'true');
+      }
+
       setMsg({ type: 'success', text: 'Tariff settings saved and propagated to all residents!' });
       await fetchTariff();
     } catch (err) {

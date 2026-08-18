@@ -3,6 +3,7 @@ package com.aquatrack.aquatrack.repository;
 import com.aquatrack.aquatrack.model.SupportTicket;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -16,6 +17,9 @@ public interface SupportTicketRepository extends JpaRepository<SupportTicket, Lo
     List<SupportTicket> findByColonyNameOrderByCreatedAtDesc(String colonyName);
 
     List<SupportTicket> findByColonyNameAndCreatedByRoleOrderByCreatedAtDesc(String colonyName, String createdByRole);
+
+    @Query("SELECT st FROM SupportTicket st WHERE ((st.createdBy.apartmentBlock = :apartmentBlock OR st.apartmentBlock = :apartmentBlock) AND (st.colonyName = :colonyName OR st.createdBy.colonyName = :colonyName)) OR st.createdBy.id = :userId ORDER BY st.createdAt DESC")
+    List<SupportTicket> findForCommunityAdminByBlockAndColony(@Param("apartmentBlock") String apartmentBlock, @Param("colonyName") String colonyName, @Param("userId") Long userId);
 
     @Query("SELECT st FROM SupportTicket st WHERE st.escalatedToSuperAdmin = true OR st.createdByRole = 'ROLE_COMMUNITY_ADMIN' OR st.createdByRole = 'ROLE_ADMIN' ORDER BY st.createdAt DESC")
     List<SupportTicket> findForSuperAdmin();

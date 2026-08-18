@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Menu, Sun, Moon, Bell, CheckCheck, Trash2, Globe, ChevronDown, Download } from 'lucide-react';
+import { Search, Menu, Sun, Moon, Bell, CheckCheck, Trash2, Globe, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api';
 import { LANGUAGES as languages, INCLUDED_LANG_CODES } from '../utils/languages';
@@ -329,9 +329,6 @@ export default function Header({ toggleSidebar }) {
           <Menu className="w-5 h-5" />
         </button>
         <div className="flex items-center gap-2 lg:gap-3">
-          <div className="w-9 h-9 lg:w-11 lg:h-11 rounded-full overflow-hidden shadow-md shadow-primary/20 border border-primary/20 flex items-center justify-center bg-surface flex-shrink-0">
-            <img src="/logo.png" alt="AquaTrack Logo" className="w-full h-full object-cover scale-105" />
-          </div>
           <div className="loader loader-responsive">
             <span className="outline-layer">AquaTrack</span>
             <span className="fill-layer">AquaTrack</span>
@@ -451,15 +448,7 @@ export default function Header({ toggleSidebar }) {
           </AnimatePresence>
         </div>
 
-        {/* PWA Download Quick Trigger Button (Hidden on smartphone screens) */}
-        <button
-          onClick={() => window.dispatchEvent(new CustomEvent('openPwaInstallModal'))}
-          className="hidden sm:flex items-center gap-1.5 p-2 sm:px-3 sm:py-2 rounded-xl bg-gradient-to-r from-cyan-500/15 via-blue-500/15 to-indigo-500/15 hover:from-cyan-500/25 hover:to-indigo-500/25 border border-cyan-500/35 text-xs font-extrabold text-cyan-600 dark:text-cyan-400 transition-all hover:scale-105 shadow-sm cursor-pointer"
-          title="Download & Install AquaTrack App"
-        >
-          <Download className="w-4 h-4 text-cyan-500 stroke-[2.5]" />
-          <span className="hidden sm:inline">App</span>
-        </button>
+
 
 
         <label htmlFor="header-switch" className="toggle">

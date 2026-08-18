@@ -483,7 +483,8 @@ public class UserManagementController {
             @PathVariable Long id,
             @RequestParam String callerRole,
             @RequestParam(required = false) String callerBlock,
-            @RequestParam String status) {
+            @RequestParam String status,
+            @RequestParam(required = false) Double waterRatePerLiter) {
 
         if (!"APPROVED".equalsIgnoreCase(status) && !"REJECTED".equalsIgnoreCase(status)) {
             return ResponseEntity.badRequest().body("Invalid status action. Must be APPROVED or REJECTED.");
@@ -514,16 +515,37 @@ public class UserManagementController {
         } else {
             return ResponseEntity.status(403).body("Access denied. Invalid caller role.");
         }
+
         user.setStatus(status.toUpperCase());
-        userRepository.save(user);
-        if ("APPROVED".equalsIgnoreCase(status) && ("ROLE_RESIDENT".equalsIgnoreCase(user.getRole()) || "ROLE_HOUSEHOLD_USER".equalsIgnoreCase(user.getRole()))) {
-            syncUserToHousehold(user);
+
+        // Super Admin setting water rate upon approval
+        if ("APPROVED".equalsIgnoreCase(status) && "ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(user.getRole()) && waterRatePerLiter != null) {
+            user.setWaterRatePerLiter(waterRatePerLiter);
+        }
+
+        User savedUser = userRepository.save(user);
+
+        if ("APPROVED".equalsIgnoreCase(status) && ("ROLE_RESIDENT".equalsIgnoreCase(savedUser.getRole()) || "ROLE_HOUSEHOLD_USER".equalsIgnoreCase(savedUser.getRole()))) {
+            syncUserToHousehold(savedUser);
+        }
+
+        // AUTO-PROPAGATE: When Super Admin approves Community Admin with water rate, sync residents in block
+        if ("APPROVED".equalsIgnoreCase(status) && "ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(savedUser.getRole()) && savedUser.getWaterRatePerLiter() != null) {
+            List<User> blockResidents1 = userRepository.findByRoleAndApartmentBlock("ROLE_RESIDENT", savedUser.getApartmentBlock());
+            List<User> blockResidents2 = userRepository.findByRoleAndApartmentBlock("ROLE_HOUSEHOLD_USER", savedUser.getApartmentBlock());
+            java.util.List<User> allResidents = new java.util.ArrayList<>();
+            allResidents.addAll(blockResidents1);
+            allResidents.addAll(blockResidents2);
+            for (User resident : allResidents) {
+                resident.setWaterRatePerLiter(savedUser.getWaterRatePerLiter());
+                userRepository.save(resident);
+            }
         }
 
         // Send approval email if role is COMMUNITY_ADMIN and status is APPROVED
-        if ("ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(user.getRole()) && "APPROVED".equalsIgnoreCase(status)) {
+        if ("ROLE_COMMUNITY_ADMIN".equalsIgnoreCase(savedUser.getRole()) && "APPROVED".equalsIgnoreCase(status)) {
             try {
-                emailService.sendCommunityApprovalEmail(user.getEmail(), user.getFullName(), user.getColonyName());
+                emailService.sendCommunityApprovalEmail(savedUser.getEmail(), savedUser.getFullName(), savedUser.getColonyName());
             } catch (Exception e) {
                 System.err.println("Error sending community admin approval email: " + e.getMessage());
             }

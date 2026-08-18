@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Droplet, Receipt, Trash2, Edit2, CheckCircle2, Clock,
-  Search, X, ChevronDown, ChevronUp, Loader2, AlertCircle, QrCode, Calendar, FileText, Download, Printer
+  Search, X, ChevronDown, ChevronUp, Loader2, AlertCircle, QrCode, Calendar, FileText, Download, Printer,
+  MapPin, Building2, Layers, Filter, ArrowUpDown
 } from 'lucide-react';
 import api from '../api';
 import MicSearchBox from '../components/MicSearchBox';
@@ -34,6 +35,11 @@ export default function WaterBillingHistory() {
   const [payQrModalBill, setPayQrModalBill] = useState(null); // Bill to collect via QR
   const [editingLog, setEditingLog] = useState(null); // Log to edit
   const [editLoading, setEditLoading] = useState(false);
+
+  // Hierarchy Filter & Grouping States
+  const [colonyFilter, setColonyFilter]         = useState('ALL');
+  const [buildingFilter, setBuildingFilter]     = useState('ALL');
+  const [groupByHierarchy, setGroupByHierarchy] = useState(false);
 
   // PDF Modal & Date Filtering States
   const [showPdfModal, setShowPdfModal] = useState(false);
@@ -157,19 +163,73 @@ export default function WaterBillingHistory() {
     }
   };
 
-  // ── Filter helpers ──────────────────────────────────────────────
+  // ── Hierarchy & Filter Helpers ─────────────────────────────────────
+  const getColonyForRecord = (record) => {
+    if (record.colonyName) return record.colonyName;
+    if (!record.apartmentBlock) return 'General Community';
+    const matchedUser = users.find(u =>
+      u.apartmentBlock && u.apartmentBlock.trim().toLowerCase() === record.apartmentBlock.trim().toLowerCase() && u.colonyName
+    );
+    return matchedUser?.colonyName || 'General Community';
+  };
+
+  // Dynamic list of unique colonies
+  const availableColonies = Array.from(new Set(
+    users.map(u => u.colonyName).concat(usageLogs.map(getColonyForRecord), bills.map(getColonyForRecord)).filter(Boolean)
+  )).sort();
+
+  // Dynamic list of unique buildings under currently selected colony (or all if ALL)
+  const availableBuildings = Array.from(new Set(
+    users
+      .filter(u => colonyFilter === 'ALL' || (u.colonyName && u.colonyName.trim().toLowerCase() === colonyFilter.trim().toLowerCase()))
+      .map(u => u.apartmentBlock)
+      .concat(
+        usageLogs
+          .filter(l => colonyFilter === 'ALL' || getColonyForRecord(l).trim().toLowerCase() === colonyFilter.trim().toLowerCase())
+          .map(l => l.apartmentBlock),
+        bills
+          .filter(b => colonyFilter === 'ALL' || getColonyForRecord(b).trim().toLowerCase() === colonyFilter.trim().toLowerCase())
+          .map(b => b.apartmentBlock)
+      )
+      .filter(Boolean)
+  )).sort();
+
   const q = searchQ.trim().toLowerCase();
 
   const filteredLogs = [...usageLogs]
-    .filter(l => !q || [l.houseNumber, l.apartmentBlock, l.logType, String(l.readingLiters), getUserName(l.houseNumber, l.apartmentBlock)]
-      .some(v => v && String(v).toLowerCase().includes(q)))
+    .filter(l => {
+      const col = getColonyForRecord(l);
+      if (colonyFilter !== 'ALL' && col.trim().toLowerCase() !== colonyFilter.trim().toLowerCase()) {
+        return false;
+      }
+      if (buildingFilter !== 'ALL' && String(l.apartmentBlock).trim().toLowerCase() !== buildingFilter.trim().toLowerCase()) {
+        return false;
+      }
+      if (q) {
+        return [l.houseNumber, l.apartmentBlock, col, l.logType, String(l.readingLiters), getUserName(l.houseNumber, l.apartmentBlock)]
+          .some(v => v && String(v).toLowerCase().includes(q));
+      }
+      return true;
+    })
     .sort((a, b) => sortDir === 'desc'
       ? new Date(b.readingDate) - new Date(a.readingDate)
       : new Date(a.readingDate) - new Date(b.readingDate));
 
   const filteredBills = [...bills]
-    .filter(b => !q || [b.houseNumber, b.apartmentBlock, b.status, String(b.amount), getUserName(b.houseNumber, b.apartmentBlock)]
-      .some(v => v && String(v).toLowerCase().includes(q)))
+    .filter(b => {
+      const col = getColonyForRecord(b);
+      if (colonyFilter !== 'ALL' && col.trim().toLowerCase() !== colonyFilter.trim().toLowerCase()) {
+        return false;
+      }
+      if (buildingFilter !== 'ALL' && String(b.apartmentBlock).trim().toLowerCase() !== buildingFilter.trim().toLowerCase()) {
+        return false;
+      }
+      if (q) {
+        return [b.houseNumber, b.apartmentBlock, col, b.status, String(b.amount), getUserName(b.houseNumber, b.apartmentBlock)]
+          .some(v => v && String(v).toLowerCase().includes(q));
+      }
+      return true;
+    })
     .sort((a, b) => sortDir === 'desc'
       ? new Date(b.generatedDate || b.createdAt) - new Date(a.generatedDate || a.createdAt)
       : new Date(a.generatedDate || a.createdAt) - new Date(b.generatedDate || b.createdAt));
@@ -207,6 +267,19 @@ export default function WaterBillingHistory() {
       });
     }
   });
+
+  // Helper to group records by Colony -> Building
+  const getHierarchyGroupedData = (items) => {
+    const colonyMap = {};
+    items.forEach(item => {
+      const colony = getColonyForRecord(item);
+      const bldg = item.apartmentBlock || 'Unassigned Building';
+      if (!colonyMap[colony]) colonyMap[colony] = {};
+      if (!colonyMap[colony][bldg]) colonyMap[colony][bldg] = [];
+      colonyMap[colony][bldg].push(item);
+    });
+    return colonyMap;
+  };
 
   // Returns true if this log's month+house has a bill generated (finalized)
   const isLogBilled = (log) => {
@@ -424,11 +497,38 @@ export default function WaterBillingHistory() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-text">Water & Billing History</h1>
-        <p className="text-text-muted mt-1">Full audit trail of meter readings and generated bills.</p>
+    <div className="space-y-5">
+      {/* ── Page Header & Top Actions ───────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-text tracking-tight flex items-center gap-2.5">
+            <Droplet className="w-7 h-7 text-primary shrink-0" />
+            Water & Billing History
+          </h1>
+          <p className="text-text-muted text-xs sm:text-sm mt-0.5">
+            Full audit trail of meter readings, community consumption, and generated invoices.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={fetchAll}
+            className="flex items-center gap-1.5 px-3 py-2 bg-surface hover:bg-surface-lighter text-text-muted hover:text-text border border-border rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-xs"
+            title="Refresh Data"
+          >
+            <Clock className="w-4 h-4 text-primary" />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+
+          <button
+            onClick={() => setShowPdfModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-emerald-500/20 transition-all cursor-pointer border border-emerald-400/40"
+            title={`Export PDF report for ${activeTab === 'usage' ? 'Water Usage Logs' : 'Billing Records'}`}
+          >
+            <FileText className="w-4 h-4 shrink-0" />
+            <span>Download {activeTab === 'usage' ? 'Water Logs' : 'Billing'} PDF</span>
+          </button>
+        </div>
       </div>
 
       {/* Status flash */}
@@ -448,65 +548,163 @@ export default function WaterBillingHistory() {
         )}
       </AnimatePresence>
 
-      {/* ── Tab Switcher ─────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-1 bg-surface-lighter border border-border p-1 rounded-xl w-full sm:w-fit">
-          {[
-            { id: 'usage',   label: 'Water Usage Logs', shortLabel: 'Usage Logs', icon: Droplet,  count: filteredLogs.length },
-            { id: 'billing', label: 'Billing Records', shortLabel: 'Billing',   icon: Receipt,  count: filteredBills.length },
-          ].map(tab => (
+      {/* ── Master Unified Control Panel ────────────────────────────────── */}
+      <div className="bg-surface border border-border/80 rounded-2xl p-4 shadow-sm space-y-3.5">
+        {/* Panel Row 1: Primary Category Tabs & Grouping View Toggle */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 border-b border-border/60 pb-3.5">
+          {/* Sub-Tab Selector with vibrant color contrast */}
+          <div className="flex items-center gap-1.5 bg-surface-lighter/90 border border-border/80 p-1 rounded-2xl w-full sm:w-fit shadow-xs">
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === tab.id
-                  ? 'bg-surface text-text shadow-sm border border-border'
-                  : 'text-text-muted hover:text-text'
+              onClick={() => setActiveTab('usage')}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                activeTab === 'usage'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25 border border-blue-400/30 scale-[1.02]'
+                  : 'text-text-muted hover:text-text hover:bg-surface/60'
               }`}
+              title="Click to view Water Meter Reading Logs"
             >
-              <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              <span className="hidden sm:inline">{tab.label}</span>
-              <span className="sm:hidden">{tab.shortLabel}</span>
-              <span className="text-[10px] sm:text-[11px] font-bold px-1.5 py-0.2 rounded-full shrink-0 ${
-                activeTab === tab.id ? 'bg-primary/15 text-primary' : 'bg-surface-lighter text-text-muted'
-              }">{tab.count}</span>
+              <Droplet className={`w-4 h-4 shrink-0 ${activeTab === 'usage' ? 'text-white' : 'text-blue-500'}`} />
+              <span>Water Usage Logs</span>
+              <span className={`text-[10px] sm:text-[11px] font-black px-2 py-0.5 rounded-full shrink-0 ${
+                activeTab === 'usage' ? 'bg-white/20 text-white' : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
+              }`}>{filteredLogs.length}</span>
             </button>
-          ))}
+
+            <button
+              onClick={() => setActiveTab('billing')}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                activeTab === 'billing'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25 border border-emerald-400/30 scale-[1.02]'
+                  : 'text-text-muted hover:text-text hover:bg-surface/60'
+              }`}
+              title="Click to view Customer Billing Records"
+            >
+              <Receipt className={`w-4 h-4 shrink-0 ${activeTab === 'billing' ? 'text-white' : 'text-emerald-500'}`} />
+              <span>Billing Records</span>
+              <span className={`text-[10px] sm:text-[11px] font-black px-2 py-0.5 rounded-full shrink-0 ${
+                activeTab === 'billing' ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+              }`}>{filteredBills.length}</span>
+            </button>
+          </div>
+
+          {/* Grouping View Switcher (Date vs Community Hierarchy) - Super Admin Only */}
+          {isSuperAdmin && (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+              <span className="text-[11px] font-black uppercase tracking-wider text-text-muted flex items-center gap-1 shrink-0">
+                <Calendar className="w-3.5 h-3.5 text-primary" />
+                Grouping:
+              </span>
+              <div className="flex items-center gap-1 bg-surface-lighter/90 border border-border/80 p-1 rounded-2xl shrink-0 w-full sm:w-auto shadow-xs">
+                <button
+                  onClick={() => setGroupByHierarchy(false)}
+                  className={`flex-1 sm:flex-none px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    !groupByHierarchy
+                      ? 'bg-surface text-text shadow-xs border border-border'
+                      : 'text-text-muted hover:text-text'
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                  By Date
+                </button>
+                <button
+                  onClick={() => setGroupByHierarchy(true)}
+                  className={`flex-1 sm:flex-none px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    groupByHierarchy
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'text-text-muted hover:text-text'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5 text-purple-300" />
+                  By Community & Building
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* PDF Download Button (Opens Date Filter Modal) */}
-        <button
-          onClick={() => setShowPdfModal(true)}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-emerald-500/20 transition-all cursor-pointer border border-emerald-400/40"
-          title={`Export PDF report with date options for ${activeTab === 'usage' ? 'Water Usage Logs' : 'Billing Records'}`}
-        >
-          <FileText className="w-4 h-4 shrink-0" />
-          <span>Download {activeTab === 'usage' ? 'Water Logs' : 'Billing'} PDF</span>
-        </button>
-      </div>
+        {/* Panel Row 2: Search Input, Community Filter, Building Filter & Sort */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
+          {/* Search Box */}
+          <div className="relative flex-1 min-w-[200px]">
+            <MicSearchBox
+              value={searchQ}
+              onChange={setSearchQ}
+              onClear={() => setSearchQ('')}
+              placeholder={activeTab === 'usage' ? 'Search house, block, liters…' : 'Search house, amount, status…'}
+            />
+          </div>
 
-      {/* ── Toolbar ──────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
-          <MicSearchBox
-            value={searchQ}
-            onChange={setSearchQ}
-            onClear={() => setSearchQ('')}
-            placeholder={activeTab === 'usage' ? 'Search by house, block, liters…' : 'Search by house, amount, status…'}
-          />
+          {/* Dropdown Filters Strip */}
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            {/* Colony & Building Filters (Super Admin Only) */}
+            {isSuperAdmin && (
+              <>
+                {/* Colony Filter */}
+                <div className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold flex-1 sm:flex-none min-w-[170px]">
+                  <MapPin className="w-4 h-4 text-blue-500 shrink-0" />
+                  <span className="text-text-muted text-xs shrink-0 font-medium">Community:</span>
+                  <select
+                    value={colonyFilter}
+                    onChange={(e) => {
+                      setColonyFilter(e.target.value);
+                      setBuildingFilter('ALL');
+                    }}
+                    className="bg-transparent text-text font-bold focus:outline-none cursor-pointer w-full text-xs sm:text-sm"
+                  >
+                    <option value="ALL" className="bg-surface text-text">All Communities</option>
+                    {availableColonies.map(col => (
+                      <option key={col} value={col} className="bg-surface text-text">{col}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Building Filter */}
+                <div className="flex items-center gap-1.5 bg-purple-500/10 border border-purple-500/20 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold flex-1 sm:flex-none min-w-[150px]">
+                  <Building2 className="w-4 h-4 text-purple-500 shrink-0" />
+                  <span className="text-text-muted text-xs shrink-0 font-medium">Building:</span>
+                  <select
+                    value={buildingFilter}
+                    onChange={(e) => setBuildingFilter(e.target.value)}
+                    className="bg-transparent text-text font-bold focus:outline-none cursor-pointer w-full text-xs sm:text-sm"
+                  >
+                    <option value="ALL" className="bg-surface text-text">All Buildings</option>
+                    {availableBuildings.map(bldg => (
+                      <option key={bldg} value={bldg} className="bg-surface text-text">{bldg}</option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {/* Touch-Friendly Mobile & Desktop Sort Direction Toggle */}
+            <button
+              onClick={() => setSortDir(d => d === 'desc' ? 'asc' : 'desc')}
+              className="w-full sm:w-auto flex items-center justify-between sm:justify-center gap-2.5 px-3.5 py-2.5 bg-gradient-to-r from-blue-500/15 via-cyan-500/10 to-blue-500/15 hover:from-blue-500/25 hover:to-cyan-500/20 border border-blue-500/30 rounded-xl text-xs sm:text-sm font-bold text-blue-600 dark:text-blue-300 shadow-xs active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap shrink-0"
+              title="Toggle Sort Order (Newest / Oldest)"
+            >
+              <span className="flex items-center gap-1.5">
+                <ArrowUpDown className="w-4 h-4 text-blue-500 shrink-0" />
+                <span className="text-text-muted font-medium text-xs">Sort:</span>
+                <strong className="text-blue-600 dark:text-blue-300 font-bold">{sortDir === 'desc' ? 'Newest First' : 'Oldest First'}</strong>
+              </span>
+              <span className="flex items-center gap-1 bg-blue-500/20 px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] font-black text-blue-500 uppercase tracking-wider">
+                {sortDir === 'desc' ? 'DESC ↓' : 'ASC ↑'}
+              </span>
+            </button>
+
+            {/* Clear Filters (If active) */}
+            {(colonyFilter !== 'ALL' || buildingFilter !== 'ALL' || searchQ) && (
+              <button
+                onClick={() => { setColonyFilter('ALL'); setBuildingFilter('ALL'); setSearchQ(''); }}
+                className="px-2.5 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-xs font-semibold cursor-pointer transition-all flex items-center gap-1 shrink-0"
+                title="Reset all filters"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Reset</span>
+              </button>
+            )}
+          </div>
         </div>
-
-        <button
-          onClick={() => setSortDir(d => d === 'desc' ? 'asc' : 'desc')}
-          className="flex-1 sm:flex-none justify-center flex items-center gap-1.5 sm:gap-2 px-3 py-2.5 bg-surface border border-border rounded-xl text-xs sm:text-sm text-text-muted hover:text-text transition-all cursor-pointer whitespace-nowrap"
-        >
-          {sortDir === 'desc' ? <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <ChevronUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-          {sortDir === 'desc' ? 'Newest first' : 'Oldest first'}
-        </button>
-
-        <button onClick={fetchAll} className="px-3.5 py-2.5 bg-primary/10 text-primary border border-primary/20 rounded-xl text-xs sm:text-sm font-medium hover:bg-primary/20 transition-all cursor-pointer shrink-0">
-          Refresh
-        </button>
       </div>
 
       {/* ── Content ──────────────────────────────────────────────── */}
@@ -521,9 +719,99 @@ export default function WaterBillingHistory() {
               {filteredLogs.length === 0 ? (
                 <div className="text-center py-20 text-text-muted">
                   <Droplet className="w-14 h-14 mx-auto mb-3 opacity-20" />
-                  <p className="font-medium">No usage logs found</p>
+                  <p className="font-medium">No usage logs found matching your filters</p>
+                </div>
+              ) : groupByHierarchy ? (
+                /* ===== HIERARCHY GROUPED VIEW (Usage Logs) ===== */
+                <div className="space-y-6">
+                  {Object.entries(getHierarchyGroupedData(filteredLogs)).map(([colonyName, bldgObj]) => (
+                    <div key={colonyName} className="space-y-4 bg-surface border border-blue-500/20 p-4 sm:p-5 rounded-2xl shadow-xs">
+                      {/* Community Header */}
+                      <div className="flex items-center justify-between gap-3 border-b border-blue-500/20 pb-3">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-5 h-5 text-blue-500 shrink-0" />
+                          <h3 className="text-base sm:text-lg font-extrabold text-text">
+                            Community: <span className="text-blue-600 dark:text-blue-400">{colonyName}</span>
+                          </h3>
+                        </div>
+                        <span className="text-xs font-bold px-3 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/20 rounded-full">
+                          {Object.values(bldgObj).flat().length} Log(s)
+                        </span>
+                      </div>
+
+                      {/* Buildings under this Colony */}
+                      <div className="space-y-5">
+                        {Object.entries(bldgObj).map(([bldgName, bldgLogs]) => {
+                          const bldgLiters = bldgLogs.reduce((s, l) => s + (l.readingLiters || 0), 0);
+                          return (
+                            <div key={bldgName} className="space-y-3">
+                              <div className="flex items-center justify-between gap-2 bg-purple-500/10 border border-purple-500/20 px-4 py-2.5 rounded-xl">
+                                <div className="flex items-center gap-2">
+                                  <Building2 className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                                  <span className="font-bold text-xs sm:text-sm text-text">
+                                    Building: <span className="text-purple-600 dark:text-purple-400 font-extrabold">{bldgName}</span>
+                                  </span>
+                                </div>
+                                <span className="text-xs font-extrabold text-purple-700 dark:text-purple-300 bg-purple-500/15 px-2.5 py-0.5 rounded-full border border-purple-500/20">
+                                  Total: {bldgLiters.toLocaleString()} L
+                                </span>
+                              </div>
+
+                              {/* Table for this Building */}
+                              <div className="bg-surface-lighter/30 border border-border rounded-xl overflow-hidden shadow-xs">
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="border-b border-border bg-surface-lighter/70">
+                                        {['Resident', 'House #', 'Reading (L)', 'Type', 'Date', 'Actions'].map(h => (
+                                          <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-text-muted uppercase tracking-wider">{h}</th>
+                                        ))}
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border/40">
+                                      {bldgLogs.map(log => {
+                                        const billed = isLogBilled(log);
+                                        return (
+                                          <tr key={log.id} className="hover:bg-surface-lighter/50 transition-colors">
+                                            <td className="px-4 py-2.5 font-semibold text-text">{getUserName(log.houseNumber, log.apartmentBlock)}</td>
+                                            <td className="px-4 py-2.5 font-semibold text-text">{log.houseNumber}</td>
+                                            <td className={`px-4 py-2.5 font-bold ${billed ? 'text-emerald-400' : 'text-blue-400'}`}>{log.readingLiters} L</td>
+                                            <td className="px-4 py-2.5">
+                                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${logTypeColor(log.logType)}`}>
+                                                {log.logType || 'DAILY'}
+                                              </span>
+                                            </td>
+                                            <td className="px-4 py-2.5 text-text-muted whitespace-nowrap">
+                                              {log.readingDate ? new Date(log.readingDate).toLocaleDateString('en-IN') : '—'}
+                                            </td>
+                                            <td className="px-4 py-2.5">
+                                              {billed ? (
+                                                <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
+                                                  <CheckCircle2 className="w-3 h-3" /> Billed
+                                                </span>
+                                              ) : (
+                                                <div className="flex items-center gap-1">
+                                                  <button onClick={() => setEditingLog(log)} className="p-1 text-text-muted hover:text-emerald-400 hover:bg-emerald-500/10 rounded cursor-pointer" title="Edit"><Edit2 className="w-3.5 h-3.5" /></button>
+                                                  <button onClick={() => deleteLog(log.id)} className="p-1 text-text-muted hover:text-red-400 hover:bg-red-500/10 rounded cursor-pointer" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                </div>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
+                /* ===== STANDARD MONTHLY VIEW (Usage Logs) ===== */
                 <div className="space-y-6">
                   {monthlyLogsGrouped.map(group => (
                     <div key={group.month} className="space-y-3">
@@ -542,7 +830,7 @@ export default function WaterBillingHistory() {
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="border-b border-border bg-surface-lighter/50">
-                                {['Resident', 'House #', 'Block', ...(isSuperAdmin ? ['Community Admin'] : []), 'Reading (L)', 'Type', 'Date', 'Actions'].map(h => (
+                                {['Resident', 'House #', 'Community / Colony', 'Building', ...(isSuperAdmin ? ['Community Admin'] : []), 'Reading (L)', 'Type', 'Date', 'Actions'].map(h => (
                                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">{h}</th>
                                 ))}
                               </tr>
@@ -550,6 +838,7 @@ export default function WaterBillingHistory() {
                             <tbody className="divide-y divide-border/40">
                               {group.logs.map(log => {
                                 const billed = isLogBilled(log);
+                                const colony = getColonyForRecord(log);
                                 return (
                                   <tr key={log.id} className={`transition-colors ${
                                     billed
@@ -558,7 +847,18 @@ export default function WaterBillingHistory() {
                                   }`}>
                                     <td className="px-4 py-3 font-semibold text-text">{getUserName(log.houseNumber, log.apartmentBlock)}</td>
                                     <td className="px-4 py-3 font-semibold text-text">{log.houseNumber}</td>
-                                    <td className="px-4 py-3 text-text-muted">{log.apartmentBlock}</td>
+                                    <td className="px-4 py-3">
+                                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/20 whitespace-nowrap flex items-center gap-1 w-fit">
+                                        <MapPin className="w-3 h-3 text-blue-500" />
+                                        {colony}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20 whitespace-nowrap flex items-center gap-1 w-fit">
+                                        <Building2 className="w-3 h-3 text-purple-500" />
+                                        {log.apartmentBlock}
+                                      </span>
+                                    </td>
                                     {isSuperAdmin && (
                                       <td className="px-4 py-3">
                                         <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border text-violet-400 bg-violet-500/10 border-violet-500/20 whitespace-nowrap">
@@ -622,9 +922,101 @@ export default function WaterBillingHistory() {
               {filteredBills.length === 0 ? (
                 <div className="text-center py-20 text-text-muted">
                   <Receipt className="w-14 h-14 mx-auto mb-3 opacity-20" />
-                  <p className="font-medium">No bills found</p>
+                  <p className="font-medium">No bills found matching your filters</p>
+                </div>
+              ) : groupByHierarchy ? (
+                /* ===== HIERARCHY GROUPED VIEW (Billing Records) ===== */
+                <div className="space-y-6">
+                  {Object.entries(getHierarchyGroupedData(filteredBills)).map(([colonyName, bldgObj]) => (
+                    <div key={colonyName} className="space-y-4 bg-surface border border-emerald-500/20 p-4 sm:p-5 rounded-2xl shadow-xs">
+                      {/* Community Header */}
+                      <div className="flex items-center justify-between gap-3 border-b border-emerald-500/20 pb-3">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-5 h-5 text-emerald-500 shrink-0" />
+                          <h3 className="text-base sm:text-lg font-extrabold text-text">
+                            Community: <span className="text-emerald-600 dark:text-emerald-400">{colonyName}</span>
+                          </h3>
+                        </div>
+                        <span className="text-xs font-bold px-3 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border border-emerald-500/20 rounded-full">
+                          {Object.values(bldgObj).flat().length} Bill(s)
+                        </span>
+                      </div>
+
+                      {/* Buildings under this Colony */}
+                      <div className="space-y-5">
+                        {Object.entries(bldgObj).map(([bldgName, bldgBills]) => {
+                          const bldgAmount = bldgBills.reduce((s, b) => s + (b.amount || 0), 0);
+                          return (
+                            <div key={bldgName} className="space-y-3">
+                              <div className="flex items-center justify-between gap-2 bg-purple-500/10 border border-purple-500/20 px-4 py-2.5 rounded-xl">
+                                <div className="flex items-center gap-2">
+                                  <Building2 className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                                  <span className="font-bold text-xs sm:text-sm text-text">
+                                    Building: <span className="text-purple-600 dark:text-purple-400 font-extrabold">{bldgName}</span>
+                                  </span>
+                                </div>
+                                <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                                  Total: ₹{bldgAmount.toLocaleString('en-IN')}
+                                </span>
+                              </div>
+
+                              {/* Table for this Building */}
+                              <div className="bg-surface-lighter/30 border border-border rounded-xl overflow-hidden shadow-xs">
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="border-b border-border bg-surface-lighter/70">
+                                        {['Resident', 'House #', 'Amount', 'Status', 'Due Date', 'Generated', 'Actions'].map(h => (
+                                          <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-text-muted uppercase tracking-wider">{h}</th>
+                                        ))}
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border/40">
+                                      {bldgBills.map(bill => (
+                                        <tr key={bill.id} className="hover:bg-surface-lighter/50 transition-colors">
+                                          <td className="px-4 py-2.5 font-semibold text-text">{getUserName(bill.houseNumber, bill.apartmentBlock)}</td>
+                                          <td className="px-4 py-2.5 font-semibold text-text">{bill.houseNumber}</td>
+                                          <td className="px-4 py-2.5 font-bold text-emerald-400">₹{bill.amount}</td>
+                                          <td className="px-4 py-2.5">
+                                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${statusColor(bill.status)}`}>
+                                              {bill.status}
+                                            </span>
+                                          </td>
+                                          <td className="px-4 py-2.5 text-text-muted whitespace-nowrap">
+                                            {bill.dueDate ? new Date(bill.dueDate).toLocaleDateString('en-IN') : '—'}
+                                          </td>
+                                          <td className="px-4 py-2.5 text-text-muted whitespace-nowrap">
+                                            {bill.generatedDate ? new Date(bill.generatedDate).toLocaleDateString('en-IN') : '—'}
+                                          </td>
+                                          <td className="px-4 py-2.5">
+                                            <div className="flex items-center gap-1">
+                                              {bill.status !== 'PAID' && (
+                                                <>
+                                                  <button onClick={() => setPayQrModalBill(bill)} className="p-1 text-text-muted hover:text-blue-400 hover:bg-blue-500/10 rounded cursor-pointer" title="Collect Payment"><QrCode className="w-3.5 h-3.5" /></button>
+                                                  <button onClick={() => markPaid(bill.id)} className="p-1 text-text-muted hover:text-emerald-400 hover:bg-emerald-500/10 rounded cursor-pointer" title="Mark Paid"><CheckCircle2 className="w-3.5 h-3.5" /></button>
+                                                  <button onClick={() => deleteBill(bill.id)} className="p-1 text-text-muted hover:text-red-400 hover:bg-red-500/10 rounded cursor-pointer" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                </>
+                                              )}
+                                              {bill.status === 'PAID' && (
+                                                <span className="p-1 text-text-muted/30 cursor-not-allowed" title="Protected"><Trash2 className="w-3.5 h-3.5" /></span>
+                                              )}
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
+                /* ===== STANDARD MONTHLY VIEW (Billing Records) ===== */
                 <div className="space-y-6">
                   {monthlyBillsGrouped.map(group => (
                     <div key={group.month} className="space-y-3">
@@ -643,77 +1035,91 @@ export default function WaterBillingHistory() {
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="border-b border-border bg-surface-lighter/50">
-                                {['Resident', 'House #', 'Block', ...(isSuperAdmin ? ['Community Admin'] : []), 'Amount', 'Status', 'Due Date', 'Generated', 'Actions'].map(h => (
+                                {['Resident', 'House #', 'Community / Colony', 'Building', ...(isSuperAdmin ? ['Community Admin'] : []), 'Amount', 'Status', 'Due Date', 'Generated', 'Actions'].map(h => (
                                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">{h}</th>
                                 ))}
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-border/40">
-                              {group.bills.map(bill => (
-                                <tr key={bill.id} className="hover:bg-surface-lighter/30 transition-colors">
-                                  <td className="px-4 py-3 font-semibold text-text">{getUserName(bill.houseNumber, bill.apartmentBlock)}</td>
-                                  <td className="px-4 py-3 font-semibold text-text">{bill.houseNumber}</td>
-                                  <td className="px-4 py-3 text-text-muted">{bill.apartmentBlock}</td>
-                                  {isSuperAdmin && (
-                                     <td className="px-4 py-3">
-                                       <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border text-violet-400 bg-violet-500/10 border-violet-500/20 whitespace-nowrap">
-                                         {getAdminForBlock(bill.apartmentBlock)}
-                                       </span>
-                                     </td>
-                                   )}
-                                  <td className="px-4 py-3 font-bold text-emerald-400">₹{bill.amount}</td>
-                                  <td className="px-4 py-3">
-                                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${statusColor(bill.status)}`}>
-                                      {bill.status}
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-3 text-text-muted whitespace-nowrap">
-                                    {bill.dueDate ? new Date(bill.dueDate).toLocaleDateString('en-IN') : '—'}
-                                  </td>
-                                  <td className="px-4 py-3 text-text-muted whitespace-nowrap">
-                                    {bill.generatedDate ? new Date(bill.generatedDate).toLocaleDateString('en-IN') : '—'}
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <div className="flex items-center gap-1">
-                                      {bill.status !== 'PAID' && (
-                                        <>
+                              {group.bills.map(bill => {
+                                const colony = getColonyForRecord(bill);
+                                return (
+                                  <tr key={bill.id} className="hover:bg-surface-lighter/30 transition-colors">
+                                    <td className="px-4 py-3 font-semibold text-text">{getUserName(bill.houseNumber, bill.apartmentBlock)}</td>
+                                    <td className="px-4 py-3 font-semibold text-text">{bill.houseNumber}</td>
+                                    <td className="px-4 py-3">
+                                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/20 whitespace-nowrap flex items-center gap-1 w-fit">
+                                        <MapPin className="w-3 h-3 text-blue-500" />
+                                        {colony}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20 whitespace-nowrap flex items-center gap-1 w-fit">
+                                        <Building2 className="w-3 h-3 text-purple-500" />
+                                        {bill.apartmentBlock}
+                                      </span>
+                                    </td>
+                                    {isSuperAdmin && (
+                                       <td className="px-4 py-3">
+                                         <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border text-violet-400 bg-violet-500/10 border-violet-500/20 whitespace-nowrap">
+                                           {getAdminForBlock(bill.apartmentBlock)}
+                                         </span>
+                                       </td>
+                                     )}
+                                    <td className="px-4 py-3 font-bold text-emerald-400">₹{bill.amount}</td>
+                                    <td className="px-4 py-3">
+                                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${statusColor(bill.status)}`}>
+                                        {bill.status}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-text-muted whitespace-nowrap">
+                                      {bill.dueDate ? new Date(bill.dueDate).toLocaleDateString('en-IN') : '—'}
+                                    </td>
+                                    <td className="px-4 py-3 text-text-muted whitespace-nowrap">
+                                      {bill.generatedDate ? new Date(bill.generatedDate).toLocaleDateString('en-IN') : '—'}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <div className="flex items-center gap-1">
+                                        {bill.status !== 'PAID' && (
+                                          <>
+                                            <button
+                                              onClick={() => setPayQrModalBill(bill)}
+                                              className="p-1.5 text-text-muted hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors cursor-pointer"
+                                              title="Collect Payment"
+                                            >
+                                              <QrCode className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                              onClick={() => markPaid(bill.id)}
+                                              className="p-1.5 text-text-muted hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors cursor-pointer"
+                                              title="Mark as Paid"
+                                            >
+                                              <CheckCircle2 className="w-4 h-4" />
+                                            </button>
+                                          </>
+                                        )}
+                                        {bill.status !== 'PAID' && (
                                           <button
-                                            onClick={() => setPayQrModalBill(bill)}
-                                            className="p-1.5 text-text-muted hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors cursor-pointer"
-                                            title="Collect Payment"
+                                            onClick={() => deleteBill(bill.id)}
+                                            className="p-1.5 text-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                                            title="Delete bill"
                                           >
-                                            <QrCode className="w-4 h-4" />
+                                            <Trash2 className="w-4 h-4" />
                                           </button>
-                                          <button
-                                            onClick={() => markPaid(bill.id)}
-                                            className="p-1.5 text-text-muted hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors cursor-pointer"
-                                            title="Mark as Paid"
+                                        )}
+                                        {bill.status === 'PAID' && (
+                                          <span
+                                            className="p-1.5 text-text-muted/30 cursor-not-allowed"
+                                            title="Paid bills are protected and cannot be deleted"
                                           >
-                                            <CheckCircle2 className="w-4 h-4" />
-                                          </button>
-                                        </>
-                                      )}
-                                      {bill.status !== 'PAID' && (
-                                        <button
-                                          onClick={() => deleteBill(bill.id)}
-                                          className="p-1.5 text-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                                          title="Delete bill"
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </button>
-                                      )}
-                                      {bill.status === 'PAID' && (
-                                        <span
-                                          className="p-1.5 text-text-muted/30 cursor-not-allowed"
-                                          title="Paid bills are protected and cannot be deleted"
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </span>
-                                      )}
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
+                                            <Trash2 className="w-4 h-4" />
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>

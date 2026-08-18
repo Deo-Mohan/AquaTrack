@@ -4,7 +4,7 @@ import {
   MessageSquare, Plus, AlertTriangle, CheckCircle2, Clock, 
   Send, ShieldAlert, ArrowUpRight, Filter, User, HelpCircle, 
   Loader2, Mail, Shield, Check, X, RefreshCw, Sparkles, LifeBuoy, Image, Paperclip,
-  Menu, PanelLeftClose, PanelLeftOpen, ChevronRight
+  Menu, PanelLeftClose, PanelLeftOpen, ChevronRight, Trash2
 } from 'lucide-react';
 import api from '../api';
 
@@ -276,6 +276,21 @@ export default function Support() {
       await fetchTickets();
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to update ticket status');
+    }
+  };
+
+  // Delete Ticket Handler (for Resolved or Closed tickets)
+  const handleDeleteTicket = async (ticketId) => {
+    if (!window.confirm('Are you sure you want to delete this closed/resolved ticket? This action cannot be undone.')) return;
+
+    try {
+      await api.delete(`/tickets/${ticketId}?callerUsername=${username}`);
+      if (selectedTicket && selectedTicket.id === ticketId) {
+        setSelectedTicket(null);
+      }
+      await fetchTickets();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to delete ticket');
     }
   };
 
@@ -563,7 +578,21 @@ export default function Support() {
                                 <span className="font-bold text-text">{ticket.createdByName}</span>
                                 {ticket.houseNumber && <span className="text-text-muted">({ticket.houseNumber})</span>}
                               </div>
-                              {getPriorityBadge(ticket.priority)}
+                              <div className="flex items-center gap-1.5">
+                                {(ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteTicket(ticket.id);
+                                    }}
+                                    className="p-1 rounded-lg hover:bg-red-500/15 text-text-muted hover:text-red-500 transition-colors cursor-pointer"
+                                    title="Delete Resolved/Closed Ticket"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                {getPriorityBadge(ticket.priority)}
+                              </div>
                             </div>
                           </motion.div>
                         );
@@ -609,13 +638,25 @@ export default function Support() {
                       )}
 
                       {/* Resolve Button */}
-                      {selectedTicket.status !== 'RESOLVED' && (isCommunityAdmin || isSuperAdmin || selectedTicket.createdByEmail === username) && (
+                      {selectedTicket.status !== 'RESOLVED' && selectedTicket.status !== 'CLOSED' && (isCommunityAdmin || isSuperAdmin || selectedTicket.createdByEmail === username) && (
                         <button
                           onClick={() => handleUpdateStatus(selectedTicket.id, 'RESOLVED')}
-                          className="px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all flex items-center gap-1.5 shadow-sm"
+                          className="px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>Mark Resolved</span>
+                        </button>
+                      )}
+
+                      {/* Delete Ticket Button for RESOLVED / CLOSED tickets */}
+                      {(selectedTicket.status === 'RESOLVED' || selectedTicket.status === 'CLOSED') && (
+                        <button
+                          onClick={() => handleDeleteTicket(selectedTicket.id)}
+                          className="px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-red-500/15 text-red-700 dark:text-red-300 border border-red-500/30 hover:bg-red-500/25 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                          title="Delete Ticket"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
+                          <span>Delete Ticket</span>
                         </button>
                       )}
 

@@ -37,6 +37,7 @@ public class SupportTicket {
     private String createdByEmail;
     private String houseNumber;
     private String colonyName; // Community Name
+    private String apartmentBlock; // Building / Block Name
 
     @ManyToOne
     @JoinColumn(name = "user_id")
@@ -99,6 +100,9 @@ public class SupportTicket {
 
     public String getColonyName() { return colonyName; }
     public void setColonyName(String colonyName) { this.colonyName = colonyName; }
+
+    public String getApartmentBlock() { return apartmentBlock; }
+    public void setApartmentBlock(String apartmentBlock) { this.apartmentBlock = apartmentBlock; }
 
     public User getCreatedBy() { return createdBy; }
     public void setCreatedBy(User createdBy) { this.createdBy = createdBy; }

@@ -25,6 +25,7 @@ const TariffSettings = lazy(() => import('./pages/TariffSettings'));
 const WaterPurchase = lazy(() => import('./pages/WaterPurchase'));
 const MeterWorkstation = lazy(() => import('./pages/MeterWorkstation'));
 const WaterBillingHistory = lazy(() => import('./pages/WaterBillingHistory'));
+const LeakDetection = lazy(() => import('./pages/LeakDetection'));
 const FeaturesPage = lazy(() => import('./pages/FeaturesPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
@@ -158,9 +159,11 @@ function App() {
           <Route path="/profile" element={<ProtectedRoute><AuthLayout><Profile /></AuthLayout></ProtectedRoute>} />
           <Route path="/support" element={<ProtectedRoute><AuthLayout><Support /></AuthLayout></ProtectedRoute>} />
           <Route path="/tariff" element={<ProtectedRoute><AuthLayout><CommunityAdminRoute><TariffSettings /></CommunityAdminRoute></AuthLayout></ProtectedRoute>} />
+          <Route path="/tariff-settings" element={<ProtectedRoute><AuthLayout><CommunityAdminRoute><TariffSettings /></CommunityAdminRoute></AuthLayout></ProtectedRoute>} />
           <Route path="/water-purchase" element={<ProtectedRoute><AuthLayout><CommunityAdminRoute><WaterPurchase /></CommunityAdminRoute></AuthLayout></ProtectedRoute>} />
           <Route path="/meter-workstation" element={<ProtectedRoute><AuthLayout><MeterWorkstation /></AuthLayout></ProtectedRoute>} />
           <Route path="/water-billing-history" element={<ProtectedRoute><AuthLayout><WaterBillingHistory /></AuthLayout></ProtectedRoute>} />
+          <Route path="/leak-detection" element={<ProtectedRoute><AuthLayout><LeakDetection /></AuthLayout></ProtectedRoute>} />
           
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/login" replace />} />
