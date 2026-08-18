@@ -6,8 +6,7 @@ AquaTrack is a premium, full-stack smart water management, analytics, PWA, and a
 
 ## 🌐 Live Application Deployment
 
-* **Frontend Web App (Vercel)**: [https://aqua-track-krishna.vercel.app](https://aqua-track-krishna.vercel.app)
-* **Backend API Service (Render)**: [https://aquatrack-esq6.onrender.com](https://aquatrack-esq6.onrender.com)
+* **Live Web App**: [https://aqua-track-krishna.vercel.app](https://aqua-track-krishna.vercel.app)
 
 ---
 
