@@ -126,8 +126,8 @@ public class UserManagementController {
                                  (u.getStatus() == null || u.getStatus().trim().isEmpty() || "APPROVED".equalsIgnoreCase(u.getStatus())))
                     .collect(Collectors.toList());
             return ResponseEntity.ok(filtered);
-        } else if ("ROLE_ADMIN".equalsIgnoreCase(callerRole)) {
-            // Super Admin / Admin can see all users (including residents/household users) to populate community analytics and block details
+        } else if ("ROLE_ADMIN".equalsIgnoreCase(callerRole) || "ROLE_RESIDENT".equalsIgnoreCase(callerRole) || "ROLE_HOUSEHOLD_USER".equalsIgnoreCase(callerRole) || "ROLE_USER".equalsIgnoreCase(callerRole)) {
+            // Super Admin, Admin, and Residents can see user directory to populate community analytics and block details
             List<User> allUsers = userRepository.findAll().stream()
                     .filter(u -> u.getStatus() == null || u.getStatus().trim().isEmpty() || "APPROVED".equalsIgnoreCase(u.getStatus()))
                     .collect(Collectors.toList());
