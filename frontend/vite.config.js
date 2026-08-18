@@ -8,8 +8,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      'motion/react': 'framer-motion',
-      'react-is': 'react'
+      'motion/react': 'framer-motion'
     }
   },
   server: {
