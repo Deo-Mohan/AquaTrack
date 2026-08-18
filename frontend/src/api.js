@@ -1,6 +1,12 @@
 import axios from 'axios';
 
 const getBaseUrl = () => {
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '') + '/api';
+  }
+  if (import.meta.env.PROD) {
+    return 'https://aquatrack-esq6.onrender.com/api';
+  }
   const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
   return `http://${host}:8080/api`;
 };

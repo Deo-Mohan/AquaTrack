@@ -11,9 +11,16 @@ export function useWebSocketAlerts(onNotificationReceived) {
     const token = localStorage.getItem('token');
     if (!token) return;
 
+    const getWsUrl = () => {
+      if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
+      if (import.meta.env.PROD) return 'wss://aquatrack-esq6.onrender.com/ws-aquatrack';
+      const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+      return `ws://${host}:8080/ws-aquatrack`;
+    };
+
     // Initialize STOMP WebSocket Client
     const stompClient = new Client({
-      brokerURL: 'ws://localhost:8080/ws-aquatrack',
+      brokerURL: getWsUrl(),
       connectHeaders: {
         Authorization: `Bearer ${token}`,
       },
