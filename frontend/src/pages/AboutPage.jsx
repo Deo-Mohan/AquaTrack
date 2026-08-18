@@ -22,7 +22,8 @@ export default function AboutPage() {
   const developerDetails = {
     name: "Krishna Mohan Kumar",
     role: "Lead Full-Stack Systems Architect & Developer",
-    mentors: "Srinadh Sir & Anjali Mam (Infosys Springboard)",
+    mentor: "Srinadh Sir (Infosys Springboard)",
+    coordinator: "Anjali Mam (Infosys Springboard)",
     bio: "Passionate software engineer specialized in building scalable, real-time web platforms, intelligent IoT water tracking infrastructure, multi-lingual AI accessibility, and modern glassmorphic web architectures.",
     portfolio: "https://krishnamohandeo.netlify.app",
     linkedin: "https://www.linkedin.com/in/krishna-mohan-kumar/",
@@ -190,10 +191,10 @@ export default function AboutPage() {
                     <Code2 className="w-3.5 h-3.5" /> Full-Stack Architect
                   </span>
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-[11px] font-extrabold uppercase tracking-widest backdrop-blur-md">
-                    AquaTrack Lead
+                    Mentor: {developerDetails.mentor}
                   </span>
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-extrabold uppercase tracking-widest backdrop-blur-md">
-                    Mentor: {developerDetails.mentors}
+                    Coordinator: {developerDetails.coordinator}
                   </span>
                 </div>
 
@@ -203,9 +204,11 @@ export default function AboutPage() {
                 <p className="text-xs sm:text-sm text-primary font-extrabold mb-1 tracking-wide">
                   {developerDetails.role}
                 </p>
-                <p className="text-xs text-text/70 font-bold mb-4 flex items-center justify-center md:justify-start gap-1.5">
-                  <span className="text-cyan-400 font-extrabold">Project Mentors:</span> {developerDetails.mentors}
-                </p>
+                <div className="text-xs text-text/70 font-bold mb-4 flex flex-wrap items-center justify-center md:justify-start gap-3">
+                  <span><span className="text-cyan-400 font-extrabold">Mentor:</span> {developerDetails.mentor}</span>
+                  <span>•</span>
+                  <span><span className="text-emerald-400 font-extrabold">Coordinator:</span> {developerDetails.coordinator}</span>
+                </div>
                 <p className="text-sm text-text/80 leading-relaxed font-medium mb-6 max-w-2xl">
                   {developerDetails.bio}
                 </p>
