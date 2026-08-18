@@ -124,7 +124,10 @@ export default function LeakDetection() {
   const detectedAnomalies = useMemo(() => {
     let rawLogs = usageLogs;
 
-    // Scope raw logs to Community Admin's colony & building block if restricted!
+    // Scope raw logs: Community Admin sees their block/colony, Resident sees ONLY their flat/house!
+    const isResidentRole = !isAdmin;
+    const residentHouse = localStorage.getItem('houseNumber') || localStorage.getItem('houseNo') || '';
+
     if (isCommunityAdmin && (userBlock || userColony)) {
       rawLogs = rawLogs.filter(log => {
         const logBlock = (log.apartmentBlock || log.block || '').toLowerCase();
@@ -132,6 +135,14 @@ export default function LeakDetection() {
         const matchBlock = userBlock ? logBlock.includes(userBlock.toLowerCase()) : true;
         const matchColony = userColony ? logColony.includes(userColony.toLowerCase()) : true;
         return matchBlock || matchColony;
+      });
+    } else if (isResidentRole) {
+      rawLogs = rawLogs.filter(log => {
+        const logHouse = String(log.houseNumber || log.houseNo || '');
+        const logBlock = (log.apartmentBlock || log.block || '').toLowerCase();
+        const matchHouse = residentHouse ? logHouse === String(residentHouse) : true;
+        const matchBlock = userBlock ? logBlock.includes(userBlock.toLowerCase()) : true;
+        return matchHouse && matchBlock;
       });
     }
 
