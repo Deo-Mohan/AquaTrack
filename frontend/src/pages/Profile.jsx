@@ -260,7 +260,7 @@ export default function Profile() {
                 <p className="text-xs font-semibold text-text-muted uppercase mt-1">{profileData.role || 'RESIDENT'}</p>
               </div>
               <div className="w-full items-center justify-center flex [transform:translateZ(20px)]">
-                <ul className="flex flex-col items-start gap-2 has-[:last]:border-b-0 *:inline-flex *:gap-2 *:items-center *:justify-center *:border-b-[1.5px] *:border-b-border *:border-dotted *:text-xs *:font-semibold *:text-text-muted pb-3">
+                <ul className="flex flex-col items-start gap-2 last:border-b-0 *:inline-flex *:gap-2 *:items-center *:justify-center *:border-b-[1.5px] *:border-b-border *:border-dotted *:text-xs *:font-semibold *:text-text-muted pb-3">
                   {profileData.mobileNumber && (
                     <li>
                       <svg id="phone" viewBox="0 0 24 24" className="fill-text-muted group-hover:fill-primary transition-colors" height="15" width="15" xmlns="http://www.w3.org/2000/svg">
