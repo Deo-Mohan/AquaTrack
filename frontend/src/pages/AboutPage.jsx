@@ -201,14 +201,9 @@ export default function AboutPage() {
                 <h2 className="text-3xl sm:text-4xl font-black text-text mb-1 tracking-tight drop-shadow-sm">
                   {developerDetails.name}
                 </h2>
-                <p className="text-xs sm:text-sm text-primary font-extrabold mb-1 tracking-wide">
+                <p className="text-xs sm:text-sm text-primary font-extrabold mb-4 tracking-wide">
                   {developerDetails.role}
                 </p>
-                <div className="text-xs text-text/70 font-bold mb-4 flex flex-wrap items-center justify-center md:justify-start gap-3">
-                  <span><span className="text-cyan-400 font-extrabold">Mentor:</span> {developerDetails.mentor}</span>
-                  <span>•</span>
-                  <span><span className="text-emerald-400 font-extrabold">Coordinator:</span> {developerDetails.coordinator}</span>
-                </div>
                 <p className="text-sm text-text/80 leading-relaxed font-medium mb-6 max-w-2xl">
                   {developerDetails.bio}
                 </p>
