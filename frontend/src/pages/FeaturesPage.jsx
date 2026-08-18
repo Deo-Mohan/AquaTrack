@@ -280,15 +280,9 @@ export default function FeaturesPage() {
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
                 <Link to="/register">
-                  <button className="btn-loader">
-                    <div className="btn-loader-bg">
-                      <span>JOIN</span>
-                    </div>
-                    <div className="btn-loader-drops">
-                      <div className="btn-loader-drop1"></div>
-                      <div className="btn-loader-drop2"></div>
-                      <div className="btn-loader-drop3"></div>
-                    </div>
+                  <button className="px-8 py-4 rounded-2xl bg-gradient-to-r from-blue-600 via-primary to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-black text-base uppercase tracking-wider shadow-lg shadow-primary/30 hover:shadow-cyan-500/50 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 group border border-white/20 cursor-pointer">
+                    <span>JOIN NOW</span>
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </button>
                 </Link>
               </div>
