@@ -148,9 +148,9 @@ export default function AboutPage() {
         <div style={{ perspective: '1000px' }} className="w-full">
           <motion.div 
             variants={itemVariants}
-            whileHover={{ rotateY: -3, rotateX: 3, scale: 1.01 }}
+            whileHover={{ rotateY: -2, rotateX: 2, scale: 1.01 }}
             transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="glass-card p-8 md:p-12 rounded-[2.5rem] border-2 border-primary/40 shadow-[0_25px_60px_-15px_rgba(59,130,246,0.3)] relative overflow-hidden group bg-gradient-to-br from-surface/90 via-surface/70 to-surface-lighter/50 backdrop-blur-3xl"
+            className="glass-card p-8 md:p-12 rounded-[2.5rem] border-2 border-primary/40 shadow-[0_25px_60px_-15px_rgba(59,130,246,0.3)] relative overflow-hidden group bg-gradient-to-br from-surface/90 via-surface/75 to-surface-lighter/60 backdrop-blur-3xl"
           >
             {/* Ambient Corner Glows */}
             <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-primary/20 via-cyan-500/10 to-transparent rounded-full blur-3xl pointer-events-none" />
@@ -164,7 +164,7 @@ export default function AboutPage() {
             <div className="flex flex-col md:flex-row items-center md:items-start gap-8 md:gap-10 relative z-10">
               {/* Creator Avatar with Ring Glow & Creator Badge */}
               <div className="flex-shrink-0 relative group/avatar">
-                <div className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full p-[3px] bg-gradient-to-tr from-blue-500 via-primary to-cyan-400 shadow-2xl shadow-primary/40 transition-transform duration-300 group-hover/avatar:scale-105">
+                <div className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-full p-[4px] bg-gradient-to-tr from-blue-500 via-primary to-cyan-400 shadow-2xl shadow-primary/40 transition-transform duration-300 group-hover/avatar:scale-105">
                   {/* Glowing Pulse Ring */}
                   <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-blue-600 via-cyan-400 to-indigo-500 blur-md opacity-60 group-hover/avatar:opacity-100 transition-opacity animate-pulse" />
                   
@@ -186,15 +186,9 @@ export default function AboutPage() {
 
               {/* Info & Tech Stack */}
               <div className="flex-1 text-center md:text-left">
-                <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-3">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary text-[11px] font-extrabold uppercase tracking-widest backdrop-blur-md">
-                    <Code2 className="w-3.5 h-3.5" /> Full-Stack Architect
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-[11px] font-extrabold uppercase tracking-widest backdrop-blur-md">
-                    Mentor: {developerDetails.mentor}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-extrabold uppercase tracking-widest backdrop-blur-md">
-                    Coordinator: {developerDetails.coordinator}
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2">
+                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary text-[11px] font-extrabold uppercase tracking-widest backdrop-blur-md shadow-sm">
+                    <Code2 className="w-3.5 h-3.5" /> Full-Stack Systems Architect
                   </span>
                 </div>
 
@@ -204,9 +198,38 @@ export default function AboutPage() {
                 <p className="text-xs sm:text-sm text-primary font-extrabold mb-4 tracking-wide">
                   {developerDetails.role}
                 </p>
-                <p className="text-sm text-text/80 leading-relaxed font-medium mb-6 max-w-2xl">
+
+                <p className="text-sm text-text/80 leading-relaxed font-medium mb-5 max-w-2xl">
                   {developerDetails.bio}
                 </p>
+
+                {/* Infosys Springboard Project Guidance Section */}
+                <div className="p-4 rounded-2xl bg-surface-lighter/90 border border-border/80 shadow-inner space-y-2 mb-6">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5" /> Infosys Springboard Mentorship
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="flex items-center gap-3 p-2.5 rounded-xl bg-background/60 border border-border/60">
+                      <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Project Mentor</span>
+                        <span className="text-xs font-black text-text">{developerDetails.mentor}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 p-2.5 rounded-xl bg-background/60 border border-border/60">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                        <ShieldCheck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Project Coordinator</span>
+                        <span className="text-xs font-black text-text">{developerDetails.coordinator}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Interactive Link Buttons */}
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 sm:gap-4">
