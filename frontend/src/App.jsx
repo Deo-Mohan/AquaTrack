@@ -82,6 +82,7 @@ const PageLoader = () => (
 
 import ErrorBoundary from './components/ErrorBoundary';
 import PwaInstallPrompt from './components/PwaInstallPrompt';
+import RenderWarmupBanner from './components/RenderWarmupBanner';
 
 // A simple layout wrapper for authenticated pages
 const AuthLayout = ({ children }) => {
@@ -133,6 +134,7 @@ const CommunityAdminRoute = ({ children }) => {
 function App() {
   return (
     <Router>
+      <RenderWarmupBanner />
       <PwaInstallPrompt />
       <Suspense fallback={<PageLoader />}>
         <Routes>

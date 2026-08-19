@@ -13,6 +13,7 @@ import SmartSearchBar from '../components/SmartSearchBar';
 import { smartFilter, sortUsers } from '../utils/smartSearch';
 import useUsernameCheck, { UsernameStatusBadge, getUsernameBorderClass } from '../hooks/useUsernameCheck.jsx';
 import { printInvoice } from '../utils/invoiceGenerator';
+import { AnimatedNumber } from '../components/AnimatedNumber';
 
 const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#f43f5e', '#06b6d4', '#6366f1', '#f97316'];
 
@@ -1695,8 +1696,22 @@ export default function AdminDashboard() {
       className={`glass-card p-4 sm:p-5 relative overflow-hidden group transition-all duration-300 flex items-center justify-between min-h-[105px] ${onClick ? 'cursor-pointer hover:scale-[1.02] hover:bg-surface-lighter/25 hover:border-primary/30 border-border/65' : ''}`}
     >
       <div className="min-w-0 flex-1 pr-1.5">
-        <p className="text-text-muted text-[11px] font-semibold leading-tight line-clamp-2 mb-1">{title}</p>
-        <h3 className="text-lg sm:text-xl font-bold text-text tracking-tight leading-none">{value}</h3>
+        <p className="text-text-muted text-[11px] font-semibold leading-tight line-clamp-2 mb-1.5">{title}</p>
+        {value !== null && value !== undefined && value !== '...' ? (
+          <h3 className="text-lg sm:text-xl font-bold text-text tracking-tight leading-none">
+            {typeof value === 'number' || (!isNaN(parseFloat(value)) && /^\d+$/.test(String(value).trim())) ? (
+              <AnimatedNumber value={value} duration={1000} />
+            ) : typeof value === 'string' && value.startsWith('₹') ? (
+              <AnimatedNumber value={value} prefix="₹" duration={1000} />
+            ) : typeof value === 'string' && value.endsWith(' Liters') ? (
+              <AnimatedNumber value={value} suffix=" Liters" duration={1000} />
+            ) : (
+              value
+            )}
+          </h3>
+        ) : (
+          <div className="h-6 w-20 sm:w-28 rounded-md bg-surface-lighter/60 dark:bg-slate-700/50 animate-pulse border border-border/40" />
+        )}
         {subtitle && (
           <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1 truncate">
             <span>{subtitle}</span>
@@ -2074,18 +2089,75 @@ export default function AdminDashboard() {
             {/* Stat Cards */}
             {isSuperAdmin ? (
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
-                <StatCard title="Total Buildings" value={stats ? `${stats.totalApartments}` : '...'} icon={Home} color="blue" delay={0.1} />
-                <StatCard title="Community Admins" value={stats ? `${stats.totalCommunityAdmins}` : '...'} icon={Users} color="emerald" delay={0.2} />
-                <StatCard title="Registered Residents" value={stats ? `${stats.totalHouseholdUsers}` : '...'} svgSrc="/colleague.svg" color="purple" delay={0.3} onClick={() => setActiveTab('users')} />
-                <StatCard title="Total Platform Users" value={stats ? `${stats.totalUsers}` : '...'} icon={Settings} color="pink" delay={0.4} />
-                <StatCard title="Total Platform Revenue" value={stats ? `₹${(stats.totalRevenue || 0).toLocaleString()}` : '...'} svgSrc="/coin.gif" color="emerald" delay={0.5} />
-                <StatCard title="Pending System Collections" value={stats ? `₹${(stats.totalPending || 0).toLocaleString()}` : '...'} svgSrc="/coin.gif" color="amber" delay={0.6} />
+                <StatCard 
+                  title="Total Buildings" 
+                  value={stats ? stats.totalApartments : null} 
+                  icon={Home} 
+                  color="blue" 
+                  delay={0.1} 
+                />
+                <StatCard 
+                  title="Community Admins" 
+                  value={stats ? stats.totalCommunityAdmins : null} 
+                  icon={Users} 
+                  color="emerald" 
+                  delay={0.2} 
+                />
+                <StatCard 
+                  title="Registered Residents" 
+                  value={stats ? stats.totalHouseholdUsers : null} 
+                  svgSrc="/colleague.svg" 
+                  color="purple" 
+                  delay={0.3} 
+                  onClick={() => setActiveTab('users')} 
+                />
+                <StatCard 
+                  title="Total Platform Users" 
+                  value={stats ? stats.totalUsers : null} 
+                  icon={Settings} 
+                  color="pink" 
+                  delay={0.4} 
+                />
+                <StatCard 
+                  title="Total Platform Revenue" 
+                  value={stats ? `₹${stats.totalRevenue || 0}` : null} 
+                  svgSrc="/coin.gif" 
+                  color="emerald" 
+                  delay={0.5} 
+                />
+                <StatCard 
+                  title="Pending System Collections" 
+                  value={stats ? `₹${stats.totalPending || 0}` : null} 
+                  svgSrc="/coin.gif" 
+                  color="amber" 
+                  delay={0.6} 
+                />
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard title="Money to be Collected" value={stats && stats.pendingCollections !== undefined ? `₹${(stats.pendingCollections || 0).toLocaleString()}` : '₹0'} svgSrc="/coin.gif" color="amber" delay={0.1} />
-                <StatCard title="Registered Residents" value={stats ? `${stats.totalResidents}` : '...'} svgSrc="/colleague.svg" color="emerald" delay={0.2} onClick={() => setActiveTab('users')} />
-                <StatCard title={`Total Block Usage (${new Date().toLocaleString('default', { month: 'long' })})`} value={stats ? `${stats.totalUsageThisMonth} Liters` : '...'} svgSrc="/empty_state_meter_reading.svg" color="purple" delay={0.3} onClick={() => navigate('/water-billing-history')} />
+                <StatCard 
+                  title="Money to be Collected" 
+                  value={stats && stats.pendingCollections !== undefined ? `₹${stats.pendingCollections || 0}` : null} 
+                  svgSrc="/coin.gif" 
+                  color="amber" 
+                  delay={0.1} 
+                />
+                <StatCard 
+                  title="Registered Residents" 
+                  value={stats ? stats.totalResidents : null} 
+                  svgSrc="/colleague.svg" 
+                  color="emerald" 
+                  delay={0.2} 
+                  onClick={() => setActiveTab('users')} 
+                />
+                <StatCard 
+                  title={`Total Block Usage (${new Date().toLocaleString('default', { month: 'long' })})`} 
+                  value={stats ? `${stats.totalUsageThisMonth} Liters` : null} 
+                  svgSrc="/empty_state_meter_reading.svg" 
+                  color="purple" 
+                  delay={0.3} 
+                  onClick={() => navigate('/water-billing-history')} 
+                />
                 <StatCard
                   title={`Water Purchased (${new Date().toLocaleString('default', { month: 'long' })})`}
                   value={`${(waterPurchasedStats.thisMonthLiters || 0).toLocaleString()} Liters`}

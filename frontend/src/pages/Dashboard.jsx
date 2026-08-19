@@ -76,14 +76,18 @@ const StatCard = ({ title, numericValue, prefix = '', suffix = '', decimals = 0,
     <div>
       <div className="flex justify-between items-start mb-3">
         <div>
-          <p className="text-text-muted text-sm font-medium mb-1">{title}</p>
-          <h3 className="text-3xl font-bold text-text tracking-tight">
-            {rawDisplay ? (
-              rawDisplay
-            ) : (
-              <AnimatedNumber value={numericValue} prefix={prefix} suffix={suffix} decimals={decimals} />
-            )}
-          </h3>
+          <p className="text-text-muted text-sm font-medium mb-1.5">{title}</p>
+          {numericValue !== null && numericValue !== undefined ? (
+            <h3 className="text-3xl font-bold text-text tracking-tight">
+              {rawDisplay ? (
+                rawDisplay
+              ) : (
+                <AnimatedNumber value={numericValue} prefix={prefix} suffix={suffix} decimals={decimals} />
+              )}
+            </h3>
+          ) : (
+            <div className="h-8 w-28 rounded-lg bg-surface-lighter/60 dark:bg-slate-700/50 animate-pulse border border-border/40" />
+          )}
         </div>
         {svgSrc ? (
           <motion.img 

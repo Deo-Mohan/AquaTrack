@@ -599,7 +599,7 @@ export default function Landing() {
           <div className="footer-social-container">
             {/* GitHub */}
             <a 
-              href="https://github.com" 
+              href="https://github.com/Deo-Mohan" 
               target="_blank" 
               rel="noopener noreferrer" 
               className="footer-social-btn"

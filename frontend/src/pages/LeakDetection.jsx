@@ -272,14 +272,25 @@ export default function LeakDetection() {
     }
   };
 
-  // Execute Send Notification to Resident
+  // Execute Send Notification to Resident (Optimistic UI Update)
   const confirmSendNotification = async () => {
     if (!activeAnomalyForAlert) return;
 
-    // Play notification water bubble chime
+    // Play notification water bubble chime instantly
     playNotificationSound();
 
     const anomaly = activeAnomalyForAlert;
+    
+    // ⚡ Optimistic UI update: Instantly mark status as NOTIFIED so user gets 0ms feedback!
+    setAnomalyStatuses(prev => ({
+      ...prev,
+      [anomaly.id]: 'NOTIFIED'
+    }));
+
+    setShowAlertModal(false);
+    triggerStatus(
+      `⚡ Notification sent to ${anomaly.residentName} (House #${anomaly.houseNumber})! Resident advised to call plumber.`
+    );
     
     // Find target resident user by matching house number and building block
     const targetUserObj = users.find(
@@ -303,7 +314,11 @@ export default function LeakDetection() {
       read: false
     };
 
-    // Send to backend DB notification API so resident gets it on next login/bell check
+    // Save to system notifications in localStorage instantly
+    const existingNotifs = JSON.parse(localStorage.getItem('aquatrack_notifications') || '[]');
+    localStorage.setItem('aquatrack_notifications', JSON.stringify([notificationPayload, ...existingNotifs]));
+
+    // Perform actual API sync asynchronously in background
     try {
       await api.post('/notifications/send', {
         username: targetUsername,
@@ -313,23 +328,8 @@ export default function LeakDetection() {
         isRead: false
       });
     } catch (err) {
-      console.warn('Backend notification send error, saved to local cache', err);
+      console.warn('Backend notification async sync note: saved in local cache', err);
     }
-
-    // Save to system notifications in localStorage so resident sees it in bell icon
-    const existingNotifs = JSON.parse(localStorage.getItem('aquatrack_notifications') || '[]');
-    localStorage.setItem('aquatrack_notifications', JSON.stringify([notificationPayload, ...existingNotifs]));
-
-    // Update anomaly status to NOTIFIED
-    setAnomalyStatuses(prev => ({
-      ...prev,
-      [anomaly.id]: 'NOTIFIED'
-    }));
-
-    setShowAlertModal(false);
-    triggerStatus(
-      `⚡ Notification sent to ${anomaly.residentName} (House #${anomaly.houseNumber})! Resident advised to call plumber.`
-    );
   };
 
   // Toggle Anomaly Status (e.g. Mark Resolved)
@@ -573,13 +573,13 @@ export default function LeakDetection() {
           {/* Row 2: Filter Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
             {/* Water Log Type Filter */}
-            <div className="flex items-center gap-2 bg-cyan-500/10 border border-cyan-500/20 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold w-full">
+            <div className="flex items-center gap-2 bg-cyan-500/10 border border-cyan-500/20 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold w-full overflow-hidden">
               <Clock className="w-4 h-4 text-cyan-400 shrink-0" />
-              <span className="text-text-muted text-xs shrink-0 font-medium">Log Type:</span>
+              <span className="text-text-muted text-[11px] sm:text-xs shrink-0 font-medium whitespace-nowrap">Log:</span>
               <select
                 value={logTypeFilter}
                 onChange={e => setLogTypeFilter(e.target.value)}
-                className="bg-transparent text-text font-bold focus:outline-none cursor-pointer w-full text-xs sm:text-sm truncate"
+                className="bg-transparent text-text font-bold focus:outline-none cursor-pointer w-full text-xs min-w-0 truncate"
               >
                 <option value="ALL" className="bg-surface text-text">All Log Types</option>
                 <option value="DAILY" className="bg-surface text-cyan-400 font-bold">📅 Daily Logs (&gt;300L)</option>
@@ -589,13 +589,13 @@ export default function LeakDetection() {
             </div>
 
             {/* Severity Filter */}
-            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold w-full">
+            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold w-full overflow-hidden">
               <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
-              <span className="text-text-muted text-xs shrink-0 font-medium">Severity:</span>
+              <span className="text-text-muted text-[11px] sm:text-xs shrink-0 font-medium whitespace-nowrap">Severity:</span>
               <select
                 value={severityFilter}
                 onChange={e => setSeverityFilter(e.target.value)}
-                className="bg-transparent text-text font-bold focus:outline-none cursor-pointer w-full text-xs sm:text-sm truncate"
+                className="bg-transparent text-text font-bold focus:outline-none cursor-pointer w-full text-xs min-w-0 truncate"
               >
                 <option value="ALL" className="bg-surface text-text">All Severities</option>
                 <option value="CRITICAL" className="bg-surface text-red-500 font-bold">CRITICAL</option>
@@ -606,13 +606,13 @@ export default function LeakDetection() {
             </div>
 
             {/* Status Filter */}
-            <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold w-full">
+            <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold w-full overflow-hidden">
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-              <span className="text-text-muted text-xs shrink-0 font-medium">Status:</span>
+              <span className="text-text-muted text-[11px] sm:text-xs shrink-0 font-medium whitespace-nowrap">Status:</span>
               <select
                 value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value)}
-                className="bg-transparent text-text font-bold focus:outline-none cursor-pointer w-full text-xs sm:text-sm truncate"
+                className="bg-transparent text-text font-bold focus:outline-none cursor-pointer w-full text-xs min-w-0 truncate"
               >
                 <option value="ALL" className="bg-surface text-text">All Statuses</option>
                 <option value="UNNOTIFIED" className="bg-surface text-amber-400 font-bold">Awaiting Alert</option>
@@ -623,16 +623,16 @@ export default function LeakDetection() {
 
             {/* Colony Filter (Super Admin Only) */}
             {isSuperAdmin && (
-              <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold w-full">
+              <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold w-full overflow-hidden">
                 <MapPin className="w-4 h-4 text-blue-500 shrink-0" />
-                <span className="text-text-muted text-xs shrink-0 font-medium">Community:</span>
+                <span className="text-text-muted text-[11px] sm:text-xs shrink-0 font-medium whitespace-nowrap">Colony:</span>
                 <select
                   value={colonyFilter}
                   onChange={e => {
                     setColonyFilter(e.target.value);
                     setBuildingFilter('ALL');
                   }}
-                  className="bg-transparent text-text font-bold focus:outline-none cursor-pointer w-full text-xs sm:text-sm truncate"
+                  className="bg-transparent text-text font-bold focus:outline-none cursor-pointer w-full text-xs min-w-0 truncate"
                 >
                   <option value="ALL" className="bg-surface text-text">All Communities</option>
                   {availableColonies.map(col => (
@@ -675,15 +675,15 @@ export default function LeakDetection() {
               />
             </div>
 
-            <div className="flex items-center gap-3 w-full md:w-auto shrink-0">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full md:w-auto shrink-0">
               {/* Severity Filter */}
-              <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold min-w-[165px]">
+              <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-xl text-xs font-semibold w-full overflow-hidden">
                 <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
-                <span className="text-text-muted text-xs shrink-0 font-medium">Severity:</span>
+                <span className="text-text-muted text-[11px] shrink-0 font-medium whitespace-nowrap">Severity:</span>
                 <select
                   value={severityFilter}
                   onChange={e => setSeverityFilter(e.target.value)}
-                  className="bg-transparent text-text font-bold focus:outline-none cursor-pointer w-full text-xs sm:text-sm truncate"
+                  className="bg-transparent text-text font-bold focus:outline-none cursor-pointer w-full text-xs min-w-0 truncate"
                 >
                   <option value="ALL" className="bg-surface text-text">All Severities</option>
                   <option value="CRITICAL" className="bg-surface text-red-500 font-bold">CRITICAL (&gt; 800L)</option>
@@ -694,13 +694,13 @@ export default function LeakDetection() {
               </div>
 
               {/* Status Filter */}
-              <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold min-w-[165px]">
+              <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 rounded-xl text-xs font-semibold w-full overflow-hidden">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span className="text-text-muted text-xs shrink-0 font-medium">Status:</span>
+                <span className="text-text-muted text-[11px] shrink-0 font-medium whitespace-nowrap">Status:</span>
                 <select
                   value={statusFilter}
                   onChange={e => setStatusFilter(e.target.value)}
-                  className="bg-transparent text-text font-bold focus:outline-none cursor-pointer w-full text-xs sm:text-sm truncate"
+                  className="bg-transparent text-text font-bold focus:outline-none cursor-pointer w-full text-xs min-w-0 truncate"
                 >
                   <option value="ALL" className="bg-surface text-text">All Statuses</option>
                   <option value="UNNOTIFIED" className="bg-surface text-amber-400 font-bold">Awaiting Alert</option>

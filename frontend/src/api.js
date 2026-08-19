@@ -25,10 +25,10 @@ const pendingRequests = new Map();
 api.interceptors.request.use((config) => {
   const key = `${config.method?.toUpperCase()}:${config.url}:${JSON.stringify(config.params || {})}:${JSON.stringify(config.data || {})}`;
 
-  // Cache lookup for GET requests (5-second cache window for data freshness)
+  // Cache lookup for GET requests (15-second cache window for instant snappy navigation)
   if (config.method?.toLowerCase() === 'get' && !config.skipCache) {
     const cached = apiCache.get(key);
-    if (cached && Date.now() - cached.timestamp < 5000) {
+    if (cached && Date.now() - cached.timestamp < 15000) {
       config.adapter = () => Promise.resolve({
         data: cached.data,
         status: 200,
@@ -73,5 +73,12 @@ api.interceptors.response.use((response) => {
   }
   return Promise.reject(error);
 });
+
+// 🚀 Automatic Background Keep-Alive Ping (every 4.5 minutes to prevent Render spin-down)
+if (typeof window !== 'undefined') {
+  setInterval(() => {
+    api.get('/health', { timeout: 4000, skipCache: true }).catch(() => {});
+  }, 4.5 * 60 * 1000);
+}
 
 export default api;
